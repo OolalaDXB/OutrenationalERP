@@ -9,6 +9,7 @@ import { InventoryPage } from "@/pages/Inventory";
 import { CustomersPage } from "@/pages/Customers";
 import { ArtistsPage } from "@/pages/Artists";
 import { SupplierSalesPage } from "@/pages/SupplierSales";
+import { ReorderPage } from "@/pages/Reorder";
 import { PlaceholderPage } from "@/pages/PlaceholderPage";
 import "@fontsource/inter/400.css";
 import "@fontsource/inter/500.css";
@@ -43,7 +44,7 @@ function App() {
       case "/customers": return <CustomersPage />;
       case "/artists": return <ArtistsPage />;
       case "/movements": return <PlaceholderPage title="Mouvements de stock" />;
-      case "/reorder": return <PlaceholderPage title="Réapprovisionnement" />;
+      case "/reorder": return <ReorderPage />;
       case "/invoices": return <PlaceholderPage title="Factures" />;
       case "/analytics": return <PlaceholderPage title="Analytics" />;
       case "/supplier-sales": return <SupplierSalesPage />;
