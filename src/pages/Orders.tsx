@@ -1,38 +1,29 @@
-import { ShoppingCart, Package, Truck, CheckCircle } from "lucide-react";
+import { useState } from "react";
+import { ShoppingCart, Package, Truck, CheckCircle, Plus } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
-import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge, orderStatusVariant, orderStatusLabel } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
-
-// Demo data
-const orders = [
-  { id: "1", orderNumber: "#1259", customer: "Jean Dupont", email: "jean@example.com", status: "pending", paymentStatus: "paid", total: 127.50, items: 3, createdAt: "2026-01-01T10:30:00" },
-  { id: "2", orderNumber: "#1258", customer: "Marie Martin", email: "marie@example.com", status: "processing", paymentStatus: "paid", total: 89.00, items: 2, createdAt: "2025-12-31T14:15:00" },
-  { id: "3", orderNumber: "#1257", customer: "Pierre Bernard", email: "pierre@example.com", status: "shipped", paymentStatus: "paid", total: 234.00, items: 5, createdAt: "2025-12-30T09:45:00" },
-  { id: "4", orderNumber: "#1256", customer: "Sophie Laurent", email: "sophie@example.com", status: "delivered", paymentStatus: "paid", total: 67.00, items: 1, createdAt: "2025-12-29T16:20:00" },
-  { id: "5", orderNumber: "#1255", customer: "Lucas Moreau", email: "lucas@example.com", status: "delivered", paymentStatus: "paid", total: 156.00, items: 4, createdAt: "2025-12-28T11:00:00" },
-  { id: "6", orderNumber: "#1254", customer: "Emma Petit", email: "emma@example.com", status: "cancelled", paymentStatus: "refunded", total: 45.00, items: 1, createdAt: "2025-12-27T13:30:00" },
-];
-
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
-  return new Intl.DateTimeFormat('fr-FR', { 
-    day: '2-digit', 
-    month: 'short', 
-    hour: '2-digit', 
-    minute: '2-digit' 
-  }).format(date);
-};
-
-const formatCurrency = (amount: number) => 
-  new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
+import { OrderDrawer } from "@/components/drawers/OrderDrawer";
+import { orders, Order, formatCurrency, formatDateTime } from "@/data/demo-data";
 
 export function OrdersPage() {
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
   const pendingCount = orders.filter(o => o.status === "pending").length;
   const processingCount = orders.filter(o => o.status === "processing").length;
   const shippedCount = orders.filter(o => o.status === "shipped").length;
   const deliveredCount = orders.filter(o => o.status === "delivered").length;
+
+  const handleRowClick = (order: Order) => {
+    setSelectedOrder(order);
+    setIsDrawerOpen(true);
+  };
+
+  const handleCloseDrawer = () => {
+    setIsDrawerOpen(false);
+    setSelectedOrder(null);
+  };
 
   return (
     <div className="space-y-6">
@@ -85,18 +76,22 @@ export function OrdersPage() {
             </thead>
             <tbody>
               {orders.map((order) => (
-                <tr key={order.id} className="border-b border-border last:border-b-0 hover:bg-secondary/50 cursor-pointer transition-colors">
+                <tr 
+                  key={order.id} 
+                  className="border-b border-border last:border-b-0 hover:bg-secondary/50 cursor-pointer transition-colors"
+                  onClick={() => handleRowClick(order)}
+                >
                   <td className="px-6 py-4">
                     <span className="font-semibold text-primary">{order.orderNumber}</span>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center text-sm font-semibold text-primary">
-                        {order.customer.split(' ').map(n => n[0]).join('')}
+                        {order.customerName.split(' ').map(n => n[0]).join('')}
                       </div>
                       <div>
-                        <div className="font-medium">{order.customer}</div>
-                        <div className="text-xs text-muted-foreground">{order.email}</div>
+                        <div className="font-medium">{order.customerName}</div>
+                        <div className="text-xs text-muted-foreground">{order.customerEmail}</div>
                       </div>
                     </div>
                   </td>
@@ -105,15 +100,22 @@ export function OrdersPage() {
                       {orderStatusLabel[order.status]}
                     </StatusBadge>
                   </td>
-                  <td className="px-6 py-4 text-sm text-muted-foreground">{order.items} articles</td>
+                  <td className="px-6 py-4 text-sm text-muted-foreground">{order.items.length} articles</td>
                   <td className="px-6 py-4 font-semibold tabular-nums">{formatCurrency(order.total)}</td>
-                  <td className="px-6 py-4 text-sm text-muted-foreground">{formatDate(order.createdAt)}</td>
+                  <td className="px-6 py-4 text-sm text-muted-foreground">{formatDateTime(order.createdAt)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Order Drawer */}
+      <OrderDrawer 
+        order={selectedOrder} 
+        isOpen={isDrawerOpen} 
+        onClose={handleCloseDrawer} 
+      />
     </div>
   );
 }
