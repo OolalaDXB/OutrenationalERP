@@ -10,6 +10,8 @@ import { CustomersPage } from "@/pages/Customers";
 import { ArtistsPage } from "@/pages/Artists";
 import { SupplierSalesPage } from "@/pages/SupplierSales";
 import { ReorderPage } from "@/pages/Reorder";
+import { InvoicesPage } from "@/pages/Invoices";
+import { AnalyticsPage } from "@/pages/Analytics";
 import { PlaceholderPage } from "@/pages/PlaceholderPage";
 import "@fontsource/inter/400.css";
 import "@fontsource/inter/500.css";
@@ -45,8 +47,8 @@ function App() {
       case "/artists": return <ArtistsPage />;
       case "/movements": return <PlaceholderPage title="Mouvements de stock" />;
       case "/reorder": return <ReorderPage />;
-      case "/invoices": return <PlaceholderPage title="Factures" />;
-      case "/analytics": return <PlaceholderPage title="Analytics" />;
+      case "/invoices": return <InvoicesPage />;
+      case "/analytics": return <AnalyticsPage />;
       case "/supplier-sales": return <SupplierSalesPage />;
       default: return <Dashboard />;
     }
