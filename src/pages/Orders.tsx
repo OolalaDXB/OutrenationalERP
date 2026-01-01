@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { ShoppingCart, Package, Truck, CheckCircle, Plus } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { StatusBadge, orderStatusVariant, orderStatusLabel } from "@/components/ui/status-badge";
@@ -9,6 +9,23 @@ import { orders, Order, formatCurrency, formatDateTime } from "@/data/demo-data"
 export function OrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  // Filtrage
+  const filteredOrders = useMemo(() => {
+    return orders.filter((order) => {
+      const matchesSearch =
+        searchTerm === "" ||
+        order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.customerEmail.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesStatus = statusFilter === "all" || order.status === statusFilter;
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [searchTerm, statusFilter]);
 
   const pendingCount = orders.filter(o => o.status === "pending").length;
   const processingCount = orders.filter(o => o.status === "processing").length;
@@ -48,16 +65,23 @@ export function OrdersPage() {
         <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
           {/* Filters */}
           <div className="flex gap-3 p-4 border-b border-border bg-secondary flex-wrap">
-            <select className="px-3 py-2 rounded-md border border-border bg-card text-sm cursor-pointer">
-              <option>Tous les statuts</option>
-              <option>En attente</option>
-              <option>En préparation</option>
-              <option>Expédié</option>
-              <option>Livré</option>
+            <select
+              className="px-3 py-2 rounded-md border border-border bg-card text-sm cursor-pointer"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="all">Tous les statuts</option>
+              <option value="pending">En attente</option>
+              <option value="processing">En préparation</option>
+              <option value="shipped">Expédié</option>
+              <option value="delivered">Livré</option>
+              <option value="cancelled">Annulé</option>
             </select>
-            <input 
-              type="text" 
-              placeholder="Rechercher client, commande..." 
+            <input
+              type="text"
+              placeholder="Rechercher client, commande..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="flex-1 min-w-[200px] max-w-[300px] px-3 py-2 rounded-md border border-border bg-card text-sm"
             />
           </div>
@@ -75,9 +99,9 @@ export function OrdersPage() {
               </tr>
             </thead>
             <tbody>
-              {orders.map((order) => (
-                <tr 
-                  key={order.id} 
+              {filteredOrders.map((order) => (
+                <tr
+                  key={order.id}
                   className="border-b border-border last:border-b-0 hover:bg-secondary/50 cursor-pointer transition-colors"
                   onClick={() => handleRowClick(order)}
                 >
@@ -107,14 +131,20 @@ export function OrdersPage() {
               ))}
             </tbody>
           </table>
+
+          {filteredOrders.length === 0 && (
+            <div className="p-12 text-center text-muted-foreground">
+              Aucune commande trouvée
+            </div>
+          )}
         </div>
       </div>
 
       {/* Order Drawer */}
-      <OrderDrawer 
-        order={selectedOrder} 
-        isOpen={isDrawerOpen} 
-        onClose={handleCloseDrawer} 
+      <OrderDrawer
+        order={selectedOrder}
+        isOpen={isDrawerOpen}
+        onClose={handleCloseDrawer}
       />
     </div>
   );

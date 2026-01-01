@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Plus, MoreHorizontal } from "lucide-react";
 import { StatusBadge, supplierTypeVariant, supplierTypeLabel } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,30 @@ import { suppliers, Supplier, formatCurrency } from "@/data/demo-data";
 export function SuppliersPage() {
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [countryFilter, setCountryFilter] = useState("all");
+
+  // Pays uniques
+  const countries = useMemo(() => {
+    const unique = new Set(suppliers.map((s) => s.country));
+    return Array.from(unique).sort();
+  }, []);
+
+  // Filtrage
+  const filteredSuppliers = useMemo(() => {
+    return suppliers.filter((supplier) => {
+      const matchesSearch =
+        searchTerm === "" ||
+        supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (supplier.email && supplier.email.toLowerCase().includes(searchTerm.toLowerCase()));
+
+      const matchesType = typeFilter === "all" || supplier.type === typeFilter;
+      const matchesCountry = countryFilter === "all" || supplier.country === countryFilter;
+
+      return matchesSearch && matchesType && matchesCountry;
+    });
+  }, [searchTerm, typeFilter, countryFilter]);
 
   const handleRowClick = (supplier: Supplier) => {
     setSelectedSupplier(supplier);
@@ -24,7 +48,7 @@ export function SuppliersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">Tous les fournisseurs</h2>
-          <p className="text-sm text-muted-foreground">{suppliers.length} fournisseurs actifs</p>
+          <p className="text-sm text-muted-foreground">{filteredSuppliers.length} fournisseurs</p>
         </div>
         <Button className="gap-2">
           <Plus className="w-4 h-4" />
@@ -35,21 +59,31 @@ export function SuppliersPage() {
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         {/* Filters */}
         <div className="flex gap-3 p-4 border-b border-border bg-secondary flex-wrap">
-          <select className="px-3 py-2 rounded-md border border-border bg-card text-sm cursor-pointer">
-            <option>Tous les types</option>
-            <option>Dépôt-vente</option>
-            <option>Achat ferme</option>
-            <option>Propre</option>
+          <select
+            className="px-3 py-2 rounded-md border border-border bg-card text-sm cursor-pointer"
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+          >
+            <option value="all">Tous les types</option>
+            <option value="consignment">Dépôt-vente</option>
+            <option value="purchase">Achat ferme</option>
+            <option value="own">Propre</option>
           </select>
-          <select className="px-3 py-2 rounded-md border border-border bg-card text-sm cursor-pointer">
-            <option>Tous les pays</option>
-            <option>France</option>
-            <option>USA</option>
-            <option>Italie</option>
+          <select
+            className="px-3 py-2 rounded-md border border-border bg-card text-sm cursor-pointer"
+            value={countryFilter}
+            onChange={(e) => setCountryFilter(e.target.value)}
+          >
+            <option value="all">Tous les pays</option>
+            {countries.map((country) => (
+              <option key={country} value={country}>{country}</option>
+            ))}
           </select>
-          <input 
-            type="text" 
-            placeholder="Rechercher fournisseur..." 
+          <input
+            type="text"
+            placeholder="Rechercher fournisseur..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
             className="flex-1 min-w-[200px] max-w-[300px] px-3 py-2 rounded-md border border-border bg-card text-sm"
           />
         </div>
@@ -68,9 +102,9 @@ export function SuppliersPage() {
             </tr>
           </thead>
           <tbody>
-            {suppliers.map((supplier) => (
-              <tr 
-                key={supplier.id} 
+            {filteredSuppliers.map((supplier) => (
+              <tr
+                key={supplier.id}
                 className="border-b border-border last:border-b-0 hover:bg-secondary/50 cursor-pointer transition-colors"
                 onClick={() => handleRowClick(supplier)}
               >
@@ -103,7 +137,7 @@ export function SuppliersPage() {
                   </span>
                 </td>
                 <td className="px-6 py-4">
-                  <button 
+                  <button
                     className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground"
                     onClick={(e) => e.stopPropagation()}
                   >
@@ -114,13 +148,19 @@ export function SuppliersPage() {
             ))}
           </tbody>
         </table>
+
+        {filteredSuppliers.length === 0 && (
+          <div className="p-12 text-center text-muted-foreground">
+            Aucun fournisseur trouvé
+          </div>
+        )}
       </div>
 
       {/* Supplier Drawer */}
-      <SupplierDrawer 
-        supplier={selectedSupplier} 
-        isOpen={isDrawerOpen} 
-        onClose={handleCloseDrawer} 
+      <SupplierDrawer
+        supplier={selectedSupplier}
+        isOpen={isDrawerOpen}
+        onClose={handleCloseDrawer}
       />
     </div>
   );

@@ -1,29 +1,46 @@
+import { useState, useMemo } from "react";
 import { Warehouse, Package, AlertTriangle, XCircle } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { StockIndicator } from "@/components/ui/stock-indicator";
-
-// Demo data
-const inventory = [
-  { id: "1", sku: "VLP-001", title: "Khmer Rouge Survivors", artist: "Various Artists", stock: 12, threshold: 10, location: "A-12" },
-  { id: "2", sku: "VLP-002", title: "Synthesizer Meditation", artist: "Mort Garson", stock: 5, threshold: 10, location: "A-15" },
-  { id: "3", sku: "VLP-003", title: "Music From the Morning of the World", artist: "Various Artists", stock: 0, threshold: 5, location: "B-03" },
-  { id: "4", sku: "ONR-001", title: "Forgotten Futures", artist: "Les Amazones d'Afrique", stock: 45, threshold: 15, location: "C-01" },
-  { id: "5", sku: "VLP-004", title: "Saharan Rock", artist: "Tinariwen", stock: 8, threshold: 10, location: "A-22" },
-  { id: "6", sku: "VLP-005", title: "Ethiopiques Vol. 4", artist: "Various Artists", stock: 3, threshold: 8, location: "B-08" },
-  { id: "7", sku: "ONR-002", title: "Cosmic Afro", artist: "Mulatu Astatke", stock: 0, threshold: 10, location: "C-05" },
-];
-
-const totalUnits = inventory.reduce((sum, item) => sum + item.stock, 0);
-const lowStockCount = inventory.filter(item => item.stock > 0 && item.stock <= item.threshold).length;
-const outOfStockCount = inventory.filter(item => item.stock === 0).length;
+import { products } from "@/data/demo-data";
 
 export function InventoryPage() {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [stockFilter, setStockFilter] = useState("all");
+
+  // Filtrage
+  const filteredProducts = useMemo(() => {
+    return products.filter((product) => {
+      const matchesSearch =
+        searchTerm === "" ||
+        product.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.artist.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.sku.toLowerCase().includes(searchTerm.toLowerCase());
+
+      let matchesStock = true;
+      if (stockFilter === "in_stock") {
+        matchesStock = product.stock > product.threshold;
+      } else if (stockFilter === "low") {
+        matchesStock = product.stock > 0 && product.stock <= product.threshold;
+      } else if (stockFilter === "out") {
+        matchesStock = product.stock === 0;
+      }
+
+      return matchesSearch && matchesStock;
+    });
+  }, [searchTerm, stockFilter]);
+
+  // Stats
+  const totalUnits = products.reduce((sum, item) => sum + item.stock, 0);
+  const lowStockCount = products.filter((item) => item.stock > 0 && item.stock <= item.threshold).length;
+  const outOfStockCount = products.filter((item) => item.stock === 0).length;
+
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <KpiCard icon={Warehouse} value={totalUnits.toString()} label="Unités en stock" variant="primary" />
-        <KpiCard icon={Package} value={inventory.length.toString()} label="Références" variant="info" />
+        <KpiCard icon={Package} value={products.length.toString()} label="Références" variant="info" />
         <KpiCard icon={AlertTriangle} value={lowStockCount.toString()} label="Stock faible" variant="warning" />
         <KpiCard icon={XCircle} value={outOfStockCount.toString()} label="Ruptures" variant="danger" />
       </div>
@@ -37,15 +54,21 @@ export function InventoryPage() {
         <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
           {/* Filters */}
           <div className="flex gap-3 p-4 border-b border-border bg-secondary flex-wrap">
-            <select className="px-3 py-2 rounded-md border border-border bg-card text-sm cursor-pointer">
-              <option>Tous les états</option>
-              <option>En stock</option>
-              <option>Stock faible</option>
-              <option>Rupture</option>
+            <select
+              className="px-3 py-2 rounded-md border border-border bg-card text-sm cursor-pointer"
+              value={stockFilter}
+              onChange={(e) => setStockFilter(e.target.value)}
+            >
+              <option value="all">Tous les états</option>
+              <option value="in_stock">En stock</option>
+              <option value="low">Stock faible</option>
+              <option value="out">Rupture</option>
             </select>
-            <input 
-              type="text" 
-              placeholder="Rechercher produit, SKU..." 
+            <input
+              type="text"
+              placeholder="Rechercher produit, SKU..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="flex-1 min-w-[200px] max-w-[300px] px-3 py-2 rounded-md border border-border bg-card text-sm"
             />
           </div>
@@ -61,7 +84,7 @@ export function InventoryPage() {
               </tr>
             </thead>
             <tbody>
-              {inventory.map((item) => (
+              {filteredProducts.map((item) => (
                 <tr key={item.id} className="border-b border-border last:border-b-0 hover:bg-secondary/50 cursor-pointer transition-colors">
                   <td className="px-6 py-4">
                     <div>
@@ -79,6 +102,12 @@ export function InventoryPage() {
               ))}
             </tbody>
           </table>
+
+          {filteredProducts.length === 0 && (
+            <div className="p-12 text-center text-muted-foreground">
+              Aucun produit trouvé
+            </div>
+          )}
         </div>
       </div>
     </div>
