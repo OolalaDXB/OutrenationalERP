@@ -3,6 +3,7 @@ import { Plus, Music, Disc } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { products } from "@/data/demo-data";
 import { ArtistFormModal } from "@/components/forms/ArtistFormModal";
+import { ArtistDrawer } from "@/components/drawers/ArtistDrawer";
 
 export interface Artist {
   id: string;
@@ -12,12 +13,20 @@ export interface Artist {
   topFormat: string;
 }
 
-const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(amount);
+const formatLabels: Record<string, string> = {
+  lp: "LP",
+  "2lp": "2×LP",
+  cd: "CD",
+  boxset: "Box Set",
+  "7inch": '7"',
+  cassette: "K7",
+};
 
 export function ArtistsPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   // Extraire les artistes depuis les produits
   const artists = useMemo(() => {
@@ -51,13 +60,14 @@ export function ArtistsPage() {
     );
   }, [artists, searchTerm]);
 
-  const formatLabels: Record<string, string> = {
-    lp: "LP",
-    "2lp": "2×LP",
-    cd: "CD",
-    boxset: "Box Set",
-    "7inch": "7\"",
-    cassette: "K7",
+  const handleArtistClick = (artist: Artist) => {
+    setSelectedArtist(artist);
+    setIsDrawerOpen(true);
+  };
+
+  const handleCloseDrawer = () => {
+    setIsDrawerOpen(false);
+    setSelectedArtist(null);
   };
 
   return (
@@ -93,6 +103,7 @@ export function ArtistsPage() {
             <div
               key={artist.id}
               className="bg-secondary rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer border border-transparent hover:border-primary/20"
+              onClick={() => handleArtistClick(artist)}
             >
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-12 h-12 rounded-full bg-primary-light flex items-center justify-center">
@@ -126,6 +137,7 @@ export function ArtistsPage() {
       </div>
 
       <ArtistFormModal isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} />
+      <ArtistDrawer artist={selectedArtist} isOpen={isDrawerOpen} onClose={handleCloseDrawer} />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { ProductsPage } from "@/pages/Products";
 import { InventoryPage } from "@/pages/Inventory";
 import { CustomersPage } from "@/pages/Customers";
 import { ArtistsPage } from "@/pages/Artists";
+import { SupplierSalesPage } from "@/pages/SupplierSales";
 import { PlaceholderPage } from "@/pages/PlaceholderPage";
 import "@fontsource/inter/400.css";
 import "@fontsource/inter/500.css";
@@ -45,7 +46,7 @@ function App() {
       case "/reorder": return <PlaceholderPage title="Réapprovisionnement" />;
       case "/invoices": return <PlaceholderPage title="Factures" />;
       case "/analytics": return <PlaceholderPage title="Analytics" />;
-      case "/supplier-sales": return <PlaceholderPage title="Ventes par fournisseur" />;
+      case "/supplier-sales": return <SupplierSalesPage />;
       default: return <Dashboard />;
     }
   };
