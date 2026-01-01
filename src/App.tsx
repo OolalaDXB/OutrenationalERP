@@ -6,6 +6,7 @@ import { OrdersPage } from "@/pages/Orders";
 import { SuppliersPage } from "@/pages/Suppliers";
 import { ProductsPage } from "@/pages/Products";
 import { InventoryPage } from "@/pages/Inventory";
+import { CustomersPage } from "@/pages/Customers";
 import { PlaceholderPage } from "@/pages/PlaceholderPage";
 import "@fontsource/inter/400.css";
 import "@fontsource/inter/500.css";
@@ -32,32 +33,19 @@ function App() {
 
   const renderPage = () => {
     switch (currentPath) {
-      case "/":
-        return <Dashboard />;
-      case "/orders":
-        return <OrdersPage />;
-      case "/products":
-        return <ProductsPage />;
-      case "/suppliers":
-        return <SuppliersPage />;
-      case "/inventory":
-        return <InventoryPage />;
-      case "/artists":
-        return <PlaceholderPage title="Artistes" />;
-      case "/movements":
-        return <PlaceholderPage title="Mouvements de stock" />;
-      case "/reorder":
-        return <PlaceholderPage title="Réapprovisionnement" />;
-      case "/customers":
-        return <PlaceholderPage title="Clients" />;
-      case "/invoices":
-        return <PlaceholderPage title="Factures" />;
-      case "/analytics":
-        return <PlaceholderPage title="Analytics" />;
-      case "/supplier-sales":
-        return <PlaceholderPage title="Ventes par fournisseur" />;
-      default:
-        return <Dashboard />;
+      case "/": return <Dashboard />;
+      case "/orders": return <OrdersPage />;
+      case "/products": return <ProductsPage />;
+      case "/suppliers": return <SuppliersPage />;
+      case "/inventory": return <InventoryPage />;
+      case "/customers": return <CustomersPage />;
+      case "/artists": return <PlaceholderPage title="Artistes" />;
+      case "/movements": return <PlaceholderPage title="Mouvements de stock" />;
+      case "/reorder": return <PlaceholderPage title="Réapprovisionnement" />;
+      case "/invoices": return <PlaceholderPage title="Factures" />;
+      case "/analytics": return <PlaceholderPage title="Analytics" />;
+      case "/supplier-sales": return <PlaceholderPage title="Ventes par fournisseur" />;
+      default: return <Dashboard />;
     }
   };
 
