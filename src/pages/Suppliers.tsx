@@ -1,75 +1,24 @@
+import { useState } from "react";
 import { Plus, MoreHorizontal } from "lucide-react";
 import { StatusBadge, supplierTypeVariant, supplierTypeLabel } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
-
-// Demo data
-const suppliers = [
-  { 
-    id: "1", 
-    name: "Via Parigi", 
-    email: "contact@viaparigi.com", 
-    type: "consignment", 
-    commissionRate: 0.20, 
-    country: "Italie",
-    products: 48,
-    revenue: 12847,
-    pendingPayout: 2278,
-    active: true 
-  },
-  { 
-    id: "2", 
-    name: "Sublime Frequencies", 
-    email: "orders@sublimefrequencies.com", 
-    type: "purchase", 
-    commissionRate: 0, 
-    country: "USA",
-    products: 124,
-    revenue: 18923,
-    pendingPayout: 0,
-    active: true 
-  },
-  { 
-    id: "3", 
-    name: "Mississippi Records", 
-    email: "info@mississippirecords.net", 
-    type: "consignment", 
-    commissionRate: 0.25, 
-    country: "USA",
-    products: 67,
-    revenue: 8456,
-    pendingPayout: 1092,
-    active: true 
-  },
-  { 
-    id: "4", 
-    name: "Outre-National Records", 
-    email: null, 
-    type: "own", 
-    commissionRate: 0, 
-    country: "France",
-    products: 23,
-    revenue: 9210,
-    pendingPayout: 0,
-    active: true 
-  },
-  { 
-    id: "5", 
-    name: "Numero Group", 
-    email: "wholesale@numerogroup.com", 
-    type: "purchase", 
-    commissionRate: 0, 
-    country: "USA",
-    products: 89,
-    revenue: 14892,
-    pendingPayout: 0,
-    active: true 
-  },
-];
-
-const formatCurrency = (amount: number) => 
-  new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
+import { SupplierDrawer } from "@/components/drawers/SupplierDrawer";
+import { suppliers, Supplier, formatCurrency } from "@/data/demo-data";
 
 export function SuppliersPage() {
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  const handleRowClick = (supplier: Supplier) => {
+    setSelectedSupplier(supplier);
+    setIsDrawerOpen(true);
+  };
+
+  const handleCloseDrawer = () => {
+    setIsDrawerOpen(false);
+    setSelectedSupplier(null);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -120,7 +69,11 @@ export function SuppliersPage() {
           </thead>
           <tbody>
             {suppliers.map((supplier) => (
-              <tr key={supplier.id} className="border-b border-border last:border-b-0 hover:bg-secondary/50 cursor-pointer transition-colors">
+              <tr 
+                key={supplier.id} 
+                className="border-b border-border last:border-b-0 hover:bg-secondary/50 cursor-pointer transition-colors"
+                onClick={() => handleRowClick(supplier)}
+              >
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-primary-light flex items-center justify-center text-sm font-semibold text-primary">
@@ -150,7 +103,10 @@ export function SuppliersPage() {
                   </span>
                 </td>
                 <td className="px-6 py-4">
-                  <button className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground">
+                  <button 
+                    className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <MoreHorizontal className="w-4 h-4" />
                   </button>
                 </td>
@@ -159,6 +115,13 @@ export function SuppliersPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Supplier Drawer */}
+      <SupplierDrawer 
+        supplier={selectedSupplier} 
+        isOpen={isDrawerOpen} 
+        onClose={handleCloseDrawer} 
+      />
     </div>
   );
 }
