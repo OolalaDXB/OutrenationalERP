@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { PageLayout } from "@/components/layout/PageLayout";
+import { NotificationProvider } from "@/hooks/use-notifications";
 import { Dashboard } from "@/pages/Dashboard";
 import { OrdersPage } from "@/pages/Orders";
 import { SuppliersPage } from "@/pages/Suppliers";
@@ -12,6 +13,7 @@ import { SupplierSalesPage } from "@/pages/SupplierSales";
 import { ReorderPage } from "@/pages/Reorder";
 import { InvoicesPage } from "@/pages/Invoices";
 import { AnalyticsPage } from "@/pages/Analytics";
+import { StockMovementsPage } from "@/pages/StockMovements";
 import { PlaceholderPage } from "@/pages/PlaceholderPage";
 import "@fontsource/inter/400.css";
 import "@fontsource/inter/500.css";
@@ -45,7 +47,7 @@ function App() {
       case "/inventory": return <InventoryPage />;
       case "/customers": return <CustomersPage />;
       case "/artists": return <ArtistsPage />;
-      case "/movements": return <PlaceholderPage title="Mouvements de stock" />;
+      case "/movements": return <StockMovementsPage />;
       case "/reorder": return <ReorderPage />;
       case "/invoices": return <InvoicesPage />;
       case "/analytics": return <AnalyticsPage />;
@@ -57,12 +59,14 @@ function App() {
   const pageInfo = pageTitles[currentPath] || { title: "Dashboard" };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar currentPath={currentPath} onNavigate={setCurrentPath} />
-      <PageLayout title={pageInfo.title} subtitle={pageInfo.subtitle}>
-        {renderPage()}
-      </PageLayout>
-    </div>
+    <NotificationProvider>
+      <div className="min-h-screen bg-background">
+        <Sidebar currentPath={currentPath} onNavigate={setCurrentPath} />
+        <PageLayout title={pageInfo.title} subtitle={pageInfo.subtitle} onNavigate={setCurrentPath}>
+          {renderPage()}
+        </PageLayout>
+      </div>
+    </NotificationProvider>
   );
 }
 
