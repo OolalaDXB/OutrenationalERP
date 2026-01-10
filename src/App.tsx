@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { NotificationProvider } from "@/hooks/use-notifications";
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { Dashboard } from "@/pages/Dashboard";
 import { OrdersPage } from "@/pages/Orders";
 import { SuppliersPage } from "@/pages/Suppliers";
@@ -15,7 +16,8 @@ import { ReorderPage } from "@/pages/Reorder";
 import { InvoicesPage } from "@/pages/Invoices";
 import { AnalyticsPage } from "@/pages/Analytics";
 import { StockMovementsPage } from "@/pages/StockMovements";
-import { PlaceholderPage } from "@/pages/PlaceholderPage";
+import { LoginPage } from "@/pages/Login";
+import { Loader2 } from "lucide-react";
 import "@fontsource/inter/400.css";
 import "@fontsource/inter/500.css";
 import "@fontsource/inter/600.css";
@@ -38,8 +40,23 @@ const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   "/supplier-sales": { title: "Ventes par fournisseur", subtitle: "Rapports" },
 };
 
-function App() {
+function AppContent() {
+  const { user, loading } = useAuth();
   const [currentPath, setCurrentPath] = useState("/");
+
+  // Show loading spinner while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Show login page if not authenticated
+  if (!user) {
+    return <LoginPage />;
+  }
 
   const renderPage = () => {
     switch (currentPath) {
@@ -62,15 +79,23 @@ function App() {
   const pageInfo = pageTitles[currentPath] || { title: "Dashboard" };
 
   return (
+    <NotificationProvider>
+      <div className="min-h-screen bg-background">
+        <Sidebar currentPath={currentPath} onNavigate={setCurrentPath} />
+        <PageLayout title={pageInfo.title} subtitle={pageInfo.subtitle} onNavigate={setCurrentPath}>
+          {renderPage()}
+        </PageLayout>
+      </div>
+    </NotificationProvider>
+  );
+}
+
+function App() {
+  return (
     <QueryClientProvider client={queryClient}>
-      <NotificationProvider>
-        <div className="min-h-screen bg-background">
-          <Sidebar currentPath={currentPath} onNavigate={setCurrentPath} />
-          <PageLayout title={pageInfo.title} subtitle={pageInfo.subtitle} onNavigate={setCurrentPath}>
-            {renderPage()}
-          </PageLayout>
-        </div>
-      </NotificationProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

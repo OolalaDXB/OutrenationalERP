@@ -1,8 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import type { Tables } from '@/integrations/supabase/types';
+import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
 export type Artist = Tables<'artists'>;
+export type ArtistInsert = TablesInsert<'artists'>;
+export type ArtistUpdate = TablesUpdate<'artists'>;
 
 export function useArtists() {
   return useQuery({
@@ -31,5 +33,59 @@ export function useArtist(id: string) {
       return data;
     },
     enabled: !!id
+  });
+}
+
+export function useCreateArtist() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (artist: ArtistInsert) => {
+      const { data, error } = await supabase
+        .from('artists')
+        .insert(artist)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['artists'] });
+    }
+  });
+}
+
+export function useUpdateArtist() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: { id: string } & ArtistUpdate) => {
+      const { data, error } = await supabase
+        .from('artists')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['artists'] });
+      queryClient.invalidateQueries({ queryKey: ['artists', variables.id] });
+    }
+  });
+}
+
+export function useDeleteArtist() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('artists')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['artists'] });
+    }
   });
 }
