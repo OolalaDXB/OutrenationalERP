@@ -2,8 +2,10 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
+export type AppRole = 'admin' | 'staff' | 'viewer';
+
 interface AuthUser extends User {
-  role?: string;
+  role?: AppRole;
 }
 
 interface AuthContextType {
@@ -13,9 +15,23 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  hasRole: (role: AppRole) => boolean;
+  hasAnyRole: (roles: AppRole[]) => boolean;
+  canWrite: () => boolean;
+  canDelete: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+async function fetchUserRole(userId: string): Promise<AppRole> {
+  const { data } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', userId)
+    .single();
+  
+  return (data?.role as AppRole) || 'viewer';
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -28,16 +44,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       async (_event, session) => {
         setSession(session);
         if (session?.user) {
-          // Fetch user role from users table
-          const { data: userData } = await supabase
-            .from('users')
-            .select('role')
-            .eq('auth_user_id', session.user.id)
-            .single();
-          
+          const role = await fetchUserRole(session.user.id);
           setUser({
             ...session.user,
-            role: userData?.role || 'user'
+            role
           });
         } else {
           setUser(null);
@@ -50,15 +60,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       if (session?.user) {
-        const { data: userData } = await supabase
-          .from('users')
-          .select('role')
-          .eq('auth_user_id', session.user.id)
-          .single();
-        
+        const role = await fetchUserRole(session.user.id);
         setUser({
           ...session.user,
-          role: userData?.role || 'user'
+          role
         });
       }
       setLoading(false);
@@ -90,8 +95,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  const hasRole = (role: AppRole): boolean => {
+    return user?.role === role;
+  };
+
+  const hasAnyRole = (roles: AppRole[]): boolean => {
+    return user?.role ? roles.includes(user.role) : false;
+  };
+
+  const canWrite = (): boolean => {
+    return hasAnyRole(['admin', 'staff']);
+  };
+
+  const canDelete = (): boolean => {
+    return hasRole('admin');
+  };
+
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      session, 
+      loading, 
+      signIn, 
+      signUp, 
+      signOut,
+      hasRole,
+      hasAnyRole,
+      canWrite,
+      canDelete
+    }}>
       {children}
     </AuthContext.Provider>
   );
