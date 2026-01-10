@@ -213,3 +213,72 @@ export function useUpdateOrder() {
     }
   });
 }
+
+export type OrderItemUpdate = {
+  id: string;
+  product_id?: string | null;
+  title: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+};
+
+export type OrderItemCreate = {
+  order_id: string;
+  product_id?: string | null;
+  title: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+};
+
+export function useUpdateOrderItems() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ 
+      orderId, 
+      itemsToDelete, 
+      itemsToUpdate, 
+      itemsToCreate 
+    }: { 
+      orderId: string;
+      itemsToDelete: string[];
+      itemsToUpdate: OrderItemUpdate[];
+      itemsToCreate: OrderItemCreate[];
+    }) => {
+      // Delete items
+      if (itemsToDelete.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('order_items')
+          .delete()
+          .in('id', itemsToDelete);
+        if (deleteError) throw deleteError;
+      }
+
+      // Update existing items
+      for (const item of itemsToUpdate) {
+        const { id, ...updates } = item;
+        const { error: updateError } = await supabase
+          .from('order_items')
+          .update(updates)
+          .eq('id', id);
+        if (updateError) throw updateError;
+      }
+
+      // Create new items
+      if (itemsToCreate.length > 0) {
+        const { error: createError } = await supabase
+          .from('order_items')
+          .insert(itemsToCreate);
+        if (createError) throw createError;
+      }
+
+      return { success: true };
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['orders', variables.orderId] });
+      queryClient.invalidateQueries({ queryKey: ['order_items', variables.orderId] });
+    }
+  });
+}
