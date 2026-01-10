@@ -1,12 +1,23 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, ShoppingCart, Package, TrendingDown, Send, Check } from "lucide-react";
+import { AlertTriangle, ShoppingCart, Package, TrendingDown, Send, Check, Loader2 } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, supplierTypeVariant, supplierTypeLabel } from "@/components/ui/status-badge";
-import { products, suppliers, formatCurrency, Product, Supplier } from "@/data/demo-data";
+import { useLowStockProducts } from "@/hooks/useProducts";
+import { useSuppliers, type Supplier } from "@/hooks/useSuppliers";
+import { formatCurrency } from "@/lib/format";
 
 interface ReorderSuggestion {
-  product: Product;
+  product: {
+    id: string;
+    title: string;
+    artist_name: string | null;
+    sku: string;
+    stock: number;
+    stock_threshold: number;
+    purchase_price: number | null;
+    supplier_id: string;
+  };
   supplier: Supplier;
   deficit: number;
   suggestedQty: number;
@@ -15,59 +26,77 @@ interface ReorderSuggestion {
 }
 
 export function ReorderPage() {
+  const { data: lowStockProducts = [], isLoading: productsLoading } = useLowStockProducts();
+  const { data: suppliers = [], isLoading: suppliersLoading } = useSuppliers();
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [supplierFilter, setSupplierFilter] = useState("all");
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
 
+  const isLoading = productsLoading || suppliersLoading;
+
   // Générer les suggestions de réappro
   const suggestions = useMemo(() => {
     const result: ReorderSuggestion[] = [];
 
-    products.forEach((product) => {
-      if (product.stock < product.threshold) {
-        const supplier = suppliers.find((s) => s.id === product.supplierId);
-        if (!supplier) return;
+    lowStockProducts.forEach((product) => {
+      if (!product.supplier_id || !product.id) return;
+      
+      const stock = product.stock ?? 0;
+      const threshold = product.stock_threshold ?? 5;
+      
+      if (stock >= threshold) return;
+      
+      const supplier = suppliers.find((s) => s.id === product.supplier_id);
+      if (!supplier) return;
 
-        const deficit = product.threshold - product.stock;
-        // Suggérer le réappro pour atteindre 2x le seuil
-        const suggestedQty = Math.max(deficit, product.threshold);
-        const estimatedCost = product.purchasePrice 
-          ? product.purchasePrice * suggestedQty 
-          : 0;
+      const deficit = threshold - stock;
+      const suggestedQty = Math.max(deficit, threshold);
+      const estimatedCost = product.purchase_price 
+        ? product.purchase_price * suggestedQty 
+        : 0;
 
-        let priority: "critical" | "high" | "medium";
-        if (product.stock === 0) {
-          priority = "critical";
-        } else if (product.stock <= product.threshold * 0.3) {
-          priority = "high";
-        } else {
-          priority = "medium";
-        }
-
-        result.push({
-          product,
-          supplier,
-          deficit,
-          suggestedQty,
-          estimatedCost,
-          priority,
-        });
+      let priority: "critical" | "high" | "medium";
+      if (stock === 0) {
+        priority = "critical";
+      } else if (stock <= threshold * 0.3) {
+        priority = "high";
+      } else {
+        priority = "medium";
       }
+
+      result.push({
+        product: {
+          id: product.id,
+          title: product.title || '',
+          artist_name: product.artist_name,
+          sku: product.sku || '',
+          stock,
+          stock_threshold: threshold,
+          purchase_price: product.purchase_price,
+          supplier_id: product.supplier_id,
+        },
+        supplier,
+        deficit,
+        suggestedQty,
+        estimatedCost,
+        priority,
+      });
     });
 
     return result.sort((a, b) => {
       const priorityOrder = { critical: 0, high: 1, medium: 2 };
       return priorityOrder[a.priority] - priorityOrder[b.priority];
     });
-  }, []);
+  }, [lowStockProducts, suppliers]);
 
   // Filtres
   const filteredSuggestions = useMemo(() => {
     return suggestions.filter((s) => {
       const matchesSearch = searchTerm === "" || 
         s.product.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.product.artist.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (s.product.artist_name && s.product.artist_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
         s.product.sku.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesPriority = priorityFilter === "all" || s.priority === priorityFilter;
@@ -104,14 +133,6 @@ export function ReorderPage() {
     setSelectedItems(newSelected);
   };
 
-  const selectAll = () => {
-    if (selectedItems.size === filteredSuggestions.length) {
-      setSelectedItems(new Set());
-    } else {
-      setSelectedItems(new Set(filteredSuggestions.map((s) => s.product.id)));
-    }
-  };
-
   const priorityStyles = {
     critical: "bg-danger-light text-danger",
     high: "bg-warning-light text-warning-foreground",
@@ -123,6 +144,14 @@ export function ReorderPage() {
     high: "Urgent",
     medium: "À prévoir",
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -275,7 +304,7 @@ export function ReorderPage() {
                         <div>
                           <div className="font-medium text-sm">{item.product.title}</div>
                           <div className="text-xs text-muted-foreground">
-                            {item.product.artist} · {item.product.sku}
+                            {item.product.artist_name || '—'} · {item.product.sku}
                           </div>
                         </div>
                       </td>
@@ -290,7 +319,7 @@ export function ReorderPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
-                        {item.product.threshold}
+                        {item.product.stock_threshold}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums font-semibold text-primary">
                         +{item.suggestedQty}

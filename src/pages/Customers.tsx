@@ -1,11 +1,13 @@
 import { useState, useMemo } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { customers, orders, Customer, formatCurrency, formatDate } from "@/data/demo-data";
 import { CustomerFormModal } from "@/components/forms/CustomerFormModal";
 import { CustomerDrawer } from "@/components/drawers/CustomerDrawer";
+import { useCustomers, type Customer } from "@/hooks/useCustomers";
+import { formatCurrency, formatDate } from "@/lib/format";
 
 export function CustomersPage() {
+  const { data: customers = [], isLoading, error } = useCustomers();
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [countryFilter, setCountryFilter] = useState("all");
@@ -14,24 +16,25 @@ export function CustomersPage() {
 
   // Pays uniques
   const countries = useMemo(() => {
-    const unique = new Set(customers.map((c) => c.country));
-    return Array.from(unique).sort();
-  }, []);
+    const unique = new Set(customers.map((c) => c.country).filter(Boolean));
+    return Array.from(unique).sort() as string[];
+  }, [customers]);
 
   // Filtrage
   const filteredCustomers = useMemo(() => {
     return customers.filter((customer) => {
+      const fullName = `${customer.first_name || ''} ${customer.last_name || ''}`.toLowerCase();
       const matchesSearch =
         searchTerm === "" ||
-        `${customer.firstName} ${customer.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        fullName.includes(searchTerm.toLowerCase()) ||
         customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        customer.city.toLowerCase().includes(searchTerm.toLowerCase());
+        (customer.city && customer.city.toLowerCase().includes(searchTerm.toLowerCase()));
 
       const matchesCountry = countryFilter === "all" || customer.country === countryFilter;
 
       return matchesSearch && matchesCountry;
     });
-  }, [searchTerm, countryFilter]);
+  }, [customers, searchTerm, countryFilter]);
 
   const handleRowClick = (customer: Customer) => {
     setSelectedCustomer(customer);
@@ -42,6 +45,22 @@ export function CustomersPage() {
     setIsDrawerOpen(false);
     setSelectedCustomer(null);
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-12 text-center text-destructive">
+        Erreur lors du chargement des clients
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -97,18 +116,20 @@ export function CustomersPage() {
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-primary-light flex items-center justify-center text-sm font-semibold text-primary">
-                      {customer.firstName[0]}{customer.lastName[0]}
+                      {(customer.first_name?.[0] || '?')}{(customer.last_name?.[0] || '')}
                     </div>
                     <div>
-                      <div className="font-semibold">{customer.firstName} {customer.lastName}</div>
+                      <div className="font-semibold">{customer.first_name} {customer.last_name}</div>
                       <div className="text-xs text-muted-foreground">{customer.email}</div>
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-sm text-muted-foreground">{customer.city}, {customer.country}</td>
-                <td className="px-6 py-4 text-sm tabular-nums">{customer.ordersCount}</td>
-                <td className="px-6 py-4 font-semibold tabular-nums">{formatCurrency(customer.totalSpent)}</td>
-                <td className="px-6 py-4 text-sm text-muted-foreground">{formatDate(customer.lastOrderAt)}</td>
+                <td className="px-6 py-4 text-sm text-muted-foreground">
+                  {customer.city ? `${customer.city}, ${customer.country || ''}` : customer.country || '—'}
+                </td>
+                <td className="px-6 py-4 text-sm tabular-nums">{customer.orders_count || 0}</td>
+                <td className="px-6 py-4 font-semibold tabular-nums">{formatCurrency(customer.total_spent)}</td>
+                <td className="px-6 py-4 text-sm text-muted-foreground">{formatDate(customer.last_order_at)}</td>
               </tr>
             ))}
           </tbody>

@@ -1,13 +1,15 @@
 import { useState, useMemo } from "react";
-import { ShoppingCart, Package, Truck, CheckCircle, Plus } from "lucide-react";
+import { ShoppingCart, Package, Truck, CheckCircle, Plus, Loader2 } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { StatusBadge, orderStatusVariant, orderStatusLabel } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { OrderDrawer } from "@/components/drawers/OrderDrawer";
-import { orders, Order, formatCurrency, formatDateTime } from "@/data/demo-data";
+import { useOrdersWithItems } from "@/hooks/useOrders";
+import { formatCurrency, formatDateTime } from "@/lib/format";
 
 export function OrdersPage() {
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const { data: orders = [], isLoading, error } = useOrdersWithItems();
+  const [selectedOrder, setSelectedOrder] = useState<typeof orders[0] | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -17,22 +19,22 @@ export function OrdersPage() {
     return orders.filter((order) => {
       const matchesSearch =
         searchTerm === "" ||
-        order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.customerEmail.toLowerCase().includes(searchTerm.toLowerCase());
+        order.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (order.customer_name && order.customer_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        order.customer_email.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesStatus = statusFilter === "all" || order.status === statusFilter;
 
       return matchesSearch && matchesStatus;
     });
-  }, [searchTerm, statusFilter]);
+  }, [orders, searchTerm, statusFilter]);
 
   const pendingCount = orders.filter(o => o.status === "pending").length;
   const processingCount = orders.filter(o => o.status === "processing").length;
   const shippedCount = orders.filter(o => o.status === "shipped").length;
   const deliveredCount = orders.filter(o => o.status === "delivered").length;
 
-  const handleRowClick = (order: Order) => {
+  const handleRowClick = (order: typeof orders[0]) => {
     setSelectedOrder(order);
     setIsDrawerOpen(true);
   };
@@ -41,6 +43,22 @@ export function OrdersPage() {
     setIsDrawerOpen(false);
     setSelectedOrder(null);
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-12 text-center text-destructive">
+        Erreur lors du chargement des commandes
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -99,36 +117,45 @@ export function OrdersPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredOrders.map((order) => (
-                <tr
-                  key={order.id}
-                  className="border-b border-border last:border-b-0 hover:bg-secondary/50 cursor-pointer transition-colors"
-                  onClick={() => handleRowClick(order)}
-                >
-                  <td className="px-6 py-4">
-                    <span className="font-semibold text-primary">{order.orderNumber}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center text-sm font-semibold text-primary">
-                        {order.customerName.split(' ').map(n => n[0]).join('')}
+              {filteredOrders.map((order) => {
+                const itemsCount = order.order_items?.length || 0;
+                const initials = order.customer_name 
+                  ? order.customer_name.split(' ').map(n => n[0]).join('') 
+                  : order.customer_email[0].toUpperCase();
+                
+                return (
+                  <tr
+                    key={order.id}
+                    className="border-b border-border last:border-b-0 hover:bg-secondary/50 cursor-pointer transition-colors"
+                    onClick={() => handleRowClick(order)}
+                  >
+                    <td className="px-6 py-4">
+                      <span className="font-semibold text-primary">{order.order_number}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center text-sm font-semibold text-primary">
+                          {initials}
+                        </div>
+                        <div>
+                          <div className="font-medium">{order.customer_name || '—'}</div>
+                          <div className="text-xs text-muted-foreground">{order.customer_email}</div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="font-medium">{order.customerName}</div>
-                        <div className="text-xs text-muted-foreground">{order.customerEmail}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <StatusBadge variant={orderStatusVariant[order.status]}>
-                      {orderStatusLabel[order.status]}
-                    </StatusBadge>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-muted-foreground">{order.items.length} articles</td>
-                  <td className="px-6 py-4 font-semibold tabular-nums">{formatCurrency(order.total)}</td>
-                  <td className="px-6 py-4 text-sm text-muted-foreground">{formatDateTime(order.createdAt)}</td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-6 py-4">
+                      {order.status && (
+                        <StatusBadge variant={orderStatusVariant[order.status]}>
+                          {orderStatusLabel[order.status]}
+                        </StatusBadge>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-muted-foreground">{itemsCount} article{itemsCount > 1 ? 's' : ''}</td>
+                    <td className="px-6 py-4 font-semibold tabular-nums">{formatCurrency(order.total)}</td>
+                    <td className="px-6 py-4 text-sm text-muted-foreground">{formatDateTime(order.created_at)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
 

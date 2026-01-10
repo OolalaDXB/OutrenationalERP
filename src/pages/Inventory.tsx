@@ -1,10 +1,11 @@
 import { useState, useMemo } from "react";
-import { Warehouse, Package, AlertTriangle, XCircle } from "lucide-react";
+import { Warehouse, Package, AlertTriangle, XCircle, Loader2 } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { StockIndicator } from "@/components/ui/stock-indicator";
-import { products } from "@/data/demo-data";
+import { useProducts } from "@/hooks/useProducts";
 
 export function InventoryPage() {
+  const { data: products = [], isLoading, error } = useProducts();
   const [searchTerm, setSearchTerm] = useState("");
   const [stockFilter, setStockFilter] = useState("all");
 
@@ -14,26 +15,48 @@ export function InventoryPage() {
       const matchesSearch =
         searchTerm === "" ||
         product.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.artist.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (product.artist_name && product.artist_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
         product.sku.toLowerCase().includes(searchTerm.toLowerCase());
 
+      const stock = product.stock ?? 0;
+      const threshold = product.stock_threshold ?? 5;
       let matchesStock = true;
       if (stockFilter === "in_stock") {
-        matchesStock = product.stock > product.threshold;
+        matchesStock = stock > threshold;
       } else if (stockFilter === "low") {
-        matchesStock = product.stock > 0 && product.stock <= product.threshold;
+        matchesStock = stock > 0 && stock <= threshold;
       } else if (stockFilter === "out") {
-        matchesStock = product.stock === 0;
+        matchesStock = stock === 0;
       }
 
       return matchesSearch && matchesStock;
     });
-  }, [searchTerm, stockFilter]);
+  }, [products, searchTerm, stockFilter]);
 
   // Stats
-  const totalUnits = products.reduce((sum, item) => sum + item.stock, 0);
-  const lowStockCount = products.filter((item) => item.stock > 0 && item.stock <= item.threshold).length;
-  const outOfStockCount = products.filter((item) => item.stock === 0).length;
+  const totalUnits = products.reduce((sum, item) => sum + (item.stock ?? 0), 0);
+  const lowStockCount = products.filter((item) => {
+    const stock = item.stock ?? 0;
+    const threshold = item.stock_threshold ?? 5;
+    return stock > 0 && stock <= threshold;
+  }).length;
+  const outOfStockCount = products.filter((item) => (item.stock ?? 0) === 0).length;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-12 text-center text-destructive">
+        Erreur lors du chargement de l'inventaire
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -89,15 +112,15 @@ export function InventoryPage() {
                   <td className="px-6 py-4">
                     <div>
                       <div className="font-semibold">{item.title}</div>
-                      <div className="text-xs text-muted-foreground">{item.artist}</div>
+                      <div className="text-xs text-muted-foreground">{item.artist_name || '—'}</div>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm font-mono text-muted-foreground">{item.sku}</td>
                   <td className="px-6 py-4">
-                    <StockIndicator current={item.stock} threshold={item.threshold} />
+                    <StockIndicator current={item.stock ?? 0} threshold={item.stock_threshold ?? 5} />
                   </td>
-                  <td className="px-6 py-4 text-sm text-muted-foreground">{item.threshold}</td>
-                  <td className="px-6 py-4 text-sm font-mono">{item.location}</td>
+                  <td className="px-6 py-4 text-sm text-muted-foreground">{item.stock_threshold ?? 5}</td>
+                  <td className="px-6 py-4 text-sm font-mono">{item.location || '—'}</td>
                 </tr>
               ))}
             </tbody>

@@ -1,29 +1,40 @@
 import { useState, useMemo } from "react";
-import { Plus, MoreHorizontal } from "lucide-react";
+import { Plus, MoreHorizontal, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StockIndicator } from "@/components/ui/stock-indicator";
-import { products, suppliers, formatCurrency } from "@/data/demo-data";
+import { useProducts } from "@/hooks/useProducts";
+import { useSuppliers } from "@/hooks/useSuppliers";
+import { formatCurrency } from "@/lib/format";
 
 const formatLabels: Record<string, string> = {
   lp: "LP",
   "2lp": "2×LP",
+  "3lp": "3×LP",
   cd: "CD",
   boxset: "Box Set",
   "7inch": '7"',
+  "10inch": '10"',
+  "12inch": '12"',
   cassette: "K7",
+  digital: "Digital",
 };
 
 export function ProductsPage() {
+  const { data: products = [], isLoading: productsLoading } = useProducts();
+  const { data: suppliers = [], isLoading: suppliersLoading } = useSuppliers();
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [supplierFilter, setSupplierFilter] = useState("all");
   const [formatFilter, setFormatFilter] = useState("all");
   const [stockFilter, setStockFilter] = useState("all");
 
+  const isLoading = productsLoading || suppliersLoading;
+
   // Formats uniques
   const formats = useMemo(() => {
     const unique = new Set(products.map((p) => p.format));
     return Array.from(unique);
-  }, []);
+  }, [products]);
 
   // Filtrage
   const filteredProducts = useMemo(() => {
@@ -31,24 +42,34 @@ export function ProductsPage() {
       const matchesSearch =
         searchTerm === "" ||
         product.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.artist.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (product.artist_name && product.artist_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
         product.sku.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesSupplier = supplierFilter === "all" || product.supplierId === supplierFilter;
+      const matchesSupplier = supplierFilter === "all" || product.supplier_id === supplierFilter;
       const matchesFormat = formatFilter === "all" || product.format === formatFilter;
 
+      const stock = product.stock ?? 0;
+      const threshold = product.stock_threshold ?? 5;
       let matchesStock = true;
       if (stockFilter === "in_stock") {
-        matchesStock = product.stock > product.threshold;
+        matchesStock = stock > threshold;
       } else if (stockFilter === "low") {
-        matchesStock = product.stock > 0 && product.stock <= product.threshold;
+        matchesStock = stock > 0 && stock <= threshold;
       } else if (stockFilter === "out") {
-        matchesStock = product.stock === 0;
+        matchesStock = stock === 0;
       }
 
       return matchesSearch && matchesSupplier && matchesFormat && matchesStock;
     });
-  }, [searchTerm, supplierFilter, formatFilter, stockFilter]);
+  }, [products, searchTerm, supplierFilter, formatFilter, stockFilter]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -123,9 +144,9 @@ export function ProductsPage() {
               <tr key={product.id} className="border-b border-border last:border-b-0 hover:bg-secondary/50 cursor-pointer transition-colors">
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
-                    {product.imageUrl ? (
+                    {product.image_url ? (
                       <img
-                        src={product.imageUrl}
+                        src={product.image_url}
                         alt={product.title}
                         className="w-12 h-12 rounded-lg object-cover"
                       />
@@ -136,17 +157,17 @@ export function ProductsPage() {
                     )}
                     <div>
                       <div className="font-semibold">{product.title}</div>
-                      <div className="text-xs text-muted-foreground">{product.artist} · {product.sku}</div>
+                      <div className="text-xs text-muted-foreground">{product.artist_name || '—'} · {product.sku}</div>
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-sm">{product.supplierName}</td>
+                <td className="px-6 py-4 text-sm">{product.supplier_name || '—'}</td>
                 <td className="px-6 py-4 text-sm">{formatLabels[product.format] || product.format.toUpperCase()}</td>
-                <td className="px-6 py-4 font-semibold tabular-nums">{formatCurrency(product.sellingPrice)}</td>
+                <td className="px-6 py-4 font-semibold tabular-nums">{formatCurrency(product.selling_price)}</td>
                 <td className="px-6 py-4">
-                  <StockIndicator current={product.stock} threshold={product.threshold} />
+                  <StockIndicator current={product.stock ?? 0} threshold={product.stock_threshold ?? 5} />
                 </td>
-                <td className="px-6 py-4 text-sm text-muted-foreground">{product.location}</td>
+                <td className="px-6 py-4 text-sm text-muted-foreground">{product.location || '—'}</td>
                 <td className="px-6 py-4">
                   <button className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground">
                     <MoreHorizontal className="w-4 h-4" />
