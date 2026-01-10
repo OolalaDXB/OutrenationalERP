@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { X, ShoppingCart, Plus, Trash2, Loader2, Search, UserPlus, User, Percent } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,12 +9,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useProducts } from "@/hooks/useProducts";
 import { useCustomers, useCreateCustomer } from "@/hooks/useCustomers";
-import { useCreateOrder, type OrderInsert, type OrderItemInsert } from "@/hooks/useOrders";
+import { useCreateOrder, type OrderInsert, type OrderItemInsert, type Order, type OrderItem } from "@/hooks/useOrders";
 import { formatCurrency } from "@/lib/format";
+
+type OrderWithItems = Order & { order_items?: OrderItem[] };
 
 interface OrderFormProps {
   isOpen: boolean;
   onClose: () => void;
+  duplicateFrom?: OrderWithItems | null;
 }
 
 interface OrderItemForm {
@@ -51,7 +54,7 @@ const PAYMENT_METHODS = [
   { value: "other", label: "Autre", autoStatus: "pending" as const },
 ] as const;
 
-export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
+export function OrderFormModal({ isOpen, onClose, duplicateFrom }: OrderFormProps) {
   const { toast } = useToast();
   const { data: products = [] } = useProducts();
   const { data: customers = [] } = useCustomers();
@@ -93,6 +96,48 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
   const [internalNotes, setInternalNotes] = useState<string>("");
 
   const [items, setItems] = useState<OrderItemForm[]>([]);
+
+  // Pre-fill form when duplicating
+  useEffect(() => {
+    if (duplicateFrom && isOpen) {
+      // Set customer
+      if (duplicateFrom.customer_id) {
+        setCustomerMode("existing");
+        setSelectedCustomerId(duplicateFrom.customer_id);
+      }
+      
+      // Set form data
+      setFormData({
+        customer_email: duplicateFrom.customer_email || "",
+        customer_name: duplicateFrom.customer_name || "",
+        shipping_address: duplicateFrom.shipping_address || "",
+        shipping_city: duplicateFrom.shipping_city || "",
+        shipping_postal_code: duplicateFrom.shipping_postal_code || "",
+        shipping_country: duplicateFrom.shipping_country || "France",
+      });
+      
+      // Set shipping
+      setShippingAmount(duplicateFrom.shipping_amount || 0);
+      
+      // Set discount
+      setDiscountAmount(duplicateFrom.discount_amount || 0);
+      
+      // Set items
+      if (duplicateFrom.order_items && duplicateFrom.order_items.length > 0) {
+        setItems(duplicateFrom.order_items.map(item => ({
+          product_id: item.product_id || "",
+          title: item.title,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+        })));
+      }
+      
+      // Reset status-related fields for new order
+      setPaymentMethod("cb");
+      setPaymentStatus("pending");
+      setSalesChannel(duplicateFrom.source || "web");
+    }
+  }, [duplicateFrom, isOpen]);
 
   // Update shipping cost when method changes
   const handleShippingMethodChange = (method: string) => {
