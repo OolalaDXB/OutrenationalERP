@@ -32,6 +32,13 @@ const SALES_CHANNELS = [
   { value: "other", label: "Autre" },
 ] as const;
 
+const SHIPPING_METHODS = [
+  { value: "colissimo", label: "Colissimo", defaultCost: 6.50 },
+  { value: "mondial_relay", label: "Mondial Relay", defaultCost: 4.50 },
+  { value: "retrait", label: "Retrait en boutique", defaultCost: 0 },
+  { value: "other", label: "Autre", defaultCost: 0 },
+] as const;
+
 export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
   const { toast } = useToast();
   const { data: products = [] } = useProducts();
@@ -58,7 +65,20 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
     shipping_country: "France",
   });
 
+  // Shipping
+  const [shippingMethod, setShippingMethod] = useState<string>("colissimo");
+  const [shippingAmount, setShippingAmount] = useState<number>(6.50);
+
   const [items, setItems] = useState<OrderItemForm[]>([]);
+
+  // Update shipping cost when method changes
+  const handleShippingMethodChange = (method: string) => {
+    setShippingMethod(method);
+    const methodData = SHIPPING_METHODS.find(m => m.value === method);
+    if (methodData) {
+      setShippingAmount(methodData.defaultCost);
+    }
+  };
 
   // Filter customers based on search
   const filteredCustomers = useMemo(() => {
@@ -122,7 +142,7 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
   };
 
   const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
-  const total = subtotal;
+  const total = subtotal + shippingAmount;
 
   const resetForm = () => {
     setSalesChannel("web");
@@ -138,6 +158,8 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
       shipping_postal_code: "",
       shipping_country: "France",
     });
+    setShippingMethod("colissimo");
+    setShippingAmount(6.50);
     setItems([]);
   };
 
@@ -209,6 +231,8 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
         shipping_country: customerMode === "existing" && selectedCustomer 
           ? selectedCustomer.country 
           : formData.shipping_country || null,
+        shipping_method: SHIPPING_METHODS.find(m => m.value === shippingMethod)?.label || shippingMethod,
+        shipping_amount: shippingAmount,
         subtotal,
         total,
         status: "pending",
@@ -431,6 +455,39 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
             </Tabs>
           </div>
 
+          {/* Shipping */}
+          <div>
+            <h3 className="text-sm font-semibold mb-4">Livraison</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Mode de livraison</Label>
+                <Select value={shippingMethod} onValueChange={handleShippingMethodChange}>
+                  <SelectTrigger className="mt-1.5">
+                    <SelectValue placeholder="Sélectionner..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SHIPPING_METHODS.map(method => (
+                      <SelectItem key={method.value} value={method.value}>
+                        {method.label} {method.defaultCost > 0 && `(${formatCurrency(method.defaultCost)})`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Frais de port (€)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={shippingAmount}
+                  onChange={(e) => setShippingAmount(Number(e.target.value))}
+                  className="mt-1.5"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Order items */}
           <div>
             <div className="flex items-center justify-between mb-4">
@@ -502,12 +559,22 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
               </div>
             )}
 
-            {/* Total */}
+            {/* Totals */}
             {items.length > 0 && (
               <div className="flex justify-end mt-4 pt-4 border-t border-border">
-                <div className="text-right">
-                  <div className="text-sm text-muted-foreground">Total</div>
-                  <div className="text-xl font-bold tabular-nums">{formatCurrency(total)}</div>
+                <div className="text-right space-y-1">
+                  <div className="flex justify-between gap-8 text-sm">
+                    <span className="text-muted-foreground">Sous-total</span>
+                    <span className="tabular-nums">{formatCurrency(subtotal)}</span>
+                  </div>
+                  <div className="flex justify-between gap-8 text-sm">
+                    <span className="text-muted-foreground">Livraison</span>
+                    <span className="tabular-nums">{formatCurrency(shippingAmount)}</span>
+                  </div>
+                  <div className="flex justify-between gap-8 pt-2 border-t border-border">
+                    <span className="font-medium">Total</span>
+                    <span className="text-xl font-bold tabular-nums">{formatCurrency(total)}</span>
+                  </div>
                 </div>
               </div>
             )}
