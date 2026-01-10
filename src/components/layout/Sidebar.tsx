@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 import { 
   LayoutDashboard, 
   ShoppingCart, 
@@ -73,6 +74,17 @@ interface SidebarProps {
 }
 
 export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
+  const { user, signOut } = useAuth();
+
+  const handleLogout = async () => {
+    await signOut();
+  };
+
+  // Get user initials and display name
+  const userEmail = user?.email || '';
+  const userInitials = userEmail ? userEmail.substring(0, 2).toUpperCase() : 'U';
+  const userRole = user?.role || 'user';
+
   return (
     <aside className="fixed left-0 top-0 bottom-0 w-[260px] bg-sidebar flex flex-col z-50">
       {/* Header */}
@@ -82,7 +94,7 @@ export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
         </div>
         <div className="mt-2">
           <span className="inline-block text-[0.6rem] font-semibold uppercase px-2 py-1 rounded bg-primary text-white">
-            Admin
+            {userRole === 'admin' ? 'Admin' : 'User'}
           </span>
         </div>
       </div>
@@ -126,13 +138,17 @@ export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
       <div className="p-3 border-t border-sidebar-border">
         <div className="flex items-center gap-3 px-3 py-2">
           <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-white text-sm font-semibold">
-            AD
+            {userInitials}
           </div>
-          <div className="flex-1">
-            <div className="text-sm font-medium text-white">Admin</div>
-            <div className="text-xs text-sidebar-foreground">Administrateur</div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-white truncate">{userEmail}</div>
+            <div className="text-xs text-sidebar-foreground capitalize">{userRole}</div>
           </div>
-          <button className="p-2 rounded-lg hover:bg-sidebar-hover text-sidebar-foreground hover:text-white transition-colors">
+          <button 
+            onClick={handleLogout}
+            className="p-2 rounded-lg hover:bg-sidebar-hover text-sidebar-foreground hover:text-white transition-colors"
+            title="Se déconnecter"
+          >
             <LogOut className="w-4 h-4" />
           </button>
         </div>
