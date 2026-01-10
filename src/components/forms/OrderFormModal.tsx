@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { X, ShoppingCart, Plus, Trash2, Loader2, Search, UserPlus, User } from "lucide-react";
+import { X, ShoppingCart, Plus, Trash2, Loader2, Search, UserPlus, User, Percent } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,6 +39,15 @@ const SHIPPING_METHODS = [
   { value: "other", label: "Autre", defaultCost: 0 },
 ] as const;
 
+const PAYMENT_METHODS = [
+  { value: "cb", label: "Carte bancaire", autoStatus: "paid" as const },
+  { value: "paypal", label: "PayPal", autoStatus: "paid" as const },
+  { value: "especes", label: "Espèces", autoStatus: "paid" as const },
+  { value: "virement", label: "Virement bancaire", autoStatus: "pending" as const },
+  { value: "cheque", label: "Chèque", autoStatus: "pending" as const },
+  { value: "other", label: "Autre", autoStatus: "pending" as const },
+] as const;
+
 export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
   const { toast } = useToast();
   const { data: products = [] } = useProducts();
@@ -69,6 +78,14 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
   const [shippingMethod, setShippingMethod] = useState<string>("colissimo");
   const [shippingAmount, setShippingAmount] = useState<number>(6.50);
 
+  // Payment
+  const [paymentMethod, setPaymentMethod] = useState<string>("cb");
+  const [paymentStatus, setPaymentStatus] = useState<"pending" | "paid">("paid");
+
+  // Discount
+  const [discountAmount, setDiscountAmount] = useState<number>(0);
+  const [discountReason, setDiscountReason] = useState<string>("");
+
   const [items, setItems] = useState<OrderItemForm[]>([]);
 
   // Update shipping cost when method changes
@@ -77,6 +94,15 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
     const methodData = SHIPPING_METHODS.find(m => m.value === method);
     if (methodData) {
       setShippingAmount(methodData.defaultCost);
+    }
+  };
+
+  // Update payment status when method changes
+  const handlePaymentMethodChange = (method: string) => {
+    setPaymentMethod(method);
+    const methodData = PAYMENT_METHODS.find(m => m.value === method);
+    if (methodData) {
+      setPaymentStatus(methodData.autoStatus);
     }
   };
 
@@ -142,7 +168,8 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
   };
 
   const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
-  const total = subtotal + shippingAmount;
+  const totalBeforeDiscount = subtotal + shippingAmount;
+  const total = Math.max(0, totalBeforeDiscount - discountAmount);
 
   const resetForm = () => {
     setSalesChannel("web");
@@ -160,6 +187,10 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
     });
     setShippingMethod("colissimo");
     setShippingAmount(6.50);
+    setPaymentMethod("cb");
+    setPaymentStatus("paid");
+    setDiscountAmount(0);
+    setDiscountReason("");
     setItems([]);
   };
 
@@ -233,10 +264,14 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
           : formData.shipping_country || null,
         shipping_method: SHIPPING_METHODS.find(m => m.value === shippingMethod)?.label || shippingMethod,
         shipping_amount: shippingAmount,
+        payment_method: PAYMENT_METHODS.find(m => m.value === paymentMethod)?.label || paymentMethod,
+        discount_amount: discountAmount > 0 ? discountAmount : null,
+        internal_notes: discountReason && discountAmount > 0 ? `Remise: ${discountReason}` : null,
         subtotal,
         total,
         status: "pending",
-        payment_status: "pending",
+        payment_status: paymentStatus,
+        paid_at: paymentStatus === "paid" ? new Date().toISOString() : null,
       };
 
       const orderItems: Omit<OrderItemInsert, 'order_id'>[] = items.map(item => ({
@@ -488,6 +523,71 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
             </div>
           </div>
 
+          {/* Payment */}
+          <div>
+            <h3 className="text-sm font-semibold mb-4">Paiement</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Mode de paiement</Label>
+                <Select value={paymentMethod} onValueChange={handlePaymentMethodChange}>
+                  <SelectTrigger className="mt-1.5">
+                    <SelectValue placeholder="Sélectionner..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_METHODS.map(method => (
+                      <SelectItem key={method.value} value={method.value}>
+                        {method.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Statut du paiement</Label>
+                <Select value={paymentStatus} onValueChange={(v) => setPaymentStatus(v as "pending" | "paid")}>
+                  <SelectTrigger className="mt-1.5">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="paid">Payé</SelectItem>
+                    <SelectItem value="pending">En attente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* Discount */}
+          <div>
+            <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+              <Percent className="w-4 h-4" />
+              Remise
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Montant de la remise (€)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={discountAmount}
+                  onChange={(e) => setDiscountAmount(Number(e.target.value))}
+                  placeholder="0.00"
+                  className="mt-1.5"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Raison (optionnel)</Label>
+                <Input
+                  value={discountReason}
+                  onChange={(e) => setDiscountReason(e.target.value)}
+                  placeholder="Ex: Client fidèle, promotion..."
+                  className="mt-1.5"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Order items */}
           <div>
             <div className="flex items-center justify-between mb-4">
@@ -571,6 +671,12 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
                     <span className="text-muted-foreground">Livraison</span>
                     <span className="tabular-nums">{formatCurrency(shippingAmount)}</span>
                   </div>
+                  {discountAmount > 0 && (
+                    <div className="flex justify-between gap-8 text-sm text-green-600">
+                      <span>Remise</span>
+                      <span className="tabular-nums">-{formatCurrency(discountAmount)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between gap-8 pt-2 border-t border-border">
                     <span className="font-medium">Total</span>
                     <span className="text-xl font-bold tabular-nums">{formatCurrency(total)}</span>
