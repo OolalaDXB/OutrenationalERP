@@ -7,6 +7,7 @@ import { useSuppliers } from "@/hooks/useSuppliers";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency } from "@/lib/format";
 import { ProductFormModal } from "@/components/forms/ProductFormModal";
+import { ProductDrawer } from "@/components/drawers/ProductDrawer";
 import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
@@ -43,6 +44,10 @@ export function ProductsPage() {
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  
+  // Drawer state
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const isLoading = productsLoading || suppliersLoading;
 
@@ -102,6 +107,16 @@ export function ProductsPage() {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingProduct(null);
+  };
+
+  const handleRowClick = (product: Product) => {
+    setSelectedProduct(product);
+    setIsDrawerOpen(true);
+  };
+
+  const handleCloseDrawer = () => {
+    setIsDrawerOpen(false);
+    setSelectedProduct(null);
   };
 
   if (isLoading) {
@@ -186,7 +201,11 @@ export function ProductsPage() {
           </thead>
           <tbody>
             {filteredProducts.map((product) => (
-              <tr key={product.id} className="border-b border-border last:border-b-0 hover:bg-secondary/50 cursor-pointer transition-colors">
+              <tr 
+                key={product.id} 
+                className="border-b border-border last:border-b-0 hover:bg-secondary/50 cursor-pointer transition-colors"
+                onClick={() => handleRowClick(product)}
+              >
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
                     {product.image_url ? (
@@ -214,7 +233,7 @@ export function ProductsPage() {
                 </td>
                 <td className="px-6 py-4 text-sm text-muted-foreground">{product.location || '—'}</td>
                 {canWrite() && (
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <button className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground">
@@ -256,6 +275,13 @@ export function ProductsPage() {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         product={editingProduct}
+      />
+
+      {/* Product Drawer */}
+      <ProductDrawer
+        product={selectedProduct}
+        isOpen={isDrawerOpen}
+        onClose={handleCloseDrawer}
       />
     </div>
   );
