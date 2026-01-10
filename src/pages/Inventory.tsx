@@ -1,13 +1,20 @@
 import { useState, useMemo } from "react";
-import { Warehouse, Package, AlertTriangle, XCircle, Loader2 } from "lucide-react";
+import { Warehouse, Package, AlertTriangle, XCircle, Loader2, CheckSquare, Square, Edit } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { StockIndicator } from "@/components/ui/stock-indicator";
-import { useProducts } from "@/hooks/useProducts";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useProducts, Product } from "@/hooks/useProducts";
+import { useAuth } from "@/hooks/useAuth";
+import { BulkStockAdjustmentModal } from "@/components/inventory/BulkStockAdjustmentModal";
 
 export function InventoryPage() {
   const { data: products = [], isLoading, error } = useProducts();
+  const { canWrite } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [stockFilter, setStockFilter] = useState("all");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkModal, setShowBulkModal] = useState(false);
 
   // Filtrage
   const filteredProducts = useMemo(() => {
@@ -42,6 +49,33 @@ export function InventoryPage() {
   }).length;
   const outOfStockCount = products.filter((item) => (item.stock ?? 0) === 0).length;
 
+  // Selection handlers
+  const toggleSelect = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredProducts.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredProducts.map(p => p.id)));
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+  };
+
+  const selectedProducts = useMemo(() => {
+    return products.filter(p => selectedIds.has(p.id));
+  }, [products, selectedIds]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -58,6 +92,9 @@ export function InventoryPage() {
     );
   }
 
+  const allSelected = filteredProducts.length > 0 && selectedIds.size === filteredProducts.length;
+  const someSelected = selectedIds.size > 0 && selectedIds.size < filteredProducts.length;
+
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
@@ -72,11 +109,17 @@ export function InventoryPage() {
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">État des stocks</h2>
+          {canWrite() && selectedIds.size > 0 && (
+            <Button onClick={() => setShowBulkModal(true)}>
+              <Edit className="w-4 h-4 mr-2" />
+              Ajuster {selectedIds.size} produit(s)
+            </Button>
+          )}
         </div>
 
         <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
           {/* Filters */}
-          <div className="flex gap-3 p-4 border-b border-border bg-secondary flex-wrap">
+          <div className="flex gap-3 p-4 border-b border-border bg-secondary flex-wrap items-center">
             <select
               className="px-3 py-2 rounded-md border border-border bg-card text-sm cursor-pointer"
               value={stockFilter}
@@ -94,11 +137,29 @@ export function InventoryPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="flex-1 min-w-[200px] max-w-[300px] px-3 py-2 rounded-md border border-border bg-card text-sm"
             />
+            {selectedIds.size > 0 && (
+              <Button variant="ghost" size="sm" onClick={clearSelection}>
+                Désélectionner ({selectedIds.size})
+              </Button>
+            )}
           </div>
 
           <table className="w-full border-collapse">
             <thead>
               <tr>
+                {canWrite() && (
+                  <th className="w-12 px-4 py-3 bg-secondary border-b border-border">
+                    <Checkbox
+                      checked={allSelected}
+                      ref={(el) => {
+                        if (el) {
+                          (el as any).indeterminate = someSelected;
+                        }
+                      }}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </th>
+                )}
                 <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Produit</th>
                 <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">SKU</th>
                 <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Stock</th>
@@ -108,7 +169,20 @@ export function InventoryPage() {
             </thead>
             <tbody>
               {filteredProducts.map((item) => (
-                <tr key={item.id} className="border-b border-border last:border-b-0 hover:bg-secondary/50 cursor-pointer transition-colors">
+                <tr 
+                  key={item.id} 
+                  className={`border-b border-border last:border-b-0 hover:bg-secondary/50 transition-colors ${
+                    selectedIds.has(item.id) ? 'bg-primary/5' : ''
+                  }`}
+                >
+                  {canWrite() && (
+                    <td className="px-4 py-4">
+                      <Checkbox
+                        checked={selectedIds.has(item.id)}
+                        onCheckedChange={() => toggleSelect(item.id)}
+                      />
+                    </td>
+                  )}
                   <td className="px-6 py-4">
                     <div>
                       <div className="font-semibold">{item.title}</div>
@@ -133,6 +207,14 @@ export function InventoryPage() {
           )}
         </div>
       </div>
+
+      {/* Bulk Adjustment Modal */}
+      <BulkStockAdjustmentModal
+        isOpen={showBulkModal}
+        onClose={() => setShowBulkModal(false)}
+        selectedProducts={selectedProducts}
+        onSuccess={clearSelection}
+      />
     </div>
   );
 }

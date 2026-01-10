@@ -104,3 +104,61 @@ export function useAdjustStock() {
     }
   });
 }
+
+export function useBulkAdjustStock() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ 
+      productIds, 
+      quantity, 
+      type, 
+      reason 
+    }: { 
+      productIds: string[]; 
+      quantity: number; 
+      type: StockMovement['type']; 
+      reason?: string;
+    }) => {
+      // Get current stocks for all products
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('id, stock')
+        .in('id', productIds);
+      
+      if (productsError) throw productsError;
+      
+      // Create movements and updates for each product
+      const movements = products.map(product => ({
+        product_id: product.id,
+        quantity: Math.abs(quantity),
+        type,
+        reason: reason || null,
+        stock_before: product.stock ?? 0,
+        stock_after: (product.stock ?? 0) + quantity
+      }));
+      
+      // Insert all movements
+      const { error: movementError } = await supabase
+        .from('stock_movements')
+        .insert(movements);
+      
+      if (movementError) throw movementError;
+      
+      // Update each product's stock
+      const updates = products.map(async (product) => {
+        const { error } = await supabase
+          .from('products')
+          .update({ stock: (product.stock ?? 0) + quantity })
+          .eq('id', product.id);
+        if (error) throw error;
+      });
+      
+      await Promise.all(updates);
+      return { count: productIds.length };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['stock_movements'] });
+    }
+  });
+}
