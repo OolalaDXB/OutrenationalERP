@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { X, ShoppingCart, MapPin, Truck, Clock, Package, Pencil, Trash2, Loader2, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { StatusBadge, orderStatusVariant, orderStatusLabel } from "@/components/ui/status-badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { Order, OrderItem } from "@/hooks/useOrders";
 import { useCancelOrder, useUpdateOrder } from "@/hooks/useOrders";
 import { useAuth } from "@/hooks/useAuth";
@@ -45,7 +47,9 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showRefundDialog, setShowRefundDialog] = useState(false);
-  const [pendingStatus, setPendingStatus] = useState<string | null>(null);
+  const [showShippedDialog, setShowShippedDialog] = useState(false);
+  const [trackingNumber, setTrackingNumber] = useState("");
+  const [trackingUrl, setTrackingUrl] = useState("");
 
   const handleCancel = async () => {
     if (!order) return;
@@ -85,19 +89,43 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
       setShowRefundDialog(true);
       return;
     }
+    // Show tracking input dialog for shipped
+    if (newStatus === "shipped") {
+      setTrackingNumber(order.tracking_number || "");
+      setTrackingUrl(order.tracking_url || "");
+      setShowShippedDialog(true);
+      return;
+    }
 
     try {
       const updateData: Record<string, unknown> = { id: order.id, status: newStatus };
       
       // Add timestamps
-      if (newStatus === "shipped") {
-        updateData.shipped_at = new Date().toISOString();
-      } else if (newStatus === "delivered") {
+      if (newStatus === "delivered") {
         updateData.delivered_at = new Date().toISOString();
       }
 
       await updateOrder.mutateAsync(updateData as Parameters<typeof updateOrder.mutateAsync>[0]);
       toast({ title: "Statut mis à jour", description: `Commande passée en "${ORDER_STATUSES.find(s => s.value === newStatus)?.label}"` });
+    } catch (error) {
+      toast({ title: "Erreur", description: "Impossible de mettre à jour le statut.", variant: "destructive" });
+    }
+  };
+
+  const handleShipOrder = async () => {
+    if (!order) return;
+    try {
+      await updateOrder.mutateAsync({
+        id: order.id,
+        status: "shipped",
+        shipped_at: new Date().toISOString(),
+        tracking_number: trackingNumber || null,
+        tracking_url: trackingUrl || null
+      } as Parameters<typeof updateOrder.mutateAsync>[0]);
+      toast({ title: "Commande expédiée", description: `La commande ${order.order_number} a été marquée comme expédiée.` });
+      setShowShippedDialog(false);
+      setTrackingNumber("");
+      setTrackingUrl("");
     } catch (error) {
       toast({ title: "Erreur", description: "Impossible de mettre à jour le statut.", variant: "destructive" });
     }
@@ -393,6 +421,48 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Shipped Dialog with Tracking Number */}
+      <Dialog open={showShippedDialog} onOpenChange={setShowShippedDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Truck className="w-5 h-5" />
+              Marquer comme expédiée
+            </DialogTitle>
+            <DialogDescription>
+              Ajoutez les informations de suivi pour la commande "{order.order_number}"
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Numéro de suivi (optionnel)</Label>
+              <Input
+                value={trackingNumber}
+                onChange={(e) => setTrackingNumber(e.target.value)}
+                placeholder="Ex: 1Z999AA10123456784"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>URL de suivi (optionnel)</Label>
+              <Input
+                value={trackingUrl}
+                onChange={(e) => setTrackingUrl(e.target.value)}
+                placeholder="Ex: https://www.ups.com/track?loc=fr_FR&tracknum=..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowShippedDialog(false)}>
+              Annuler
+            </Button>
+            <Button onClick={handleShipOrder} disabled={updateOrder.isPending}>
+              {updateOrder.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Confirmer l'expédition
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
