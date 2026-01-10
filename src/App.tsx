@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { NotificationProvider } from "@/hooks/use-notifications";
@@ -19,6 +20,8 @@ import "@fontsource/inter/400.css";
 import "@fontsource/inter/500.css";
 import "@fontsource/inter/600.css";
 import "@fontsource/inter/700.css";
+
+const queryClient = new QueryClient();
 
 const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   "/": { title: "Dashboard", subtitle: "Vue d'ensemble" },
@@ -59,14 +62,16 @@ function App() {
   const pageInfo = pageTitles[currentPath] || { title: "Dashboard" };
 
   return (
-    <NotificationProvider>
-      <div className="min-h-screen bg-background">
-        <Sidebar currentPath={currentPath} onNavigate={setCurrentPath} />
-        <PageLayout title={pageInfo.title} subtitle={pageInfo.subtitle} onNavigate={setCurrentPath}>
-          {renderPage()}
-        </PageLayout>
-      </div>
-    </NotificationProvider>
+    <QueryClientProvider client={queryClient}>
+      <NotificationProvider>
+        <div className="min-h-screen bg-background">
+          <Sidebar currentPath={currentPath} onNavigate={setCurrentPath} />
+          <PageLayout title={pageInfo.title} subtitle={pageInfo.subtitle} onNavigate={setCurrentPath}>
+            {renderPage()}
+          </PageLayout>
+        </div>
+      </NotificationProvider>
+    </QueryClientProvider>
   );
 }
 
