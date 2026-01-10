@@ -4,15 +4,24 @@ import { KpiCard } from "@/components/ui/kpi-card";
 import { StatusBadge, orderStatusVariant, orderStatusLabel } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { OrderDrawer } from "@/components/drawers/OrderDrawer";
-import { useOrdersWithItems } from "@/hooks/useOrders";
+import { OrderFormModal } from "@/components/forms/OrderFormModal";
+import { useOrdersWithItems, useUpdateOrderStatus, useCancelOrder } from "@/hooks/useOrders";
 import { formatCurrency, formatDateTime } from "@/lib/format";
+import { useToast } from "@/hooks/use-toast";
 
 export function OrdersPage() {
   const { data: orders = [], isLoading, error } = useOrdersWithItems();
+  const updateOrderStatus = useUpdateOrderStatus();
+  const cancelOrder = useCancelOrder();
+  const { toast } = useToast();
+  
   const [selectedOrder, setSelectedOrder] = useState<typeof orders[0] | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Filtrage
   const filteredOrders = useMemo(() => {
@@ -42,6 +51,14 @@ export function OrdersPage() {
   const handleCloseDrawer = () => {
     setIsDrawerOpen(false);
     setSelectedOrder(null);
+  };
+
+  const handleCreateNew = () => {
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
   };
 
   if (isLoading) {
@@ -74,7 +91,7 @@ export function OrdersPage() {
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Toutes les commandes</h2>
-          <Button className="gap-2">
+          <Button className="gap-2" onClick={handleCreateNew}>
             <Plus className="w-4 h-4" />
             Nouvelle commande
           </Button>
@@ -172,6 +189,12 @@ export function OrdersPage() {
         order={selectedOrder}
         isOpen={isDrawerOpen}
         onClose={handleCloseDrawer}
+      />
+
+      {/* Order Form Modal */}
+      <OrderFormModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
       />
     </div>
   );

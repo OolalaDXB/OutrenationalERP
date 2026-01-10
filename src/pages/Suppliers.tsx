@@ -1,18 +1,33 @@
 import { useState, useMemo } from "react";
-import { Plus, MoreHorizontal, Loader2 } from "lucide-react";
+import { Plus, MoreHorizontal, Loader2, Pencil, Trash2 } from "lucide-react";
 import { StatusBadge, supplierTypeVariant, supplierTypeLabel } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { SupplierDrawer } from "@/components/drawers/SupplierDrawer";
-import { useSuppliers, type Supplier } from "@/hooks/useSuppliers";
+import { SupplierFormModal } from "@/components/forms/SupplierFormModal";
+import { useSuppliers, useDeleteSupplier, type Supplier } from "@/hooks/useSuppliers";
 import { formatCurrency } from "@/lib/format";
+import { useToast } from "@/hooks/use-toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function SuppliersPage() {
   const { data: suppliers = [], isLoading, error } = useSuppliers();
+  const deleteSupplier = useDeleteSupplier();
+  const { toast } = useToast();
+  
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [countryFilter, setCountryFilter] = useState("all");
+  
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
 
   // Pays uniques
   const countries = useMemo(() => {
@@ -45,6 +60,33 @@ export function SuppliersPage() {
     setSelectedSupplier(null);
   };
 
+  const handleCreateNew = () => {
+    setEditingSupplier(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEdit = (supplier: Supplier, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingSupplier(supplier);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (supplier: Supplier, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm(`Supprimer "${supplier.name}" ?`)) return;
+    try {
+      await deleteSupplier.mutateAsync(supplier.id);
+      toast({ title: "Succès", description: "Fournisseur supprimé" });
+    } catch (error) {
+      toast({ title: "Erreur", description: "Impossible de supprimer le fournisseur", variant: "destructive" });
+    }
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditingSupplier(null);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -68,7 +110,7 @@ export function SuppliersPage() {
           <h2 className="text-lg font-semibold">Tous les fournisseurs</h2>
           <p className="text-sm text-muted-foreground">{filteredSuppliers.length} fournisseurs</p>
         </div>
-        <Button className="gap-2">
+        <Button className="gap-2" onClick={handleCreateNew}>
           <Plus className="w-4 h-4" />
           Nouveau fournisseur
         </Button>
@@ -157,12 +199,29 @@ export function SuppliersPage() {
                   </span>
                 </td>
                 <td className="px-6 py-4">
-                  <button
-                    className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <MoreHorizontal className="w-4 h-4" />
-                  </button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreHorizontal className="w-4 h-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={(e) => handleEdit(supplier, e as unknown as React.MouseEvent)}>
+                        <Pencil className="w-4 h-4 mr-2" />
+                        Modifier
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={(e) => handleDelete(supplier, e as unknown as React.MouseEvent)}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Supprimer
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </td>
               </tr>
             ))}
@@ -181,6 +240,13 @@ export function SuppliersPage() {
         supplier={selectedSupplier}
         isOpen={isDrawerOpen}
         onClose={handleCloseDrawer}
+      />
+
+      {/* Supplier Form Modal */}
+      <SupplierFormModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        supplier={editingSupplier}
       />
     </div>
   );
