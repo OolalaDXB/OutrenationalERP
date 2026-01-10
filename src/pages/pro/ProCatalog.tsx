@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useProducts } from "@/hooks/useProducts";
 import { useSuppliers } from "@/hooks/useSuppliers";
+import { useGenres, useProductGenres } from "@/hooks/useGenres";
 import { useProAuth } from "@/hooks/useProAuth";
 import { useCart } from "@/hooks/useCart";
 import { formatCurrency } from "@/lib/format";
@@ -22,15 +23,29 @@ const FORMATS = [
 export function ProCatalog() {
   const { data: products = [], isLoading } = useProducts();
   const { data: suppliers = [] } = useSuppliers();
+  const { data: genres = [] } = useGenres();
+  const { data: productGenres = [] } = useProductGenres();
   const { customer } = useProAuth();
   const { addItem, items } = useCart();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [formatFilter, setFormatFilter] = useState("all");
   const [supplierFilter, setSupplierFilter] = useState("all");
+  const [genreFilter, setGenreFilter] = useState("all");
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
 
   const discountRate = customer?.discount_rate || 0;
+
+  // Create a map of product IDs to their genre IDs
+  const productGenreMap = useMemo(() => {
+    const map = new Map<string, string[]>();
+    productGenres.forEach(pg => {
+      const existing = map.get(pg.product_id) || [];
+      existing.push(pg.genre_id);
+      map.set(pg.product_id, existing);
+    });
+    return map;
+  }, [productGenres]);
 
   // Filter products: in stock, published, matching filters
   const filteredProducts = useMemo(() => {
@@ -57,9 +72,15 @@ export function ProCatalog() {
       // Supplier filter
       if (supplierFilter !== "all" && product.supplier_id !== supplierFilter) return false;
 
+      // Genre filter
+      if (genreFilter !== "all") {
+        const productGenreIds = productGenreMap.get(product.id) || [];
+        if (!productGenreIds.includes(genreFilter)) return false;
+      }
+
       return true;
     });
-  }, [products, searchTerm, formatFilter, supplierFilter]);
+  }, [products, searchTerm, formatFilter, supplierFilter, genreFilter, productGenreMap]);
 
   const getProPrice = (price: number) => {
     return price * (1 - discountRate / 100);
@@ -132,6 +153,20 @@ export function ProCatalog() {
             {suppliers.map(supplier => (
               <SelectItem key={supplier.id} value={supplier.id}>
                 {supplier.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={genreFilter} onValueChange={setGenreFilter}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Genre" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les genres</SelectItem>
+            {genres.map(genre => (
+              <SelectItem key={genre.id} value={genre.id}>
+                {genre.name}
               </SelectItem>
             ))}
           </SelectContent>
