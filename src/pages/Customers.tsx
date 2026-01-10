@@ -5,9 +5,11 @@ import { CustomerFormModal } from "@/components/forms/CustomerFormModal";
 import { CustomerDrawer } from "@/components/drawers/CustomerDrawer";
 import { useCustomers, type Customer } from "@/hooks/useCustomers";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { useAuth } from "@/hooks/useAuth";
 
 export function CustomersPage() {
   const { data: customers = [], isLoading, error } = useCustomers();
+  const { canWrite } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [countryFilter, setCountryFilter] = useState("all");
@@ -69,10 +71,12 @@ export function CustomersPage() {
           <h2 className="text-lg font-semibold">Tous les clients</h2>
           <p className="text-sm text-muted-foreground">{filteredCustomers.length} clients</p>
         </div>
-        <Button className="gap-2" onClick={() => setShowForm(true)}>
-          <Plus className="w-4 h-4" />
-          Nouveau client
-        </Button>
+        {canWrite() && (
+          <Button className="gap-2" onClick={() => setShowForm(true)}>
+            <Plus className="w-4 h-4" />
+            Nouveau client
+          </Button>
+        )}
       </div>
 
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">

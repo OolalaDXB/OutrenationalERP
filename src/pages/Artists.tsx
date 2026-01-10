@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useProducts } from "@/hooks/useProducts";
 import { ArtistFormModal } from "@/components/forms/ArtistFormModal";
 import { ArtistDrawer } from "@/components/drawers/ArtistDrawer";
+import { useAuth } from "@/hooks/useAuth";
 
 export interface Artist {
   id: string;
@@ -28,6 +29,7 @@ const formatLabels: Record<string, string> = {
 
 export function ArtistsPage() {
   const { data: products = [], isLoading, error } = useProducts();
+  const { canWrite } = useAuth();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
@@ -102,10 +104,12 @@ export function ArtistsPage() {
             {artists.length} artistes au catalogue
           </p>
         </div>
-        <Button className="gap-2" onClick={() => setIsFormOpen(true)}>
-          <Plus className="w-4 h-4" />
-          Ajouter un artiste
-        </Button>
+        {canWrite() && (
+          <Button className="gap-2" onClick={() => setIsFormOpen(true)}>
+            <Plus className="w-4 h-4" />
+            Ajouter un artiste
+          </Button>
+        )}
       </div>
 
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">

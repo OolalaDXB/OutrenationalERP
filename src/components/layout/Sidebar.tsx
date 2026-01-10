@@ -13,14 +13,20 @@ import {
   FileText,
   BarChart3,
   PieChart,
-  LogOut
+  LogOut,
+  UserCog,
+  Shield,
+  ShieldCheck,
+  Eye
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 interface NavItem {
   icon: React.ElementType;
   label: string;
   href: string;
   badge?: number;
+  adminOnly?: boolean;
 }
 
 interface NavSection {
@@ -66,7 +72,31 @@ const navigation: NavSection[] = [
       { icon: PieChart, label: "Ventes par fournisseur", href: "/supplier-sales" },
     ],
   },
+  {
+    title: "Administration",
+    items: [
+      { icon: UserCog, label: "Gestion des rôles", href: "/admin/roles", adminOnly: true },
+    ],
+  },
 ];
+
+const roleIcons = {
+  admin: ShieldCheck,
+  staff: Shield,
+  viewer: Eye,
+};
+
+const roleColors = {
+  admin: "bg-red-500/20 text-red-400 border-red-500/30",
+  staff: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  viewer: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+};
+
+const roleLabels = {
+  admin: "Admin",
+  staff: "Staff",
+  viewer: "Viewer",
+};
 
 interface SidebarProps {
   currentPath: string;
@@ -74,7 +104,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
-  const { user, signOut } = useAuth();
+  const { user, signOut, hasRole } = useAuth();
 
   const handleLogout = async () => {
     await signOut();
@@ -83,7 +113,14 @@ export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
   // Get user initials and display name
   const userEmail = user?.email || '';
   const userInitials = userEmail ? userEmail.substring(0, 2).toUpperCase() : 'U';
-  const userRole = user?.role || 'user';
+  const userRole = user?.role || 'viewer';
+  const RoleIcon = roleIcons[userRole] || Eye;
+
+  // Filter navigation based on role
+  const filteredNavigation = navigation.map(section => ({
+    ...section,
+    items: section.items.filter(item => !item.adminOnly || hasRole('admin'))
+  })).filter(section => section.items.length > 0);
 
   return (
     <aside className="fixed left-0 top-0 bottom-0 w-[260px] bg-sidebar flex flex-col z-50">
@@ -93,15 +130,16 @@ export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
           Outre-National<span className="text-primary font-normal"> Records</span>
         </div>
         <div className="mt-2">
-          <span className="inline-block text-[0.6rem] font-semibold uppercase px-2 py-1 rounded bg-primary text-white">
-            {userRole === 'admin' ? 'Admin' : 'User'}
-          </span>
+          <Badge variant="outline" className={cn("text-[0.6rem] font-semibold uppercase", roleColors[userRole])}>
+            <RoleIcon className="w-3 h-3 mr-1" />
+            {roleLabels[userRole]}
+          </Badge>
         </div>
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 py-4 px-3 overflow-y-auto">
-        {navigation.map((section) => (
+        {filteredNavigation.map((section) => (
           <div key={section.title} className="mb-6">
             <div className="px-3 mb-2 text-[0.65rem] font-semibold uppercase tracking-wider text-sidebar-foreground/50">
               {section.title}
