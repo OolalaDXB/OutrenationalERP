@@ -3,7 +3,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Disc3 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import logo from '@/assets/outre-national-logo.png';
 
 export function LoginPage() {
   const { signIn, signUp } = useAuth();
@@ -45,9 +46,7 @@ export function LoginPage() {
         <div className="bg-card rounded-2xl border border-border shadow-lg p-8">
           {/* Logo */}
           <div className="flex items-center justify-center gap-3 mb-8">
-            <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
-              <Disc3 className="w-7 h-7 text-primary-foreground" />
-            </div>
+            <img src={logo} alt="Outre-National" className="h-12 w-12" />
             <div>
               <h1 className="text-xl font-bold text-foreground">Outre-National</h1>
               <p className="text-xs text-muted-foreground">Backoffice</p>
@@ -132,9 +131,14 @@ export function LoginPage() {
           </div>
         </div>
 
-        <p className="text-center text-xs text-muted-foreground mt-4">
-          © 2024 Outre-National. Tous droits réservés.
-        </p>
+        <div className="text-center mt-4 space-y-1">
+          <p className="text-xs text-muted-foreground">
+            © 2026 Outre-National. Tous droits réservés.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Powered by Sillon
+          </p>
+        </div>
       </div>
     </div>
   );
