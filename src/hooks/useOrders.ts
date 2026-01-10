@@ -77,13 +77,19 @@ export function useCreateOrder() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ order, items }: { order: OrderInsert; items: Omit<OrderItemInsert, 'order_id'>[] }) => {
+      console.log('Creating order with data:', { order, items });
+      
       // Insert order first
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .insert(order)
         .select()
         .single();
-      if (orderError) throw orderError;
+      if (orderError) {
+        console.error('Order creation error:', orderError);
+        throw orderError;
+      }
+      console.log('Order created:', orderData);
 
       // Insert order items with the new order_id
       if (items.length > 0) {
@@ -94,13 +100,41 @@ export function useCreateOrder() {
         const { error: itemsError } = await supabase
           .from('order_items')
           .insert(itemsWithOrderId);
-        if (itemsError) throw itemsError;
+        if (itemsError) {
+          console.error('Order items error:', itemsError);
+          throw itemsError;
+        }
+        console.log('Order items created');
+
+        // Decrement stock for each product
+        for (const item of items) {
+          if (item.product_id) {
+            // Get current stock
+            const { data: product } = await supabase
+              .from('products')
+              .select('stock')
+              .eq('id', item.product_id)
+              .single();
+            
+            if (product) {
+              const newStock = Math.max(0, (product.stock || 0) - item.quantity);
+              const { error: stockError } = await supabase
+                .from('products')
+                .update({ stock: newStock })
+                .eq('id', item.product_id);
+              if (stockError) {
+                console.warn('Stock decrement warning:', stockError);
+              }
+            }
+          }
+        }
       }
 
       return orderData;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
     }
   });
 }

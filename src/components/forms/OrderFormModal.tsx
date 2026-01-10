@@ -525,8 +525,9 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
                   type="number"
                   min="0"
                   step="0.01"
-                  value={shippingAmount}
-                  onChange={(e) => setShippingAmount(Number(e.target.value))}
+                  value={shippingAmount === 0 ? "" : shippingAmount}
+                  onChange={(e) => setShippingAmount(parseFloat(e.target.value) || 0)}
+                  placeholder="0.00"
                   className="mt-1.5"
                 />
               </div>
