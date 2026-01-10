@@ -105,12 +105,12 @@ export function ProLogin() {
 
           <div className="mt-6 pt-6 border-t border-border text-center text-sm text-muted-foreground">
             <p>Pas encore de compte professionnel ?</p>
-            <p className="mt-1">
-              Contactez-nous à{" "}
-              <a href="mailto:pro@outre-national.com" className="text-primary hover:underline">
-                pro@outre-national.com
-              </a>
-            </p>
+            <Link 
+              to="/pro/register" 
+              className="inline-block mt-2 text-primary hover:underline font-medium"
+            >
+              Créer un compte
+            </Link>
           </div>
         </div>
 
