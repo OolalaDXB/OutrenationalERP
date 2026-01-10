@@ -1,10 +1,18 @@
 import { useState, useMemo } from "react";
-import { Plus, MoreHorizontal, Loader2 } from "lucide-react";
+import { Plus, MoreHorizontal, Loader2, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StockIndicator } from "@/components/ui/stock-indicator";
-import { useProducts } from "@/hooks/useProducts";
+import { useProducts, useDeleteProduct, type Product } from "@/hooks/useProducts";
 import { useSuppliers } from "@/hooks/useSuppliers";
 import { formatCurrency } from "@/lib/format";
+import { ProductFormModal } from "@/components/forms/ProductFormModal";
+import { useToast } from "@/hooks/use-toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const formatLabels: Record<string, string> = {
   lp: "LP",
@@ -22,11 +30,17 @@ const formatLabels: Record<string, string> = {
 export function ProductsPage() {
   const { data: products = [], isLoading: productsLoading } = useProducts();
   const { data: suppliers = [], isLoading: suppliersLoading } = useSuppliers();
+  const deleteProduct = useDeleteProduct();
+  const { toast } = useToast();
   
   const [searchTerm, setSearchTerm] = useState("");
   const [supplierFilter, setSupplierFilter] = useState("all");
   const [formatFilter, setFormatFilter] = useState("all");
   const [stockFilter, setStockFilter] = useState("all");
+  
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   const isLoading = productsLoading || suppliersLoading;
 
@@ -63,6 +77,31 @@ export function ProductsPage() {
     });
   }, [products, searchTerm, supplierFilter, formatFilter, stockFilter]);
 
+  const handleCreateNew = () => {
+    setEditingProduct(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEdit = (product: Product) => {
+    setEditingProduct(product);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (product: Product) => {
+    if (!confirm(`Supprimer "${product.title}" ?`)) return;
+    try {
+      await deleteProduct.mutateAsync(product.id);
+      toast({ title: "Succès", description: "Produit supprimé" });
+    } catch (error) {
+      toast({ title: "Erreur", description: "Impossible de supprimer le produit", variant: "destructive" });
+    }
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditingProduct(null);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -78,7 +117,7 @@ export function ProductsPage() {
           <h2 className="text-lg font-semibold">Tous les produits</h2>
           <p className="text-sm text-muted-foreground">{filteredProducts.length} références</p>
         </div>
-        <Button className="gap-2">
+        <Button className="gap-2" onClick={handleCreateNew}>
           <Plus className="w-4 h-4" />
           Nouveau produit
         </Button>
@@ -169,9 +208,26 @@ export function ProductsPage() {
                 </td>
                 <td className="px-6 py-4 text-sm text-muted-foreground">{product.location || '—'}</td>
                 <td className="px-6 py-4">
-                  <button className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground">
-                    <MoreHorizontal className="w-4 h-4" />
-                  </button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground">
+                        <MoreHorizontal className="w-4 h-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleEdit(product)}>
+                        <Pencil className="w-4 h-4 mr-2" />
+                        Modifier
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => handleDelete(product)}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Supprimer
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </td>
               </tr>
             ))}
@@ -184,6 +240,13 @@ export function ProductsPage() {
           </div>
         )}
       </div>
+
+      {/* Product Form Modal */}
+      <ProductFormModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        product={editingProduct}
+      />
     </div>
   );
 }

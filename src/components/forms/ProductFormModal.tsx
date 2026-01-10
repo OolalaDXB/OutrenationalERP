@@ -1,63 +1,135 @@
-import { useState } from "react";
-import { X, Package } from "lucide-react";
+import { useState, useEffect } from "react";
+import { X, Package, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { suppliers } from "@/data/demo-data";
+import { useSuppliers } from "@/hooks/useSuppliers";
+import { useCreateProduct, useUpdateProduct, type Product, type ProductInsert } from "@/hooks/useProducts";
+import type { Enums } from "@/integrations/supabase/types";
 
 interface ProductFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: ProductFormData) => void;
+  product?: Product | null; // For edit mode
 }
 
-export interface ProductFormData {
-  sku: string;
-  title: string;
-  artist: string;
-  supplierId: string;
-  format: 'lp' | '2lp' | 'cd' | 'boxset' | '7inch' | 'cassette';
-  sellingPrice: number;
-  purchasePrice: number | null;
-  description: string;
-  stock: number;
-  threshold: number;
-  location: string;
-  status: 'draft' | 'published' | 'archived';
-}
-
-export function ProductFormModal({ isOpen, onClose, onSubmit }: ProductFormProps) {
+export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps) {
   const { toast } = useToast();
-  const [formData, setFormData] = useState<ProductFormData>({
+  const { data: suppliers = [] } = useSuppliers();
+  const createProduct = useCreateProduct();
+  const updateProduct = useUpdateProduct();
+  
+  const isEditMode = !!product;
+  
+  const [formData, setFormData] = useState<{
+    sku: string;
+    title: string;
+    artist_name: string;
+    supplier_id: string;
+    format: Enums<'product_format'>;
+    selling_price: number;
+    purchase_price: number | null;
+    description: string;
+    stock: number;
+    stock_threshold: number;
+    location: string;
+    status: Enums<'product_status'>;
+  }>({
     sku: "",
     title: "",
-    artist: "",
-    supplierId: "",
+    artist_name: "",
+    supplier_id: "",
     format: "lp",
-    sellingPrice: 0,
-    purchasePrice: null,
+    selling_price: 0,
+    purchase_price: null,
     description: "",
     stock: 0,
-    threshold: 10,
+    stock_threshold: 10,
     location: "",
     status: "draft",
   });
 
+  // Populate form when editing
+  useEffect(() => {
+    if (product) {
+      setFormData({
+        sku: product.sku || "",
+        title: product.title || "",
+        artist_name: product.artist_name || "",
+        supplier_id: product.supplier_id || "",
+        format: product.format || "lp",
+        selling_price: product.selling_price || 0,
+        purchase_price: product.purchase_price || null,
+        description: product.description || "",
+        stock: product.stock || 0,
+        stock_threshold: product.stock_threshold || 10,
+        location: product.location || "",
+        status: product.status || "draft",
+      });
+    } else {
+      // Reset form for create mode
+      setFormData({
+        sku: "",
+        title: "",
+        artist_name: "",
+        supplier_id: "",
+        format: "lp",
+        selling_price: 0,
+        purchase_price: null,
+        description: "",
+        stock: 0,
+        stock_threshold: 10,
+        location: "",
+        status: "draft",
+      });
+    }
+  }, [product, isOpen]);
+
   if (!isOpen) return null;
 
-  const selectedSupplier = suppliers.find(s => s.id === formData.supplierId);
+  const selectedSupplier = suppliers.find(s => s.id === formData.supplier_id);
+  const isLoading = createProduct.isPending || updateProduct.isPending;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.title || !formData.artist || !formData.supplierId) {
+    if (!formData.title || !formData.supplier_id) {
       toast({ title: "Erreur", description: "Veuillez remplir les champs obligatoires", variant: "destructive" });
       return;
     }
-    onSubmit(formData);
-    toast({ title: "Succès", description: "Produit créé avec succès" });
-    onClose();
+
+    try {
+      const productData: ProductInsert = {
+        sku: formData.sku || `SKU-${Date.now()}`,
+        title: formData.title,
+        artist_name: formData.artist_name || null,
+        supplier_id: formData.supplier_id,
+        format: formData.format,
+        selling_price: formData.selling_price,
+        purchase_price: formData.purchase_price,
+        description: formData.description || null,
+        stock: formData.stock,
+        stock_threshold: formData.stock_threshold,
+        location: formData.location || null,
+        status: formData.status,
+      };
+
+      if (isEditMode && product) {
+        await updateProduct.mutateAsync({ id: product.id, ...productData });
+        toast({ title: "Succès", description: "Produit mis à jour avec succès" });
+      } else {
+        await createProduct.mutateAsync(productData);
+        toast({ title: "Succès", description: "Produit créé avec succès" });
+      }
+      onClose();
+    } catch (error) {
+      toast({ 
+        title: "Erreur", 
+        description: error instanceof Error ? error.message : "Une erreur est survenue", 
+        variant: "destructive" 
+      });
+    }
   };
 
   return (
@@ -67,12 +139,12 @@ export function ProductFormModal({ isOpen, onClose, onSubmit }: ProductFormProps
         {/* Header */}
         <div className="sticky top-0 bg-card flex items-center justify-between p-6 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary-light flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
               <Package className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold">Nouveau produit</h2>
-              <p className="text-sm text-muted-foreground">Ajouter un vinyle au catalogue</p>
+              <h2 className="text-lg font-semibold">{isEditMode ? "Modifier le produit" : "Nouveau produit"}</h2>
+              <p className="text-sm text-muted-foreground">{isEditMode ? "Modifier les informations du produit" : "Ajouter un vinyle au catalogue"}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-secondary transition-colors">
@@ -97,10 +169,10 @@ export function ProductFormModal({ isOpen, onClose, onSubmit }: ProductFormProps
               </div>
 
               <div>
-                <Label className="text-sm font-medium text-muted-foreground">Artiste *</Label>
+                <Label className="text-sm font-medium text-muted-foreground">Artiste</Label>
                 <Input
-                  value={formData.artist}
-                  onChange={(e) => setFormData({ ...formData, artist: e.target.value })}
+                  value={formData.artist_name}
+                  onChange={(e) => setFormData({ ...formData, artist_name: e.target.value })}
                   placeholder="Pastor Chris Congregation"
                   className="mt-1.5"
                 />
@@ -119,8 +191,8 @@ export function ProductFormModal({ isOpen, onClose, onSubmit }: ProductFormProps
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">Fournisseur *</Label>
                 <select
-                  value={formData.supplierId}
-                  onChange={(e) => setFormData({ ...formData, supplierId: e.target.value })}
+                  value={formData.supplier_id}
+                  onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
                   className="w-full mt-1.5 px-3 py-2 rounded-lg border border-border bg-card text-sm"
                 >
                   <option value="">Sélectionner...</option>
@@ -139,9 +211,12 @@ export function ProductFormModal({ isOpen, onClose, onSubmit }: ProductFormProps
                 >
                   <option value="lp">LP</option>
                   <option value="2lp">2LP</option>
+                  <option value="3lp">3LP</option>
                   <option value="cd">CD</option>
                   <option value="boxset">Boxset</option>
                   <option value="7inch">7"</option>
+                  <option value="10inch">10"</option>
+                  <option value="12inch">12"</option>
                   <option value="cassette">Cassette</option>
                 </select>
               </div>
@@ -169,8 +244,8 @@ export function ProductFormModal({ isOpen, onClose, onSubmit }: ProductFormProps
                     type="number"
                     min="0"
                     step="0.01"
-                    value={formData.sellingPrice}
-                    onChange={(e) => setFormData({ ...formData, sellingPrice: Number(e.target.value) })}
+                    value={formData.selling_price}
+                    onChange={(e) => setFormData({ ...formData, selling_price: Number(e.target.value) })}
                     className="pr-8"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">€</span>
@@ -186,8 +261,8 @@ export function ProductFormModal({ isOpen, onClose, onSubmit }: ProductFormProps
                     type="number"
                     min="0"
                     step="0.01"
-                    value={formData.purchasePrice || 0}
-                    onChange={(e) => setFormData({ ...formData, purchasePrice: Number(e.target.value) || null })}
+                    value={formData.purchase_price || 0}
+                    onChange={(e) => setFormData({ ...formData, purchase_price: Number(e.target.value) || null })}
                     disabled={selectedSupplier?.type !== "purchase"}
                     className="pr-8"
                   />
@@ -217,8 +292,8 @@ export function ProductFormModal({ isOpen, onClose, onSubmit }: ProductFormProps
                 <Input
                   type="number"
                   min="0"
-                  value={formData.threshold}
-                  onChange={(e) => setFormData({ ...formData, threshold: Number(e.target.value) })}
+                  value={formData.stock_threshold}
+                  onChange={(e) => setFormData({ ...formData, stock_threshold: Number(e.target.value) })}
                   className="mt-1.5"
                 />
               </div>
@@ -250,11 +325,12 @@ export function ProductFormModal({ isOpen, onClose, onSubmit }: ProductFormProps
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-border">
-            <Button type="button" variant="secondary" onClick={onClose}>
+            <Button type="button" variant="secondary" onClick={onClose} disabled={isLoading}>
               Annuler
             </Button>
-            <Button type="submit">
-              Créer le produit
+            <Button type="submit" disabled={isLoading}>
+              {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {isEditMode ? "Enregistrer" : "Créer le produit"}
             </Button>
           </div>
         </form>

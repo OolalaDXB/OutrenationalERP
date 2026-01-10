@@ -1,61 +1,111 @@
-import { useState } from "react";
-import { X, Building2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { X, Building2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { useCreateSupplier, useUpdateSupplier, type Supplier, type SupplierInsert } from "@/hooks/useSuppliers";
+import type { Enums } from "@/integrations/supabase/types";
 
 interface SupplierFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: SupplierFormData) => void;
+  supplier?: Supplier | null; // For edit mode
 }
 
-export interface SupplierFormData {
-  name: string;
-  email: string;
-  type: 'consignment' | 'purchase' | 'own';
-  commissionRate: number;
-  country: string;
-  contactName: string;
-  phone: string;
-  address: string;
-}
-
-export function SupplierFormModal({ isOpen, onClose, onSubmit }: SupplierFormProps) {
+export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormProps) {
   const { toast } = useToast();
-  const [formData, setFormData] = useState<SupplierFormData>({
+  const createSupplier = useCreateSupplier();
+  const updateSupplier = useUpdateSupplier();
+  
+  const isEditMode = !!supplier;
+
+  const [formData, setFormData] = useState<{
+    name: string;
+    email: string;
+    type: Enums<'supplier_type'>;
+    commission_rate: number;
+    country: string;
+    contact_name: string;
+    phone: string;
+    address: string;
+  }>({
     name: "",
     email: "",
     type: "purchase",
-    commissionRate: 0,
+    commission_rate: 0,
     country: "",
-    contactName: "",
+    contact_name: "",
     phone: "",
     address: "",
   });
 
+  // Populate form when editing
+  useEffect(() => {
+    if (supplier) {
+      setFormData({
+        name: supplier.name || "",
+        email: supplier.email || "",
+        type: supplier.type || "purchase",
+        commission_rate: supplier.commission_rate || 0,
+        country: supplier.country || "",
+        contact_name: supplier.contact_name || "",
+        phone: supplier.phone || "",
+        address: supplier.address || "",
+      });
+    } else {
+      setFormData({
+        name: "",
+        email: "",
+        type: "purchase",
+        commission_rate: 0,
+        country: "",
+        contact_name: "",
+        phone: "",
+        address: "",
+      });
+    }
+  }, [supplier, isOpen]);
+
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const isLoading = createSupplier.isPending || updateSupplier.isPending;
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name) {
       toast({ title: "Erreur", description: "Le nom est requis", variant: "destructive" });
       return;
     }
-    onSubmit(formData);
-    toast({ title: "Succès", description: "Fournisseur créé avec succès" });
-    onClose();
-    setFormData({
-      name: "",
-      email: "",
-      type: "purchase",
-      commissionRate: 0,
-      country: "",
-      contactName: "",
-      phone: "",
-      address: "",
-    });
+
+    try {
+      const supplierData: SupplierInsert = {
+        name: formData.name,
+        email: formData.email || null,
+        type: formData.type,
+        commission_rate: formData.type === "consignment" ? formData.commission_rate : null,
+        country: formData.country || null,
+        contact_name: formData.contact_name || null,
+        phone: formData.phone || null,
+        address: formData.address || null,
+        active: true,
+      };
+
+      if (isEditMode && supplier) {
+        await updateSupplier.mutateAsync({ id: supplier.id, ...supplierData });
+        toast({ title: "Succès", description: "Fournisseur mis à jour avec succès" });
+      } else {
+        await createSupplier.mutateAsync(supplierData);
+        toast({ title: "Succès", description: "Fournisseur créé avec succès" });
+      }
+      onClose();
+    } catch (error) {
+      toast({ 
+        title: "Erreur", 
+        description: error instanceof Error ? error.message : "Une erreur est survenue", 
+        variant: "destructive" 
+      });
+    }
   };
 
   return (
@@ -65,12 +115,12 @@ export function SupplierFormModal({ isOpen, onClose, onSubmit }: SupplierFormPro
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary-light flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
               <Building2 className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold">Nouveau fournisseur</h2>
-              <p className="text-sm text-muted-foreground">Ajouter un fournisseur au catalogue</p>
+              <h2 className="text-lg font-semibold">{isEditMode ? "Modifier le fournisseur" : "Nouveau fournisseur"}</h2>
+              <p className="text-sm text-muted-foreground">{isEditMode ? "Modifier les informations" : "Ajouter un fournisseur"}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-secondary transition-colors">
@@ -114,8 +164,8 @@ export function SupplierFormModal({ isOpen, onClose, onSubmit }: SupplierFormPro
                   min="0"
                   max="100"
                   step="1"
-                  value={formData.type === "consignment" ? formData.commissionRate * 100 : 0}
-                  onChange={(e) => setFormData({ ...formData, commissionRate: Number(e.target.value) / 100 })}
+                  value={formData.type === "consignment" ? formData.commission_rate * 100 : 0}
+                  onChange={(e) => setFormData({ ...formData, commission_rate: Number(e.target.value) / 100 })}
                   disabled={formData.type !== "consignment"}
                   className="pr-8"
                 />
@@ -147,8 +197,8 @@ export function SupplierFormModal({ isOpen, onClose, onSubmit }: SupplierFormPro
             <div>
               <Label className="text-sm font-medium text-muted-foreground">Contact</Label>
               <Input
-                value={formData.contactName}
-                onChange={(e) => setFormData({ ...formData, contactName: e.target.value })}
+                value={formData.contact_name}
+                onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
                 placeholder="Nom du contact"
                 className="mt-1.5"
               />
@@ -176,11 +226,12 @@ export function SupplierFormModal({ isOpen, onClose, onSubmit }: SupplierFormPro
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-border">
-            <Button type="button" variant="secondary" onClick={onClose}>
+            <Button type="button" variant="secondary" onClick={onClose} disabled={isLoading}>
               Annuler
             </Button>
-            <Button type="submit">
-              Créer le fournisseur
+            <Button type="submit" disabled={isLoading}>
+              {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {isEditMode ? "Enregistrer" : "Créer le fournisseur"}
             </Button>
           </div>
         </form>
