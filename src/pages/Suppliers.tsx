@@ -1,11 +1,13 @@
 import { useState, useMemo } from "react";
-import { Plus, MoreHorizontal } from "lucide-react";
+import { Plus, MoreHorizontal, Loader2 } from "lucide-react";
 import { StatusBadge, supplierTypeVariant, supplierTypeLabel } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { SupplierDrawer } from "@/components/drawers/SupplierDrawer";
-import { suppliers, Supplier, formatCurrency } from "@/data/demo-data";
+import { useSuppliers, type Supplier } from "@/hooks/useSuppliers";
+import { formatCurrency } from "@/lib/format";
 
 export function SuppliersPage() {
+  const { data: suppliers = [], isLoading, error } = useSuppliers();
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -14,9 +16,9 @@ export function SuppliersPage() {
 
   // Pays uniques
   const countries = useMemo(() => {
-    const unique = new Set(suppliers.map((s) => s.country));
-    return Array.from(unique).sort();
-  }, []);
+    const unique = new Set(suppliers.map((s) => s.country).filter(Boolean));
+    return Array.from(unique).sort() as string[];
+  }, [suppliers]);
 
   // Filtrage
   const filteredSuppliers = useMemo(() => {
@@ -31,7 +33,7 @@ export function SuppliersPage() {
 
       return matchesSearch && matchesType && matchesCountry;
     });
-  }, [searchTerm, typeFilter, countryFilter]);
+  }, [suppliers, searchTerm, typeFilter, countryFilter]);
 
   const handleRowClick = (supplier: Supplier) => {
     setSelectedSupplier(supplier);
@@ -42,6 +44,22 @@ export function SuppliersPage() {
     setIsDrawerOpen(false);
     setSelectedSupplier(null);
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-12 text-center text-destructive">
+        Erreur lors du chargement des fournisseurs
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -115,7 +133,7 @@ export function SuppliersPage() {
                     </div>
                     <div>
                       <div className="font-semibold text-primary">{supplier.name}</div>
-                      <div className="text-xs text-muted-foreground">{supplier.country}</div>
+                      <div className="text-xs text-muted-foreground">{supplier.country || '—'}</div>
                     </div>
                   </div>
                 </td>
@@ -126,14 +144,16 @@ export function SuppliersPage() {
                 </td>
                 <td className="px-6 py-4">
                   <span className="text-sm tabular-nums">
-                    {supplier.type === "consignment" ? `${(supplier.commissionRate * 100).toFixed(0)}%` : "—"}
+                    {supplier.type === "consignment" && supplier.commission_rate 
+                      ? `${(supplier.commission_rate * 100).toFixed(0)}%` 
+                      : "—"}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-sm tabular-nums">{supplier.products}</td>
-                <td className="px-6 py-4 font-semibold tabular-nums">{formatCurrency(supplier.revenue)}</td>
+                <td className="px-6 py-4 text-sm tabular-nums">{supplier.products_count || 0}</td>
+                <td className="px-6 py-4 font-semibold tabular-nums">{formatCurrency(supplier.total_revenue)}</td>
                 <td className="px-6 py-4">
-                  <span className={`tabular-nums ${supplier.pendingPayout > 0 ? "text-info font-semibold" : "text-muted-foreground"}`}>
-                    {supplier.pendingPayout > 0 ? formatCurrency(supplier.pendingPayout) : "—"}
+                  <span className={`tabular-nums ${(supplier.pending_payout || 0) > 0 ? "text-info font-semibold" : "text-muted-foreground"}`}>
+                    {(supplier.pending_payout || 0) > 0 ? formatCurrency(supplier.pending_payout) : "—"}
                   </span>
                 </td>
                 <td className="px-6 py-4">

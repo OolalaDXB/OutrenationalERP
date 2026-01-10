@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
-import { Plus, Music, Disc } from "lucide-react";
+import { Plus, Music, Disc, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { products } from "@/data/demo-data";
+import { useProducts } from "@/hooks/useProducts";
 import { ArtistFormModal } from "@/components/forms/ArtistFormModal";
 import { ArtistDrawer } from "@/components/drawers/ArtistDrawer";
 
@@ -16,13 +16,18 @@ export interface Artist {
 const formatLabels: Record<string, string> = {
   lp: "LP",
   "2lp": "2×LP",
+  "3lp": "3×LP",
   cd: "CD",
   boxset: "Box Set",
   "7inch": '7"',
+  "10inch": '10"',
+  "12inch": '12"',
   cassette: "K7",
+  digital: "Digital",
 };
 
 export function ArtistsPage() {
+  const { data: products = [], isLoading, error } = useProducts();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
@@ -33,25 +38,27 @@ export function ArtistsPage() {
     const artistMap = new Map<string, Artist>();
 
     products.forEach((product) => {
-      if (!artistMap.has(product.artist)) {
-        artistMap.set(product.artist, {
-          id: `artist-${product.artist.toLowerCase().replace(/\s+/g, "-")}`,
-          name: product.artist,
+      const artistName = product.artist_name || 'Unknown Artist';
+      
+      if (!artistMap.has(artistName)) {
+        artistMap.set(artistName, {
+          id: `artist-${artistName.toLowerCase().replace(/\s+/g, "-")}`,
+          name: artistName,
           productsCount: 0,
           totalRevenue: 0,
           topFormat: product.format,
         });
       }
 
-      const artist = artistMap.get(product.artist)!;
+      const artist = artistMap.get(artistName)!;
       artist.productsCount += 1;
-      artist.totalRevenue += product.sellingPrice * product.stock;
+      artist.totalRevenue += product.selling_price * (product.stock ?? 0);
     });
 
     return Array.from(artistMap.values()).sort((a, b) =>
       a.name.localeCompare(b.name)
     );
-  }, []);
+  }, [products]);
 
   const filteredArtists = useMemo(() => {
     if (!searchTerm) return artists;
@@ -69,6 +76,22 @@ export function ArtistsPage() {
     setIsDrawerOpen(false);
     setSelectedArtist(null);
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-12 text-center text-destructive">
+        Erreur lors du chargement des artistes
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
