@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useProAuth } from "@/hooks/useProAuth";
+import logo from "@/assets/outre-national-logo.png";
 
 export function ProLogin() {
   const navigate = useNavigate();
@@ -52,9 +53,7 @@ export function ProLogin() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 mx-auto rounded-xl bg-primary flex items-center justify-center mb-4">
-            <span className="text-primary-foreground font-bold text-2xl">ON</span>
-          </div>
+          <img src={logo} alt="Outre-National" className="h-16 w-16 mx-auto mb-4" />
           <h1 className="text-2xl font-bold">Outre-National Pro</h1>
           <p className="text-muted-foreground mt-1">Portail professionnel</p>
         </div>
@@ -119,6 +118,16 @@ export function ProLogin() {
           <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">
             ← Retour au site principal
           </Link>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center mt-4 space-y-1">
+          <p className="text-xs text-muted-foreground">
+            © 2026 Outre-National. Tous droits réservés.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Powered by Sillon
+          </p>
         </div>
       </div>
     </div>
