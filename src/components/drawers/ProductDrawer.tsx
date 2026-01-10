@@ -1,13 +1,14 @@
 import { useState } from "react";
-import { X, Disc3, MapPin, Tag, Package, Euro, TrendingUp, Pencil, Trash2, ExternalLink } from "lucide-react";
+import { X, Disc3, MapPin, Tag, Package, Euro, TrendingUp, Pencil, Trash2, ExternalLink, Plus, Minus, History, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { StockIndicator } from "@/components/ui/stock-indicator";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import type { Product } from "@/hooks/useProducts";
 import { useDeleteProduct } from "@/hooks/useProducts";
+import { useStockMovements, useAdjustStock } from "@/hooks/useStockMovements";
 import { useAuth } from "@/hooks/useAuth";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDate, formatDateTime } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
 import { ProductFormModal } from "@/components/forms/ProductFormModal";
 
@@ -53,9 +54,31 @@ const statusLabels: Record<string, string> = {
   archived: "Archivé",
 };
 
+const movementTypeLabels: Record<string, string> = {
+  purchase: "Achat",
+  sale: "Vente",
+  return: "Retour",
+  adjustment: "Ajustement",
+  loss: "Perte",
+  consignment_in: "Dépôt entrant",
+  consignment_out: "Dépôt sortant",
+};
+
+const movementTypeColors: Record<string, string> = {
+  purchase: "text-success",
+  sale: "text-danger",
+  return: "text-info",
+  adjustment: "text-warning",
+  loss: "text-danger",
+  consignment_in: "text-success",
+  consignment_out: "text-danger",
+};
+
 export function ProductDrawer({ product, isOpen, onClose }: ProductDrawerProps) {
   const { canWrite, canDelete } = useAuth();
   const deleteProduct = useDeleteProduct();
+  const adjustStock = useAdjustStock();
+  const { data: stockMovements = [], isLoading: movementsLoading } = useStockMovements(product?.id);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
@@ -68,6 +91,24 @@ export function ProductDrawer({ product, isOpen, onClose }: ProductDrawerProps) 
       onClose();
     } catch (error) {
       toast({ title: "Erreur", description: "Impossible de supprimer le produit.", variant: "destructive" });
+    }
+  };
+
+  const handleStockAdjust = async (delta: number) => {
+    if (!product) return;
+    try {
+      await adjustStock.mutateAsync({
+        productId: product.id,
+        quantity: delta,
+        type: "adjustment",
+        reason: delta > 0 ? "Ajustement manuel (+)" : "Ajustement manuel (-)"
+      });
+      toast({ 
+        title: "Stock mis à jour", 
+        description: `Stock ${delta > 0 ? 'augmenté' : 'diminué'} de ${Math.abs(delta)} unité(s)` 
+      });
+    } catch (error) {
+      toast({ title: "Erreur", description: "Impossible de mettre à jour le stock.", variant: "destructive" });
     }
   };
 
@@ -198,7 +239,7 @@ export function ProductDrawer({ product, isOpen, onClose }: ProductDrawerProps) 
               </div>
             </div>
 
-            {/* Stock */}
+            {/* Stock with Quick Adjust */}
             <div>
               <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
                 <Package className="w-4 h-4" />
@@ -215,6 +256,101 @@ export function ProductDrawer({ product, isOpen, onClose }: ProductDrawerProps) 
                 {product.stock_threshold && (
                   <div className="mt-3 text-xs text-muted-foreground">
                     Seuil d'alerte: {product.stock_threshold} unités
+                  </div>
+                )}
+                
+                {/* Quick Stock Adjustment */}
+                {canWrite() && (
+                  <div className="mt-4 pt-4 border-t border-border">
+                    <div className="text-xs text-muted-foreground mb-2">Ajustement rapide</div>
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handleStockAdjust(-1)}
+                        disabled={adjustStock.isPending || (product.stock ?? 0) <= 0}
+                        className="gap-1"
+                      >
+                        <Minus className="w-3 h-3" />
+                        1
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handleStockAdjust(1)}
+                        disabled={adjustStock.isPending}
+                        className="gap-1"
+                      >
+                        <Plus className="w-3 h-3" />
+                        1
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handleStockAdjust(-5)}
+                        disabled={adjustStock.isPending || (product.stock ?? 0) < 5}
+                        className="gap-1"
+                      >
+                        <Minus className="w-3 h-3" />
+                        5
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handleStockAdjust(5)}
+                        disabled={adjustStock.isPending}
+                        className="gap-1"
+                      >
+                        <Plus className="w-3 h-3" />
+                        5
+                      </Button>
+                      {adjustStock.isPending && <Loader2 className="w-4 h-4 animate-spin ml-2" />}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Stock Movement History */}
+            <div>
+              <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <History className="w-4 h-4" />
+                Historique des mouvements
+              </h3>
+              <div className="bg-secondary rounded-lg overflow-hidden">
+                {movementsLoading ? (
+                  <div className="p-4 flex items-center justify-center">
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : stockMovements.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    Aucun mouvement de stock
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border max-h-48 overflow-y-auto">
+                    {stockMovements.slice(0, 10).map((movement) => (
+                      <div key={movement.id} className="p-3 flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-medium">
+                            {movementTypeLabels[movement.type] || movement.type}
+                          </div>
+                          {movement.reason && (
+                            <div className="text-xs text-muted-foreground">{movement.reason}</div>
+                          )}
+                          <div className="text-xs text-muted-foreground">{formatDateTime(movement.created_at)}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className={`text-sm font-semibold ${movementTypeColors[movement.type] || ''}`}>
+                            {movement.type === 'sale' || movement.type === 'loss' || movement.type === 'consignment_out' 
+                              ? `-${movement.quantity}` 
+                              : `+${movement.quantity}`}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {movement.stock_before} → {movement.stock_after}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

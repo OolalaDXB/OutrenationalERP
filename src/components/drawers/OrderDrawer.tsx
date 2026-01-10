@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { X, ShoppingCart, MapPin, Truck, Clock, Package, Pencil, Trash2 } from "lucide-react";
+import { X, ShoppingCart, MapPin, Truck, Clock, Package, Pencil, Trash2, Loader2, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, orderStatusVariant, orderStatusLabel } from "@/components/ui/status-badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import type { Order, OrderItem } from "@/hooks/useOrders";
-import { useCancelOrder } from "@/hooks/useOrders";
+import { useCancelOrder, useUpdateOrder } from "@/hooks/useOrders";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
@@ -18,11 +20,32 @@ interface OrderDrawerProps {
   onClose: () => void;
 }
 
+const ORDER_STATUSES = [
+  { value: "pending", label: "En attente" },
+  { value: "confirmed", label: "Confirmée" },
+  { value: "processing", label: "En préparation" },
+  { value: "shipped", label: "Expédiée" },
+  { value: "delivered", label: "Livrée" },
+  { value: "cancelled", label: "Annulée" },
+  { value: "refunded", label: "Remboursée" },
+] as const;
+
+const PAYMENT_STATUSES = [
+  { value: "pending", label: "En attente" },
+  { value: "paid", label: "Payé" },
+  { value: "partial", label: "Partiel" },
+  { value: "refunded", label: "Remboursé" },
+  { value: "failed", label: "Échoué" },
+] as const;
+
 export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   const { canWrite, canDelete } = useAuth();
   const cancelOrder = useCancelOrder();
+  const updateOrder = useUpdateOrder();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showRefundDialog, setShowRefundDialog] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<string | null>(null);
 
   const handleCancel = async () => {
     if (!order) return;
@@ -30,9 +53,69 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
       await cancelOrder.mutateAsync({ id: order.id, reason: "Annulation par l'utilisateur" });
       toast({ title: "Commande annulée", description: `La commande ${order.order_number} a été annulée.` });
       setShowCancelDialog(false);
-      onClose();
     } catch (error) {
       toast({ title: "Erreur", description: "Impossible d'annuler la commande.", variant: "destructive" });
+    }
+  };
+
+  const handleRefund = async () => {
+    if (!order) return;
+    try {
+      await updateOrder.mutateAsync({ 
+        id: order.id, 
+        status: "refunded",
+        payment_status: "refunded"
+      });
+      toast({ title: "Commande remboursée", description: `La commande ${order.order_number} a été remboursée.` });
+      setShowRefundDialog(false);
+    } catch (error) {
+      toast({ title: "Erreur", description: "Impossible de rembourser la commande.", variant: "destructive" });
+    }
+  };
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (!order) return;
+    
+    // Show confirmation for cancelled/refunded
+    if (newStatus === "cancelled") {
+      setShowCancelDialog(true);
+      return;
+    }
+    if (newStatus === "refunded") {
+      setShowRefundDialog(true);
+      return;
+    }
+
+    try {
+      const updateData: Record<string, unknown> = { id: order.id, status: newStatus };
+      
+      // Add timestamps
+      if (newStatus === "shipped") {
+        updateData.shipped_at = new Date().toISOString();
+      } else if (newStatus === "delivered") {
+        updateData.delivered_at = new Date().toISOString();
+      }
+
+      await updateOrder.mutateAsync(updateData as Parameters<typeof updateOrder.mutateAsync>[0]);
+      toast({ title: "Statut mis à jour", description: `Commande passée en "${ORDER_STATUSES.find(s => s.value === newStatus)?.label}"` });
+    } catch (error) {
+      toast({ title: "Erreur", description: "Impossible de mettre à jour le statut.", variant: "destructive" });
+    }
+  };
+
+  const handlePaymentStatusChange = async (newStatus: string) => {
+    if (!order) return;
+    try {
+      const updateData: Record<string, unknown> = { id: order.id, payment_status: newStatus };
+      
+      if (newStatus === "paid") {
+        updateData.paid_at = new Date().toISOString();
+      }
+
+      await updateOrder.mutateAsync(updateData as Parameters<typeof updateOrder.mutateAsync>[0]);
+      toast({ title: "Paiement mis à jour", description: `Statut de paiement: "${PAYMENT_STATUSES.find(s => s.value === newStatus)?.label}"` });
+    } catch (error) {
+      toast({ title: "Erreur", description: "Impossible de mettre à jour le paiement.", variant: "destructive" });
     }
   };
 
@@ -57,7 +140,8 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
     order.shipping_country
   ].filter(Boolean).join(', ');
 
-  const canCancelOrder = order.status !== "cancelled" && order.status !== "delivered" && order.status !== "refunded";
+  const canModifyOrder = order.status !== "cancelled" && order.status !== "refunded" && order.status !== "delivered";
+  const isUpdating = updateOrder.isPending || cancelOrder.isPending;
 
   return (
     <>
@@ -65,7 +149,7 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
         <div className="absolute inset-0 bg-foreground/50" onClick={onClose} />
         <div className="absolute right-0 top-0 bottom-0 w-full max-w-xl bg-card shadow-lg animate-slide-in-right overflow-y-auto">
           {/* Header */}
-          <div className="sticky top-0 bg-card flex items-center justify-between p-6 border-b border-border">
+          <div className="sticky top-0 bg-card flex items-center justify-between p-6 border-b border-border z-10">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-primary-light flex items-center justify-center">
                 <ShoppingCart className="w-5 h-5 text-primary" />
@@ -81,20 +165,77 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
           </div>
 
           <div className="p-6 space-y-6">
-            {/* Status */}
-            <div className="flex items-center justify-between">
-              {order.status && (
-                <StatusBadge variant={orderStatusVariant[order.status]}>
-                  {orderStatusLabel[order.status]}
-                </StatusBadge>
-              )}
-              {order.payment_status === "paid" && (
-                <span className="text-sm text-success font-medium">Payé</span>
-              )}
-              {order.payment_status === "refunded" && (
-                <span className="text-sm text-danger font-medium">Remboursé</span>
-              )}
-            </div>
+            {/* Status Management */}
+            {canWrite() && (
+              <div className="bg-secondary rounded-lg p-4 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Statut commande</Label>
+                    <Select 
+                      value={order.status || "pending"} 
+                      onValueChange={handleStatusChange}
+                      disabled={isUpdating}
+                    >
+                      <SelectTrigger className="mt-1.5">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ORDER_STATUSES.map(status => (
+                          <SelectItem key={status.value} value={status.value}>
+                            {status.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                      <CreditCard className="w-3 h-3" />
+                      Statut paiement
+                    </Label>
+                    <Select 
+                      value={order.payment_status || "pending"} 
+                      onValueChange={handlePaymentStatusChange}
+                      disabled={isUpdating}
+                    >
+                      <SelectTrigger className="mt-1.5">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PAYMENT_STATUSES.map(status => (
+                          <SelectItem key={status.value} value={status.value}>
+                            {status.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                {isUpdating && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Mise à jour en cours...
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Current Status Display (for read-only users) */}
+            {!canWrite() && (
+              <div className="flex items-center justify-between">
+                {order.status && (
+                  <StatusBadge variant={orderStatusVariant[order.status]}>
+                    {orderStatusLabel[order.status]}
+                  </StatusBadge>
+                )}
+                {order.payment_status === "paid" && (
+                  <span className="text-sm text-success font-medium">Payé</span>
+                )}
+                {order.payment_status === "refunded" && (
+                  <span className="text-sm text-danger font-medium">Remboursé</span>
+                )}
+              </div>
+            )}
 
             {/* Customer */}
             <div className="bg-secondary rounded-lg p-4">
@@ -184,24 +325,20 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
                 <span className="text-muted-foreground">Livraison</span>
                 <span>{formatCurrency(order.shipping_amount)}</span>
               </div>
+              {(order.discount_amount ?? 0) > 0 && (
+                <div className="flex justify-between text-sm text-success">
+                  <span>Remise</span>
+                  <span>-{formatCurrency(order.discount_amount)}</span>
+                </div>
+              )}
               <div className="flex justify-between font-semibold text-lg pt-2 border-t border-border">
                 <span>Total</span>
                 <span>{formatCurrency(order.total)}</span>
               </div>
             </div>
 
-            {/* Actions */}
-            {order.status === "pending" && (
-              <div className="flex gap-3">
-                <Button className="flex-1">Préparer la commande</Button>
-              </div>
-            )}
-            {order.status === "processing" && (
-              <Button className="w-full">Marquer comme expédiée</Button>
-            )}
-
             {/* Edit/Cancel Actions */}
-            {(canWrite() || canDelete()) && canCancelOrder && (
+            {(canWrite() || canDelete()) && canModifyOrder && (
               <div className="flex gap-3 pt-4 border-t border-border">
                 {canWrite() && (
                   <Button variant="outline" className="flex-1" onClick={() => setShowEditModal(true)}>
@@ -234,6 +371,24 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
             <AlertDialogCancel>Retour</AlertDialogCancel>
             <AlertDialogAction onClick={handleCancel} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Annuler la commande
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Refund Confirmation Dialog */}
+      <AlertDialog open={showRefundDialog} onOpenChange={setShowRefundDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Rembourser la commande ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action marquera la commande "{order.order_number}" comme remboursée.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Retour</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRefund} className="bg-warning text-warning-foreground hover:bg-warning/90">
+              Rembourser
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
