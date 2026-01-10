@@ -1,9 +1,11 @@
 import { Euro, ShoppingCart, Users, AlertTriangle, Loader2 } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
-import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge, supplierTypeVariant, supplierTypeLabel } from "@/components/ui/status-badge";
 import { useDashboardKpis, useSupplierSalesView } from "@/hooks/useDashboard";
 import { formatCurrency } from "@/lib/format";
+import type { Tables } from "@/integrations/supabase/types";
+
+type SupplierSalesRow = Tables<'v_supplier_sales'>;
 
 export function Dashboard() {
   const { data: kpis, isLoading: kpisLoading } = useDashboardKpis();
@@ -58,64 +60,60 @@ export function Dashboard() {
           </div>
         </div>
 
-        <DataTable
-          columns={[
-            {
-              key: "name",
-              header: "Fournisseur",
-              render: (item) => (
-                <div>
-                  <div className="font-semibold text-primary">{item.supplier_name}</div>
-                  <div className="text-xs text-muted-foreground">{item.items_sold ?? 0} articles vendus</div>
-                </div>
-              ),
-            },
-            {
-              key: "type",
-              header: "Type",
-              render: (item) => item.supplier_type ? (
-                <StatusBadge variant={supplierTypeVariant[item.supplier_type]}>
-                  {supplierTypeLabel[item.supplier_type]}
-                </StatusBadge>
-              ) : null,
-            },
-            {
-              key: "commission",
-              header: "Commission",
-              render: (item) => (
-                <span className="text-sm tabular-nums">
-                  {item.supplier_type === "consignment" && item.commission_rate
-                    ? `${(item.commission_rate * 100).toFixed(0)}%` 
-                    : "—"}
-                </span>
-              ),
-            },
-            {
-              key: "revenue",
-              header: "CA Brut",
-              render: (item) => (
-                <span className="font-semibold tabular-nums">{formatCurrency(item.gross_sales)}</span>
-              ),
-            },
-            {
-              key: "margin",
-              header: "Marge ON",
-              render: (item) => (
-                <span className="font-semibold tabular-nums text-success">{formatCurrency(item.our_margin)}</span>
-              ),
-            },
-            {
-              key: "payout",
-              header: "À reverser",
-              render: (item) => (
-                <span className={`tabular-nums ${(item.supplier_due ?? 0) > 0 ? "text-info font-medium" : "text-muted-foreground"}`}>
-                  {(item.supplier_due ?? 0) > 0 ? formatCurrency(item.supplier_due) : "—"}
-                </span>
-              ),
-            },
-          ]}
-          data={supplierSales}
-        />
+        <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr>
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Fournisseur</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Type</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Commission</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">CA Brut</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Marge ON</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">À reverser</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(supplierSales as SupplierSalesRow[]).map((item) => (
+                <tr key={item.supplier_id} className="border-b border-border last:border-b-0 hover:bg-secondary/50 transition-colors">
+                  <td className="px-6 py-4">
+                    <div className="font-semibold text-primary">{item.supplier_name}</div>
+                    <div className="text-xs text-muted-foreground">{item.items_sold ?? 0} articles vendus</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    {item.supplier_type && (
+                      <StatusBadge variant={supplierTypeVariant[item.supplier_type]}>
+                        {supplierTypeLabel[item.supplier_type]}
+                      </StatusBadge>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-sm tabular-nums">
+                      {item.supplier_type === "consignment" && item.commission_rate
+                        ? `${((item.commission_rate || 0) * 100).toFixed(0)}%`
+                        : "—"}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="font-semibold tabular-nums">{formatCurrency(item.gross_sales)}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="font-semibold tabular-nums text-success">{formatCurrency(item.our_margin)}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`tabular-nums ${(item.supplier_due ?? 0) > 0 ? "text-info font-medium" : "text-muted-foreground"}`}>
+                      {(item.supplier_due ?? 0) > 0 ? formatCurrency(item.supplier_due) : "—"}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {supplierSales.length === 0 && (
+            <div className="p-12 text-center text-muted-foreground">
+              Aucune donnée de vente
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

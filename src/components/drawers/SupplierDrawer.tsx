@@ -1,7 +1,8 @@
 import { X, Building2, Mail, Phone, MapPin, Package, Euro, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, supplierTypeVariant, supplierTypeLabel } from "@/components/ui/status-badge";
-import { Supplier, formatCurrency, formatDate } from "@/data/demo-data";
+import type { Supplier } from "@/hooks/useSuppliers";
+import { formatCurrency, formatDate } from "@/lib/format";
 
 interface SupplierDrawerProps {
   supplier: Supplier | null;
@@ -43,20 +44,22 @@ export function SupplierDrawer({ supplier, isOpen, onClose }: SupplierDrawerProp
                 <a href={`mailto:${supplier.email}`} className="text-primary hover:underline">{supplier.email}</a>
               </div>
             )}
-            {supplier.phone !== "—" && (
+            {supplier.phone && (
               <div className="flex items-center gap-3 text-sm">
                 <Phone className="w-4 h-4 text-muted-foreground" />
                 <span>{supplier.phone}</span>
               </div>
             )}
-            <div className="flex items-center gap-3 text-sm">
-              <MapPin className="w-4 h-4 text-muted-foreground" />
-              <span>{supplier.address}</span>
-            </div>
-            {supplier.contactName !== "—" && (
+            {supplier.address && (
+              <div className="flex items-center gap-3 text-sm">
+                <MapPin className="w-4 h-4 text-muted-foreground" />
+                <span>{supplier.address}{supplier.city ? `, ${supplier.city}` : ''}{supplier.country ? `, ${supplier.country}` : ''}</span>
+              </div>
+            )}
+            {supplier.contact_name && (
               <div className="flex items-center gap-3 text-sm">
                 <Building2 className="w-4 h-4 text-muted-foreground" />
-                <span>Contact : {supplier.contactName}</span>
+                <span>Contact : {supplier.contact_name}</span>
               </div>
             )}
           </div>
@@ -72,12 +75,14 @@ export function SupplierDrawer({ supplier, isOpen, onClose }: SupplierDrawerProp
               <div>
                 <div className="text-xs text-muted-foreground mb-1">Commission ON</div>
                 <div className="font-medium">
-                  {supplier.type === "consignment" ? `${(supplier.commissionRate * 100).toFixed(0)}%` : "N/A"}
+                  {supplier.type === "consignment" && supplier.commission_rate 
+                    ? `${(supplier.commission_rate * 100).toFixed(0)}%` 
+                    : "N/A"}
                 </div>
               </div>
               <div>
                 <div className="text-xs text-muted-foreground mb-1">Depuis</div>
-                <div className="font-medium">{formatDate(supplier.createdAt)}</div>
+                <div className="font-medium">{formatDate(supplier.created_at)}</div>
               </div>
               <div>
                 <div className="text-xs text-muted-foreground mb-1">Statut</div>
@@ -97,28 +102,28 @@ export function SupplierDrawer({ supplier, isOpen, onClose }: SupplierDrawerProp
                 <div className="flex items-center justify-center gap-1 text-muted-foreground mb-2">
                   <Package className="w-4 h-4" />
                 </div>
-                <div className="text-2xl font-bold">{supplier.products}</div>
+                <div className="text-2xl font-bold">{supplier.products_count || 0}</div>
                 <div className="text-xs text-muted-foreground">Références</div>
               </div>
               <div className="bg-secondary rounded-lg p-4 text-center">
                 <div className="flex items-center justify-center gap-1 text-muted-foreground mb-2">
                   <Euro className="w-4 h-4" />
                 </div>
-                <div className="text-2xl font-bold">{formatCurrency(supplier.revenue)}</div>
+                <div className="text-2xl font-bold">{formatCurrency(supplier.total_revenue)}</div>
                 <div className="text-xs text-muted-foreground">CA Total</div>
               </div>
             </div>
           </div>
 
           {/* À reverser */}
-          {supplier.pendingPayout > 0 && (
+          {(supplier.pending_payout ?? 0) > 0 && (
             <div className="bg-info-light rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm font-medium text-info">À reverser</div>
                   <div className="text-xs text-info/70">Période en cours</div>
                 </div>
-                <div className="text-2xl font-bold text-info">{formatCurrency(supplier.pendingPayout)}</div>
+                <div className="text-2xl font-bold text-info">{formatCurrency(supplier.pending_payout)}</div>
               </div>
             </div>
           )}

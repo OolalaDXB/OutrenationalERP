@@ -104,7 +104,7 @@ export function ProductsPage() {
           >
             <option value="all">Tous les formats</option>
             {formats.map((f) => (
-              <option key={f} value={f}>{formatLabels[f] || f.toUpperCase()}</option>
+              <option key={f} value={f}>{formatLabels[f] || f?.toUpperCase()}</option>
             ))}
           </select>
           <select
