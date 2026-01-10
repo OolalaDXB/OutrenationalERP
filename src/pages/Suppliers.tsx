@@ -7,6 +7,7 @@ import { SupplierFormModal } from "@/components/forms/SupplierFormModal";
 import { useSuppliers, useDeleteSupplier, type Supplier } from "@/hooks/useSuppliers";
 import { formatCurrency } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,6 +19,7 @@ export function SuppliersPage() {
   const { data: suppliers = [], isLoading, error } = useSuppliers();
   const deleteSupplier = useDeleteSupplier();
   const { toast } = useToast();
+  const { canWrite, canDelete } = useAuth();
   
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -110,10 +112,12 @@ export function SuppliersPage() {
           <h2 className="text-lg font-semibold">Tous les fournisseurs</h2>
           <p className="text-sm text-muted-foreground">{filteredSuppliers.length} fournisseurs</p>
         </div>
-        <Button className="gap-2" onClick={handleCreateNew}>
-          <Plus className="w-4 h-4" />
-          Nouveau fournisseur
-        </Button>
+        {canWrite() && (
+          <Button className="gap-2" onClick={handleCreateNew}>
+            <Plus className="w-4 h-4" />
+            Nouveau fournisseur
+          </Button>
+        )}
       </div>
 
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
@@ -158,7 +162,9 @@ export function SuppliersPage() {
               <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Références</th>
               <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">CA Total</th>
               <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">À reverser</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border"></th>
+              {canWrite() && (
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border"></th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -198,31 +204,35 @@ export function SuppliersPage() {
                     {(supplier.pending_payout || 0) > 0 ? formatCurrency(supplier.pending_payout) : "—"}
                   </span>
                 </td>
-                <td className="px-6 py-4">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <MoreHorizontal className="w-4 h-4" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={(e) => handleEdit(supplier, e as unknown as React.MouseEvent)}>
-                        <Pencil className="w-4 h-4 mr-2" />
-                        Modifier
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={(e) => handleDelete(supplier, e as unknown as React.MouseEvent)}
-                        className="text-destructive focus:text-destructive"
-                      >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Supprimer
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </td>
+                {canWrite() && (
+                  <td className="px-6 py-4">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreHorizontal className="w-4 h-4" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={(e) => handleEdit(supplier, e as unknown as React.MouseEvent)}>
+                          <Pencil className="w-4 h-4 mr-2" />
+                          Modifier
+                        </DropdownMenuItem>
+                        {canDelete() && (
+                          <DropdownMenuItem 
+                            onClick={(e) => handleDelete(supplier, e as unknown as React.MouseEvent)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Supprimer
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

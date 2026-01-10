@@ -8,12 +8,14 @@ import { OrderFormModal } from "@/components/forms/OrderFormModal";
 import { useOrdersWithItems, useUpdateOrderStatus, useCancelOrder } from "@/hooks/useOrders";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 export function OrdersPage() {
   const { data: orders = [], isLoading, error } = useOrdersWithItems();
   const updateOrderStatus = useUpdateOrderStatus();
   const cancelOrder = useCancelOrder();
   const { toast } = useToast();
+  const { canWrite } = useAuth();
   
   const [selectedOrder, setSelectedOrder] = useState<typeof orders[0] | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -91,10 +93,12 @@ export function OrdersPage() {
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Toutes les commandes</h2>
-          <Button className="gap-2" onClick={handleCreateNew}>
-            <Plus className="w-4 h-4" />
-            Nouvelle commande
-          </Button>
+          {canWrite() && (
+            <Button className="gap-2" onClick={handleCreateNew}>
+              <Plus className="w-4 h-4" />
+              Nouvelle commande
+            </Button>
+          )}
         </div>
 
         <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">

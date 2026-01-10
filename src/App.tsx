@@ -16,6 +16,7 @@ import { ReorderPage } from "@/pages/Reorder";
 import { InvoicesPage } from "@/pages/Invoices";
 import { AnalyticsPage } from "@/pages/Analytics";
 import { StockMovementsPage } from "@/pages/StockMovements";
+import { UserRolesPage } from "@/pages/UserRoles";
 import { LoginPage } from "@/pages/Login";
 import { Loader2 } from "lucide-react";
 import "@fontsource/inter/400.css";
@@ -38,6 +39,7 @@ const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   "/invoices": { title: "Factures", subtitle: "Facturation" },
   "/analytics": { title: "Analytics", subtitle: "Statistiques" },
   "/supplier-sales": { title: "Ventes par fournisseur", subtitle: "Rapports" },
+  "/admin/roles": { title: "Gestion des rôles", subtitle: "Administration" },
 };
 
 function AppContent() {
@@ -72,6 +74,7 @@ function AppContent() {
       case "/invoices": return <InvoicesPage />;
       case "/analytics": return <AnalyticsPage />;
       case "/supplier-sales": return <SupplierSalesPage />;
+      case "/admin/roles": return <UserRolesPage />;
       default: return <Dashboard />;
     }
   };
