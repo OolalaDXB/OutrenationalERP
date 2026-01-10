@@ -29,6 +29,7 @@ interface ProAuthContextType {
   isProfessional: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<{ error: Error | null }>;
   refreshCustomer: () => Promise<void>;
 }
 
@@ -100,6 +101,13 @@ export function ProAuthProvider({ children }: { children: React.ReactNode }) {
     setCustomer(null);
   };
 
+  const resetPassword = async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/pro/reset-password`,
+    });
+    return { error: error as Error | null };
+  };
+
   const isApproved = customer?.approved === true;
   const isProfessional = customer?.customer_type === 'professional';
 
@@ -112,6 +120,7 @@ export function ProAuthProvider({ children }: { children: React.ReactNode }) {
       isProfessional,
       signIn,
       signOut,
+      resetPassword,
       refreshCustomer
     }}>
       {children}
