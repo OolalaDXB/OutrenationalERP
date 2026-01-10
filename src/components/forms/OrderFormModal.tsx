@@ -1,10 +1,14 @@
-import { useState } from "react";
-import { X, ShoppingCart, Plus, Trash2, Loader2 } from "lucide-react";
+import { useState, useMemo } from "react";
+import { X, ShoppingCart, Plus, Trash2, Loader2, Search, UserPlus, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useProducts } from "@/hooks/useProducts";
+import { useCustomers, useCreateCustomer } from "@/hooks/useCustomers";
 import { useCreateOrder, type OrderInsert, type OrderItemInsert } from "@/hooks/useOrders";
 import { formatCurrency } from "@/lib/format";
 
@@ -20,11 +24,31 @@ interface OrderItemForm {
   unit_price: number;
 }
 
+const SALES_CHANNELS = [
+  { value: "web", label: "Site web" },
+  { value: "marketplace", label: "Marketplace (Discogs, eBay...)" },
+  { value: "shop", label: "Boutique physique" },
+  { value: "phone", label: "Téléphone" },
+  { value: "other", label: "Autre" },
+] as const;
+
 export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
   const { toast } = useToast();
   const { data: products = [] } = useProducts();
+  const { data: customers = [] } = useCustomers();
   const createOrder = useCreateOrder();
+  const createCustomer = useCreateCustomer();
 
+  // Sales channel
+  const [salesChannel, setSalesChannel] = useState<string>("web");
+
+  // Customer selection mode
+  const [customerMode, setCustomerMode] = useState<"existing" | "new">("existing");
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [saveNewCustomer, setSaveNewCustomer] = useState(true);
+
+  // Form data for new customer
   const [formData, setFormData] = useState({
     customer_email: "",
     customer_name: "",
@@ -36,9 +60,43 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
 
   const [items, setItems] = useState<OrderItemForm[]>([]);
 
+  // Filter customers based on search
+  const filteredCustomers = useMemo(() => {
+    if (!customerSearch) return customers.slice(0, 20);
+    const search = customerSearch.toLowerCase();
+    return customers
+      .filter(c => 
+        c.email?.toLowerCase().includes(search) ||
+        c.first_name?.toLowerCase().includes(search) ||
+        c.last_name?.toLowerCase().includes(search)
+      )
+      .slice(0, 20);
+  }, [customers, customerSearch]);
+
+  // Get selected customer data
+  const selectedCustomer = useMemo(() => {
+    return customers.find(c => c.id === selectedCustomerId);
+  }, [customers, selectedCustomerId]);
+
+  // Auto-fill form when selecting existing customer
+  const handleSelectCustomer = (customerId: string) => {
+    setSelectedCustomerId(customerId);
+    const customer = customers.find(c => c.id === customerId);
+    if (customer) {
+      setFormData({
+        customer_email: customer.email,
+        customer_name: `${customer.first_name || ''} ${customer.last_name || ''}`.trim(),
+        shipping_address: customer.address || "",
+        shipping_city: customer.city || "",
+        shipping_postal_code: customer.postal_code || "",
+        shipping_country: customer.country || "France",
+      });
+    }
+  };
+
   if (!isOpen) return null;
 
-  const isLoading = createOrder.isPending;
+  const isLoading = createOrder.isPending || createCustomer.isPending;
 
   const addItem = () => {
     setItems([...items, { product_id: "", title: "", quantity: 1, unit_price: 0 }]);
@@ -52,7 +110,6 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], ...updates };
     
-    // If product selected, auto-fill title and price
     if (updates.product_id) {
       const product = products.find(p => p.id === updates.product_id);
       if (product) {
@@ -65,12 +122,34 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
   };
 
   const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
-  const total = subtotal; // Could add shipping/tax here
+  const total = subtotal;
+
+  const resetForm = () => {
+    setSalesChannel("web");
+    setCustomerMode("existing");
+    setSelectedCustomerId("");
+    setCustomerSearch("");
+    setSaveNewCustomer(true);
+    setFormData({
+      customer_email: "",
+      customer_name: "",
+      shipping_address: "",
+      shipping_city: "",
+      shipping_postal_code: "",
+      shipping_country: "France",
+    });
+    setItems([]);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.customer_email) {
+    // Validate email
+    const customerEmail = customerMode === "existing" && selectedCustomer 
+      ? selectedCustomer.email 
+      : formData.customer_email;
+
+    if (!customerEmail) {
       toast({ title: "Erreur", description: "L'email client est requis", variant: "destructive" });
       return;
     }
@@ -81,14 +160,55 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
     }
 
     try {
+      let customerId: string | null = null;
+
+      // Handle customer creation for new customers
+      if (customerMode === "new" && saveNewCustomer) {
+        // Check if email already exists
+        const existingCustomer = customers.find(c => c.email === formData.customer_email);
+        if (existingCustomer) {
+          customerId = existingCustomer.id;
+        } else {
+          // Parse name into first and last name
+          const nameParts = formData.customer_name.trim().split(' ');
+          const firstName = nameParts[0] || '';
+          const lastName = nameParts.slice(1).join(' ') || '';
+
+          const newCustomer = await createCustomer.mutateAsync({
+            email: formData.customer_email,
+            first_name: firstName || null,
+            last_name: lastName || null,
+            address: formData.shipping_address || null,
+            city: formData.shipping_city || null,
+            postal_code: formData.shipping_postal_code || null,
+            country: formData.shipping_country || null,
+          });
+          customerId = newCustomer.id;
+        }
+      } else if (customerMode === "existing" && selectedCustomerId) {
+        customerId = selectedCustomerId;
+      }
+
       const orderData: OrderInsert = {
         order_number: `ORD-${Date.now()}`,
-        customer_email: formData.customer_email,
-        customer_name: formData.customer_name || null,
-        shipping_address: formData.shipping_address || null,
-        shipping_city: formData.shipping_city || null,
-        shipping_postal_code: formData.shipping_postal_code || null,
-        shipping_country: formData.shipping_country || null,
+        customer_email: customerEmail,
+        customer_name: customerMode === "existing" && selectedCustomer 
+          ? `${selectedCustomer.first_name || ''} ${selectedCustomer.last_name || ''}`.trim() 
+          : formData.customer_name || null,
+        customer_id: customerId,
+        source: salesChannel,
+        shipping_address: customerMode === "existing" && selectedCustomer 
+          ? selectedCustomer.address 
+          : formData.shipping_address || null,
+        shipping_city: customerMode === "existing" && selectedCustomer 
+          ? selectedCustomer.city 
+          : formData.shipping_city || null,
+        shipping_postal_code: customerMode === "existing" && selectedCustomer 
+          ? selectedCustomer.postal_code 
+          : formData.shipping_postal_code || null,
+        shipping_country: customerMode === "existing" && selectedCustomer 
+          ? selectedCustomer.country 
+          : formData.shipping_country || null,
         subtotal,
         total,
         status: "pending",
@@ -106,17 +226,7 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
       await createOrder.mutateAsync({ order: orderData, items: orderItems });
       toast({ title: "Succès", description: "Commande créée avec succès" });
       onClose();
-      
-      // Reset form
-      setFormData({
-        customer_email: "",
-        customer_name: "",
-        shipping_address: "",
-        shipping_city: "",
-        shipping_postal_code: "",
-        shipping_country: "France",
-      });
-      setItems([]);
+      resetForm();
     } catch (error) {
       toast({ 
         title: "Erreur", 
@@ -148,64 +258,177 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Client info */}
+          {/* Sales Channel */}
           <div>
-            <h3 className="text-sm font-semibold mb-4">Informations client</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-sm font-medium text-muted-foreground">Email *</Label>
-                <Input
-                  type="email"
-                  value={formData.customer_email}
-                  onChange={(e) => setFormData({ ...formData, customer_email: e.target.value })}
-                  placeholder="client@example.com"
-                  className="mt-1.5"
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-muted-foreground">Nom</Label>
-                <Input
-                  value={formData.customer_name}
-                  onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
-                  placeholder="Jean Dupont"
-                  className="mt-1.5"
-                />
-              </div>
-            </div>
+            <Label className="text-sm font-semibold">Canal de vente</Label>
+            <Select value={salesChannel} onValueChange={setSalesChannel}>
+              <SelectTrigger className="mt-2">
+                <SelectValue placeholder="Sélectionner un canal..." />
+              </SelectTrigger>
+              <SelectContent>
+                {SALES_CHANNELS.map(channel => (
+                  <SelectItem key={channel.value} value={channel.value}>
+                    {channel.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Shipping address */}
+          {/* Customer Selection */}
           <div>
-            <h3 className="text-sm font-semibold mb-4">Adresse de livraison</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
-                <Label className="text-sm font-medium text-muted-foreground">Adresse</Label>
-                <Input
-                  value={formData.shipping_address}
-                  onChange={(e) => setFormData({ ...formData, shipping_address: e.target.value })}
-                  placeholder="123 rue de la Musique"
-                  className="mt-1.5"
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-muted-foreground">Ville</Label>
-                <Input
-                  value={formData.shipping_city}
-                  onChange={(e) => setFormData({ ...formData, shipping_city: e.target.value })}
-                  placeholder="Paris"
-                  className="mt-1.5"
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-muted-foreground">Code postal</Label>
-                <Input
-                  value={formData.shipping_postal_code}
-                  onChange={(e) => setFormData({ ...formData, shipping_postal_code: e.target.value })}
-                  placeholder="75001"
-                  className="mt-1.5"
-                />
-              </div>
-            </div>
+            <h3 className="text-sm font-semibold mb-4">Informations client</h3>
+            
+            <Tabs value={customerMode} onValueChange={(v) => setCustomerMode(v as "existing" | "new")} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsTrigger value="existing" className="gap-2">
+                  <User className="w-4 h-4" />
+                  Client existant
+                </TabsTrigger>
+                <TabsTrigger value="new" className="gap-2">
+                  <UserPlus className="w-4 h-4" />
+                  Nouveau client
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="existing" className="space-y-4">
+                {/* Customer Search */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    value={customerSearch}
+                    onChange={(e) => setCustomerSearch(e.target.value)}
+                    placeholder="Rechercher par nom ou email..."
+                    className="pl-10"
+                  />
+                </div>
+
+                {/* Customer List */}
+                <div className="max-h-48 overflow-y-auto border border-border rounded-lg divide-y divide-border">
+                  {filteredCustomers.length === 0 ? (
+                    <div className="p-4 text-center text-sm text-muted-foreground">
+                      Aucun client trouvé
+                    </div>
+                  ) : (
+                    filteredCustomers.map(customer => (
+                      <button
+                        key={customer.id}
+                        type="button"
+                        onClick={() => handleSelectCustomer(customer.id)}
+                        className={`w-full p-3 text-left hover:bg-secondary/50 transition-colors ${
+                          selectedCustomerId === customer.id ? 'bg-primary/10 border-l-2 border-l-primary' : ''
+                        }`}
+                      >
+                        <div className="font-medium text-sm">
+                          {customer.first_name} {customer.last_name}
+                        </div>
+                        <div className="text-xs text-muted-foreground">{customer.email}</div>
+                        {customer.city && (
+                          <div className="text-xs text-muted-foreground mt-1">{customer.city}, {customer.country}</div>
+                        )}
+                      </button>
+                    ))
+                  )}
+                </div>
+
+                {/* Selected Customer Summary */}
+                {selectedCustomer && (
+                  <div className="bg-secondary/50 rounded-lg p-4 space-y-2">
+                    <div className="text-sm font-medium">Client sélectionné</div>
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Nom:</span> {selectedCustomer.first_name} {selectedCustomer.last_name}
+                    </div>
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Email:</span> {selectedCustomer.email}
+                    </div>
+                    {selectedCustomer.address && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Adresse:</span> {selectedCustomer.address}, {selectedCustomer.city} {selectedCustomer.postal_code}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="new" className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Email *</Label>
+                    <Input
+                      type="email"
+                      value={formData.customer_email}
+                      onChange={(e) => setFormData({ ...formData, customer_email: e.target.value })}
+                      placeholder="client@example.com"
+                      className="mt-1.5"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Nom complet</Label>
+                    <Input
+                      value={formData.customer_name}
+                      onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
+                      placeholder="Jean Dupont"
+                      className="mt-1.5"
+                    />
+                  </div>
+                </div>
+
+                {/* Shipping address for new customer */}
+                <div className="pt-4 border-t border-border">
+                  <h4 className="text-sm font-medium mb-3">Adresse de livraison</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="col-span-2">
+                      <Label className="text-sm font-medium text-muted-foreground">Adresse</Label>
+                      <Input
+                        value={formData.shipping_address}
+                        onChange={(e) => setFormData({ ...formData, shipping_address: e.target.value })}
+                        placeholder="123 rue de la Musique"
+                        className="mt-1.5"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Ville</Label>
+                      <Input
+                        value={formData.shipping_city}
+                        onChange={(e) => setFormData({ ...formData, shipping_city: e.target.value })}
+                        placeholder="Paris"
+                        className="mt-1.5"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">Code postal</Label>
+                      <Input
+                        value={formData.shipping_postal_code}
+                        onChange={(e) => setFormData({ ...formData, shipping_postal_code: e.target.value })}
+                        placeholder="75001"
+                        className="mt-1.5"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <Label className="text-sm font-medium text-muted-foreground">Pays</Label>
+                      <Input
+                        value={formData.shipping_country}
+                        onChange={(e) => setFormData({ ...formData, shipping_country: e.target.value })}
+                        placeholder="France"
+                        className="mt-1.5"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Save customer checkbox */}
+                <div className="flex items-center gap-2 pt-2">
+                  <Checkbox
+                    id="save-customer"
+                    checked={saveNewCustomer}
+                    onCheckedChange={(checked) => setSaveNewCustomer(checked === true)}
+                  />
+                  <Label htmlFor="save-customer" className="text-sm cursor-pointer">
+                    Enregistrer ce client pour le futur
+                  </Label>
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
 
           {/* Order items */}
@@ -294,7 +517,10 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
             <Button type="button" variant="secondary" onClick={onClose} disabled={isLoading}>
               Annuler
             </Button>
-            <Button type="submit" disabled={isLoading || items.length === 0}>
+            <Button 
+              type="submit" 
+              disabled={isLoading || items.length === 0 || (customerMode === "existing" && !selectedCustomerId) || (customerMode === "new" && !formData.customer_email)}
+            >
               {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Créer la commande
             </Button>
