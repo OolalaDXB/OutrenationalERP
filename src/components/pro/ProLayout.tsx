@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useProAuth } from "@/hooks/useProAuth";
 import { useCart } from "@/hooks/useCart";
 import { cn } from "@/lib/utils";
+import outreNationalLogo from "@/assets/outre-national-logo.png";
 
 const NAV_ITEMS = [
   { to: "/pro/catalog", label: "Catalogue", icon: Package },
@@ -66,10 +67,8 @@ export function ProLayout() {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link to="/pro" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-sm">ON</span>
-              </div>
-              <span className="font-semibold text-lg hidden sm:block">Outre-National Pro</span>
+              <img src={outreNationalLogo} alt="Outre-National" className="w-8 h-8 rounded" />
+              <span className="font-semibold text-lg hidden sm:block">Outre-National</span>
             </Link>
 
             {/* Navigation */}
@@ -153,6 +152,9 @@ export function ProLayout() {
               <span>Contact: pro@outre-national.com</span>
               <span>Tél: +33 1 23 45 67 89</span>
             </div>
+          </div>
+          <div className="text-center mt-4">
+            <span className="text-xs text-muted-foreground">Powered by Sillon</span>
           </div>
         </div>
       </footer>
