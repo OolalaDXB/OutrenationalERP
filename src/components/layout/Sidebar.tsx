@@ -118,9 +118,11 @@ export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
     setIsRefreshing(true);
     await refreshRole();
     setIsRefreshing(false);
+    const newRole = user?.role || 'viewer';
     toast({
       title: "Rôle mis à jour",
-      description: `Votre rôle actuel : ${user?.role || 'viewer'}`,
+      description: `Votre rôle actuel : ${newRole}`,
+      variant: newRole as "admin" | "staff" | "viewer",
     });
   };
 
