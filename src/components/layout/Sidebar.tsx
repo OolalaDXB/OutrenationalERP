@@ -23,6 +23,7 @@ import {
   Eye
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import outreNationalLogo from "@/assets/outre-national-logo.png";
 
 interface NavItem {
   icon: React.ElementType;
@@ -142,8 +143,9 @@ export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
     <aside className="fixed left-0 top-0 bottom-0 w-[260px] bg-sidebar flex flex-col z-50">
       {/* Header */}
       <div className="px-6 py-5 border-b border-sidebar-border">
-        <div className="text-lg font-bold text-white">
-          Outre-National<span className="text-primary font-normal"> Records</span>
+        <div className="flex items-center gap-3">
+          <img src={outreNationalLogo} alt="Outre-National" className="w-10 h-10 rounded invert" />
+          <span className="text-lg font-bold text-white">Outre-National</span>
         </div>
         <div className="mt-2 flex items-center gap-2">
           <Badge variant="outline" className={cn("text-[0.6rem] font-semibold uppercase", roleColors[userRole])}>
@@ -213,6 +215,9 @@ export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
           >
             <LogOut className="w-4 h-4" />
           </button>
+        </div>
+        <div className="px-3 py-2 text-center">
+          <span className="text-xs text-sidebar-foreground/50">Powered by Sillon</span>
         </div>
       </div>
     </aside>
