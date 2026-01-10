@@ -12,7 +12,7 @@ import { useCancelOrder, useUpdateOrder } from "@/hooks/useOrders";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
-import { OrderFormModal } from "@/components/forms/OrderFormModal";
+import { OrderEditModal } from "@/components/forms/OrderEditModal";
 
 type OrderWithItems = Order & { order_items?: OrderItem[] };
 
@@ -463,6 +463,15 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Order Modal */}
+      {showEditModal && (
+        <OrderEditModal
+          isOpen={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          order={order}
+        />
+      )}
     </>
   );
 }
