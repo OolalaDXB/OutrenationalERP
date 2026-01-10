@@ -35,7 +35,10 @@ const SALES_CHANNELS = [
 const SHIPPING_METHODS = [
   { value: "colissimo", label: "Colissimo", defaultCost: 6.50 },
   { value: "mondial_relay", label: "Mondial Relay", defaultCost: 4.50 },
-  { value: "retrait", label: "Retrait en boutique", defaultCost: 0 },
+  { value: "livraison", label: "Livraison standard", defaultCost: 5.00 },
+  { value: "dhl", label: "DHL Express", defaultCost: 15.00 },
+  { value: "ups", label: "UPS", defaultCost: 12.00 },
+  { value: "retrait", label: "Retrait", defaultCost: 0 },
   { value: "other", label: "Autre", defaultCost: 0 },
 ] as const;
 
@@ -85,6 +88,9 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
   // Discount
   const [discountAmount, setDiscountAmount] = useState<number>(0);
   const [discountReason, setDiscountReason] = useState<string>("");
+
+  // Internal notes
+  const [internalNotes, setInternalNotes] = useState<string>("");
 
   const [items, setItems] = useState<OrderItemForm[]>([]);
 
@@ -191,6 +197,7 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
     setPaymentStatus("paid");
     setDiscountAmount(0);
     setDiscountReason("");
+    setInternalNotes("");
     setItems([]);
   };
 
@@ -266,7 +273,10 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
         shipping_amount: shippingAmount,
         payment_method: PAYMENT_METHODS.find(m => m.value === paymentMethod)?.label || paymentMethod,
         discount_amount: discountAmount > 0 ? discountAmount : null,
-        internal_notes: discountReason && discountAmount > 0 ? `Remise: ${discountReason}` : null,
+        internal_notes: [
+          discountReason && discountAmount > 0 ? `Remise: ${discountReason}` : null,
+          internalNotes || null,
+        ].filter(Boolean).join('\n') || null,
         subtotal,
         total,
         status: "pending",
@@ -586,6 +596,17 @@ export function OrderFormModal({ isOpen, onClose }: OrderFormProps) {
                 />
               </div>
             </div>
+          </div>
+
+          {/* Internal Notes */}
+          <div>
+            <h3 className="text-sm font-semibold mb-4">Notes internes</h3>
+            <textarea
+              value={internalNotes}
+              onChange={(e) => setInternalNotes(e.target.value)}
+              placeholder="Notes pour l'équipe (non visibles par le client)..."
+              className="w-full min-h-[80px] px-3 py-2 rounded-md border border-border bg-card text-sm resize-y"
+            />
           </div>
 
           {/* Order items */}
