@@ -8,7 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useProducts } from "@/hooks/useProducts";
 import { useUpdateOrder, useUpdateOrderItems, type Order, type OrderItem, type OrderUpdate } from "@/hooks/useOrders";
+import { useRestoreStockForItem } from "@/hooks/useRestoreStock";
 import { formatCurrency } from "@/lib/format";
+
+// Statuses where stock was already decremented
+const STOCK_DECREMENTED_STATUSES = ['confirmed', 'processing', 'shipped', 'delivered'];
 
 type OrderWithItems = Order & { order_items?: OrderItem[] };
 
@@ -43,6 +47,10 @@ export function OrderEditModal({ isOpen, onClose, order }: OrderEditModalProps) 
   const { data: products = [] } = useProducts();
   const updateOrder = useUpdateOrder();
   const updateOrderItems = useUpdateOrderItems();
+  const restoreStockForItem = useRestoreStockForItem();
+
+  // Track original quantities for stock restoration
+  const [originalItems, setOriginalItems] = useState<Map<string, number>>(new Map());
 
   // Shipping
   const [shippingMethod, setShippingMethod] = useState(order.shipping_method || "");
@@ -66,7 +74,7 @@ export function OrderEditModal({ isOpen, onClose, order }: OrderEditModalProps) 
   // Product search
   const [productSearch, setProductSearch] = useState("");
 
-  // Initialize items from order
+  // Initialize items from order and store original quantities
   useEffect(() => {
     if (order.order_items) {
       setItems(order.order_items.map(item => ({
@@ -78,6 +86,15 @@ export function OrderEditModal({ isOpen, onClose, order }: OrderEditModalProps) 
         isNew: false,
         isDeleted: false,
       })));
+      
+      // Store original quantities for stock restoration
+      const originals = new Map<string, number>();
+      order.order_items.forEach(item => {
+        if (item.id) {
+          originals.set(item.id, item.quantity);
+        }
+      });
+      setOriginalItems(originals);
     }
   }, [order.order_items]);
 
@@ -166,6 +183,8 @@ export function OrderEditModal({ isOpen, onClose, order }: OrderEditModalProps) 
       return;
     }
 
+    const shouldRestoreStock = order.status && STOCK_DECREMENTED_STATUSES.includes(order.status);
+
     try {
       // Update order details
       const orderUpdate: OrderUpdate & { id: string } = {
@@ -183,6 +202,57 @@ export function OrderEditModal({ isOpen, onClose, order }: OrderEditModalProps) 
       };
 
       await updateOrder.mutateAsync(orderUpdate);
+
+      // Restore stock for deleted items and quantity decreases
+      if (shouldRestoreStock) {
+        let stockRestoredCount = 0;
+
+        // Restore stock for deleted items
+        const deletedItems = items.filter(item => item.isDeleted && item.id && item.product_id);
+        for (const item of deletedItems) {
+          const originalQty = originalItems.get(item.id!) || 0;
+          if (item.product_id && originalQty > 0) {
+            try {
+              await restoreStockForItem.mutateAsync({
+                productId: item.product_id,
+                quantity: originalQty,
+                orderId: order.id,
+                reason: `Article supprimé: ${item.title}`
+              });
+              stockRestoredCount++;
+            } catch (err) {
+              console.warn('Failed to restore stock for deleted item:', err);
+            }
+          }
+        }
+
+        // Restore stock for quantity decreases
+        const updatedItems = items.filter(item => !item.isDeleted && !item.isNew && item.id && item.product_id);
+        for (const item of updatedItems) {
+          const originalQty = originalItems.get(item.id!) || 0;
+          const quantityDiff = originalQty - item.quantity;
+          if (item.product_id && quantityDiff > 0) {
+            try {
+              await restoreStockForItem.mutateAsync({
+                productId: item.product_id,
+                quantity: quantityDiff,
+                orderId: order.id,
+                reason: `Quantité réduite: ${item.title}`
+              });
+              stockRestoredCount++;
+            } catch (err) {
+              console.warn('Failed to restore stock for quantity decrease:', err);
+            }
+          }
+        }
+
+        if (stockRestoredCount > 0) {
+          toast({ 
+            title: "Stock restauré", 
+            description: `Stock restauré pour ${stockRestoredCount} produit(s)` 
+          });
+        }
+      }
 
       // Update order items
       const itemsToDelete = items.filter(item => item.isDeleted && item.id).map(item => item.id!);

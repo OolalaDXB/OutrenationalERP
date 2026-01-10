@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, ShoppingCart, MapPin, Truck, Clock, Package, Pencil, Trash2, Loader2, CreditCard } from "lucide-react";
+import { X, ShoppingCart, MapPin, Truck, Clock, Package, Pencil, Trash2, Loader2, CreditCard, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge, orderStatusVariant, orderStatusLabel } from "@/components/ui/status-badge";
@@ -9,10 +9,12 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { Order, OrderItem } from "@/hooks/useOrders";
 import { useCancelOrder, useUpdateOrder } from "@/hooks/useOrders";
+import { useRestoreStock } from "@/hooks/useRestoreStock";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
 import { OrderEditModal } from "@/components/forms/OrderEditModal";
+import { OrderFormModal } from "@/components/forms/OrderFormModal";
 
 type OrderWithItems = Order & { order_items?: OrderItem[] };
 
@@ -44,7 +46,9 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   const { canWrite, canDelete } = useAuth();
   const cancelOrder = useCancelOrder();
   const updateOrder = useUpdateOrder();
+  const restoreStock = useRestoreStock();
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showRefundDialog, setShowRefundDialog] = useState(false);
   const [showShippedDialog, setShowShippedDialog] = useState(false);
@@ -54,6 +58,27 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   const handleCancel = async () => {
     if (!order) return;
     try {
+      // Restore stock for all items if order was in a status where stock was decremented
+      if (order.order_items && order.order_items.length > 0) {
+        const result = await restoreStock.mutateAsync({
+          items: order.order_items.map(item => ({
+            product_id: item.product_id,
+            quantity: item.quantity,
+            title: item.title
+          })),
+          orderId: order.id,
+          orderStatus: order.status,
+          reason: 'Annulation commande'
+        });
+        
+        if (result.restoredCount > 0) {
+          toast({ 
+            title: "Stock restauré", 
+            description: `Stock restauré pour ${result.restoredCount} produit(s)` 
+          });
+        }
+      }
+
       await cancelOrder.mutateAsync({ id: order.id, reason: "Annulation par l'utilisateur" });
       toast({ title: "Commande annulée", description: `La commande ${order.order_number} a été annulée.` });
       setShowCancelDialog(false);
@@ -365,16 +390,20 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
               </div>
             </div>
 
-            {/* Edit/Cancel Actions */}
-            {(canWrite() || canDelete()) && canModifyOrder && (
+            {/* Edit/Duplicate/Cancel Actions */}
+            {canWrite() && (
               <div className="flex gap-3 pt-4 border-t border-border">
-                {canWrite() && (
+                {canModifyOrder && (
                   <Button variant="outline" className="flex-1" onClick={() => setShowEditModal(true)}>
                     <Pencil className="w-4 h-4 mr-2" />
                     Modifier
                   </Button>
                 )}
-                {canDelete() && (
+                <Button variant="outline" className="flex-1" onClick={() => setShowDuplicateModal(true)}>
+                  <Copy className="w-4 h-4 mr-2" />
+                  Dupliquer
+                </Button>
+                {canDelete() && canModifyOrder && (
                   <Button variant="destructive" className="flex-1" onClick={() => setShowCancelDialog(true)}>
                     <Trash2 className="w-4 h-4 mr-2" />
                     Annuler
@@ -470,6 +499,15 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
           isOpen={showEditModal}
           onClose={() => setShowEditModal(false)}
           order={order}
+        />
+      )}
+
+      {/* Duplicate Order Modal */}
+      {showDuplicateModal && (
+        <OrderFormModal
+          isOpen={showDuplicateModal}
+          onClose={() => setShowDuplicateModal(false)}
+          duplicateFrom={order}
         />
       )}
     </>
