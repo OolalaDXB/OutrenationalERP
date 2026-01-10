@@ -159,3 +159,23 @@ export function useCancelOrder() {
     }
   });
 }
+
+export function useUpdateOrder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: { id: string } & OrderUpdate) => {
+      const { data, error } = await supabase
+        .from('orders')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['orders', variables.id] });
+    }
+  });
+}

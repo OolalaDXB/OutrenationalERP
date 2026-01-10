@@ -1,14 +1,26 @@
 import { useState, useMemo } from "react";
-import { ShoppingCart, Package, Truck, CheckCircle, Plus, Loader2 } from "lucide-react";
+import { ShoppingCart, Package, Truck, CheckCircle, Plus, Loader2, X } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { StatusBadge, orderStatusVariant, orderStatusLabel } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { OrderDrawer } from "@/components/drawers/OrderDrawer";
 import { OrderFormModal } from "@/components/forms/OrderFormModal";
 import { useOrdersWithItems, useUpdateOrderStatus, useCancelOrder } from "@/hooks/useOrders";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+
+const ALL_STATUSES = [
+  { value: "pending", label: "En attente" },
+  { value: "confirmed", label: "Confirmée" },
+  { value: "processing", label: "En préparation" },
+  { value: "shipped", label: "Expédiée" },
+  { value: "delivered", label: "Livrée" },
+  { value: "cancelled", label: "Annulée" },
+  { value: "refunded", label: "Remboursée" },
+];
 
 export function OrdersPage() {
   const { data: orders = [], isLoading, error } = useOrdersWithItems();
@@ -20,10 +32,24 @@ export function OrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<typeof orders[0] | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Handle status toggle
+  const toggleStatus = (status: string) => {
+    setSelectedStatuses(prev => 
+      prev.includes(status) 
+        ? prev.filter(s => s !== status)
+        : [...prev, status]
+    );
+  };
+
+  // Clear all status filters
+  const clearStatusFilters = () => {
+    setSelectedStatuses([]);
+  };
 
   // Filtrage
   const filteredOrders = useMemo(() => {
@@ -34,11 +60,12 @@ export function OrdersPage() {
         (order.customer_name && order.customer_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
         order.customer_email.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesStatus = statusFilter === "all" || order.status === statusFilter;
+      const matchesStatus = selectedStatuses.length === 0 || 
+        (order.status && selectedStatuses.includes(order.status));
 
       return matchesSearch && matchesStatus;
     });
-  }, [orders, searchTerm, statusFilter]);
+  }, [orders, searchTerm, selectedStatuses]);
 
   const pendingCount = orders.filter(o => o.status === "pending").length;
   const processingCount = orders.filter(o => o.status === "processing").length;
@@ -103,19 +130,67 @@ export function OrdersPage() {
 
         <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
           {/* Filters */}
-          <div className="flex gap-3 p-4 border-b border-border bg-secondary flex-wrap">
-            <select
-              className="px-3 py-2 rounded-md border border-border bg-card text-sm cursor-pointer"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="all">Tous les statuts</option>
-              <option value="pending">En attente</option>
-              <option value="processing">En préparation</option>
-              <option value="shipped">Expédié</option>
-              <option value="delivered">Livré</option>
-              <option value="cancelled">Annulé</option>
-            </select>
+          <div className="flex gap-3 p-4 border-b border-border bg-secondary flex-wrap items-center">
+            {/* Multi-select Status Filter */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="px-3 py-2 rounded-md border border-border bg-card text-sm cursor-pointer flex items-center gap-2 hover:bg-secondary/80 transition-colors">
+                  {selectedStatuses.length === 0 ? (
+                    "Tous les statuts"
+                  ) : selectedStatuses.length === 1 ? (
+                    ALL_STATUSES.find(s => s.value === selectedStatuses[0])?.label
+                  ) : (
+                    `${selectedStatuses.length} statuts sélectionnés`
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-2" align="start">
+                <div className="space-y-1">
+                  {ALL_STATUSES.map(status => (
+                    <label
+                      key={status.value}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-secondary cursor-pointer"
+                    >
+                      <Checkbox
+                        checked={selectedStatuses.includes(status.value)}
+                        onCheckedChange={() => toggleStatus(status.value)}
+                      />
+                      <span className="text-sm">{status.label}</span>
+                    </label>
+                  ))}
+                </div>
+                {selectedStatuses.length > 0 && (
+                  <button
+                    onClick={clearStatusFilters}
+                    className="w-full mt-2 pt-2 border-t border-border text-sm text-muted-foreground hover:text-foreground flex items-center justify-center gap-1"
+                  >
+                    <X className="w-3 h-3" />
+                    Effacer les filtres
+                  </button>
+                )}
+              </PopoverContent>
+            </Popover>
+
+            {/* Selected status badges */}
+            {selectedStatuses.length > 0 && (
+              <div className="flex items-center gap-1 flex-wrap">
+                {selectedStatuses.map(status => (
+                  <span
+                    key={status}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-primary/10 text-primary text-xs"
+                  >
+                    {ALL_STATUSES.find(s => s.value === status)?.label}
+                    <button
+                      onClick={() => toggleStatus(status)}
+                      className="hover:bg-primary/20 rounded-full p-0.5"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
             <input
               type="text"
               placeholder="Rechercher client, commande..."
