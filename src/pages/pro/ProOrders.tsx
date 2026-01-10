@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { FileText, Package, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { FileText, Package, Loader2, ChevronDown, ChevronUp, Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { generateProInvoicePDF } from "@/components/pro/ProInvoicePDF";
 import { StatusBadge, orderStatusVariant, orderStatusLabel } from "@/components/ui/status-badge";
 import { useProAuth } from "@/hooks/useProAuth";
 import { useQuery } from "@tanstack/react-query";
@@ -89,6 +91,20 @@ export function ProOrders() {
                         </StatusBadge>
                       )}
                     </div>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (customer) {
+                          generateProInvoicePDF(order, customer);
+                        }
+                      }}
+                      title="Télécharger la facture"
+                    >
+                      <Download className="w-4 h-4" />
+                    </Button>
                     {isExpanded ? (
                       <ChevronUp className="w-5 h-5 text-muted-foreground" />
                     ) : (
