@@ -108,11 +108,16 @@ export type Database = {
           accepts_marketing: boolean | null
           address: string | null
           address_line_2: string | null
+          approved: boolean | null
           auth_user_id: string | null
           average_order_value: number | null
           city: string | null
+          company_name: string | null
           country: string | null
           created_at: string | null
+          credit_limit: number | null
+          customer_type: string | null
+          discount_rate: number | null
           email: string
           first_name: string | null
           id: string
@@ -120,21 +125,28 @@ export type Database = {
           last_order_at: string | null
           notes: string | null
           orders_count: number | null
+          payment_terms: number | null
           phone: string | null
           postal_code: string | null
           tags: string[] | null
           total_spent: number | null
           updated_at: string | null
+          vat_number: string | null
         }
         Insert: {
           accepts_marketing?: boolean | null
           address?: string | null
           address_line_2?: string | null
+          approved?: boolean | null
           auth_user_id?: string | null
           average_order_value?: number | null
           city?: string | null
+          company_name?: string | null
           country?: string | null
           created_at?: string | null
+          credit_limit?: number | null
+          customer_type?: string | null
+          discount_rate?: number | null
           email: string
           first_name?: string | null
           id?: string
@@ -142,21 +154,28 @@ export type Database = {
           last_order_at?: string | null
           notes?: string | null
           orders_count?: number | null
+          payment_terms?: number | null
           phone?: string | null
           postal_code?: string | null
           tags?: string[] | null
           total_spent?: number | null
           updated_at?: string | null
+          vat_number?: string | null
         }
         Update: {
           accepts_marketing?: boolean | null
           address?: string | null
           address_line_2?: string | null
+          approved?: boolean | null
           auth_user_id?: string | null
           average_order_value?: number | null
           city?: string | null
+          company_name?: string | null
           country?: string | null
           created_at?: string | null
+          credit_limit?: number | null
+          customer_type?: string | null
+          discount_rate?: number | null
           email?: string
           first_name?: string | null
           id?: string
@@ -164,11 +183,13 @@ export type Database = {
           last_order_at?: string | null
           notes?: string | null
           orders_count?: number | null
+          payment_terms?: number | null
           phone?: string | null
           postal_code?: string | null
           tags?: string[] | null
           total_spent?: number | null
           updated_at?: string | null
+          vat_number?: string | null
         }
         Relationships: []
       }
