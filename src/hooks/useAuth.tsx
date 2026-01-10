@@ -24,12 +24,18 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 async function fetchUserRole(userId: string): Promise<AppRole> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('user_roles')
     .select('role')
     .eq('user_id', userId)
-    .single();
+    .maybeSingle();
   
+  if (error) {
+    console.error('Error fetching role:', error);
+    return 'viewer';
+  }
+  
+  console.log('Fetched role:', data);
   return (data?.role as AppRole) || 'viewer';
 }
 
