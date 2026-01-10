@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { Warehouse, Package, AlertTriangle, XCircle, Loader2, CheckSquare, Square, Edit } from "lucide-react";
+import { useState, useMemo, useCallback } from "react";
+import { Warehouse, Package, AlertTriangle, XCircle, Loader2, Edit, Download } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { StockIndicator } from "@/components/ui/stock-indicator";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useProducts, Product } from "@/hooks/useProducts";
 import { useAuth } from "@/hooks/useAuth";
 import { BulkStockAdjustmentModal } from "@/components/inventory/BulkStockAdjustmentModal";
+import { toast } from "@/hooks/use-toast";
 
 export function InventoryPage() {
   const { data: products = [], isLoading, error } = useProducts();
@@ -39,6 +40,68 @@ export function InventoryPage() {
       return matchesSearch && matchesStock;
     });
   }, [products, searchTerm, stockFilter]);
+
+  // CSV Export function
+  const exportToCSV = useCallback(() => {
+    const dataToExport = filteredProducts;
+    
+    if (dataToExport.length === 0) {
+      toast({ title: "Aucune donnée", description: "Aucun produit à exporter", variant: "destructive" });
+      return;
+    }
+
+    // CSV headers
+    const headers = [
+      "SKU",
+      "Titre",
+      "Artiste",
+      "Stock",
+      "Seuil",
+      "Emplacement",
+      "Format",
+      "Prix vente",
+      "Prix achat",
+      "Statut stock"
+    ];
+
+    // CSV rows
+    const rows = dataToExport.map(product => {
+      const stock = product.stock ?? 0;
+      const threshold = product.stock_threshold ?? 5;
+      let stockStatus = "En stock";
+      if (stock === 0) stockStatus = "Rupture";
+      else if (stock <= threshold) stockStatus = "Stock faible";
+
+      return [
+        product.sku,
+        `"${(product.title || '').replace(/"/g, '""')}"`,
+        `"${(product.artist_name || '').replace(/"/g, '""')}"`,
+        stock.toString(),
+        threshold.toString(),
+        `"${(product.location || '').replace(/"/g, '""')}"`,
+        product.format || '',
+        product.selling_price?.toString() || '',
+        product.cost_price?.toString() || '',
+        stockStatus
+      ].join(";");
+    });
+
+    // Combine headers and rows
+    const csvContent = [headers.join(";"), ...rows].join("\n");
+    
+    // Create blob and download
+    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `inventaire_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast({ title: "Export réussi", description: `${dataToExport.length} produit(s) exporté(s)` });
+  }, [filteredProducts]);
 
   // Stats
   const totalUnits = products.reduce((sum, item) => sum + (item.stock ?? 0), 0);
@@ -107,14 +170,20 @@ export function InventoryPage() {
 
       {/* Inventory Table */}
       <div>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
           <h2 className="text-lg font-semibold">État des stocks</h2>
-          {canWrite() && selectedIds.size > 0 && (
-            <Button onClick={() => setShowBulkModal(true)}>
-              <Edit className="w-4 h-4 mr-2" />
-              Ajuster {selectedIds.size} produit(s)
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={exportToCSV}>
+              <Download className="w-4 h-4 mr-2" />
+              Exporter CSV
             </Button>
-          )}
+            {canWrite() && selectedIds.size > 0 && (
+              <Button onClick={() => setShowBulkModal(true)}>
+                <Edit className="w-4 h-4 mr-2" />
+                Ajuster {selectedIds.size} produit(s)
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
