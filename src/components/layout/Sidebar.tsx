@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { 
@@ -8,7 +9,8 @@ import {
   Palette,
   Warehouse,
   ArrowUpDown,
-  RefreshCw,
+  RefreshCw as RefreshCwIcon,
+  RotateCw,
   UserCircle,
   FileText,
   BarChart3,
@@ -55,7 +57,7 @@ const navigation: NavSection[] = [
     items: [
       { icon: Warehouse, label: "Inventaire", href: "/inventory" },
       { icon: ArrowUpDown, label: "Mouvements", href: "/movements" },
-      { icon: RefreshCw, label: "Réapprovisionnement", href: "/reorder" },
+      { icon: RefreshCwIcon, label: "Réapprovisionnement", href: "/reorder" },
     ],
   },
   {
@@ -104,10 +106,17 @@ interface SidebarProps {
 }
 
 export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
-  const { user, signOut, hasRole } = useAuth();
+  const { user, signOut, hasRole, refreshRole } = useAuth();
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleLogout = async () => {
     await signOut();
+  };
+
+  const handleRefreshRole = async () => {
+    setIsRefreshing(true);
+    await refreshRole();
+    setIsRefreshing(false);
   };
 
   // Get user initials and display name
@@ -129,11 +138,19 @@ export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
         <div className="text-lg font-bold text-white">
           Outre-National<span className="text-primary font-normal"> Records</span>
         </div>
-        <div className="mt-2">
+        <div className="mt-2 flex items-center gap-2">
           <Badge variant="outline" className={cn("text-[0.6rem] font-semibold uppercase", roleColors[userRole])}>
             <RoleIcon className="w-3 h-3 mr-1" />
             {roleLabels[userRole]}
           </Badge>
+          <button
+            onClick={handleRefreshRole}
+            disabled={isRefreshing}
+            className="p-1 rounded hover:bg-sidebar-hover text-sidebar-foreground/50 hover:text-white transition-colors disabled:opacity-50"
+            title="Rafraîchir le rôle"
+          >
+            <RotateCw className={cn("w-3 h-3", isRefreshing && "animate-spin")} />
+          </button>
         </div>
       </div>
 

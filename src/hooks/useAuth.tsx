@@ -15,6 +15,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  refreshRole: () => Promise<void>;
   hasRole: (role: AppRole) => boolean;
   hasAnyRole: (roles: AppRole[]) => boolean;
   canWrite: () => boolean;
@@ -101,6 +102,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  const refreshRole = async () => {
+    if (user) {
+      const role = await fetchUserRole(user.id);
+      setUser(prev => prev ? { ...prev, role } : null);
+      console.log('Role refreshed:', role);
+    }
+  };
+
   const hasRole = (role: AppRole): boolean => {
     return user?.role === role;
   };
@@ -125,6 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn, 
       signUp, 
       signOut,
+      refreshRole,
       hasRole,
       hasAnyRole,
       canWrite,
