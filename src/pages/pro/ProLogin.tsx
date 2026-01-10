@@ -1,19 +1,30 @@
 import { useState } from "react";
 import { useNavigate, Navigate, Link } from "react-router-dom";
-import { Loader2, LogIn, AlertCircle } from "lucide-react";
+import { Loader2, LogIn, AlertCircle, Moon, Sun, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useProAuth } from "@/hooks/useProAuth";
+import { useTheme } from "next-themes";
 import logo from "@/assets/outre-national-logo.png";
+
+type ViewMode = 'login' | 'forgot-password';
 
 export function ProLogin() {
   const navigate = useNavigate();
-  const { user, isLoading, isProfessional, isApproved, signIn } = useProAuth();
+  const { user, isLoading, isProfessional, isApproved, signIn, resetPassword } = useProAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('login');
+
+  const { theme, setTheme } = useTheme();
+
+  const toggleTheme = () => {
+    setTheme(theme === 'dark' ? 'light' : 'dark');
+  };
 
   // Already logged in and approved
   if (!isLoading && user && isProfessional && isApproved) {
@@ -23,21 +34,36 @@ export function ProLogin() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setMessage("");
     setIsSubmitting(true);
 
     try {
-      const { error: signInError } = await signIn(email, password);
-      if (signInError) {
-        setError("Email ou mot de passe incorrect");
-        return;
+      if (viewMode === 'forgot-password') {
+        const { error: resetError } = await resetPassword(email);
+        if (resetError) {
+          setError(resetError.message);
+        } else {
+          setMessage("Un email de réinitialisation a été envoyé à votre adresse.");
+        }
+      } else {
+        const { error: signInError } = await signIn(email, password);
+        if (signInError) {
+          setError("Email ou mot de passe incorrect");
+          return;
+        }
+        navigate("/pro");
       }
-      // Navigation will happen automatically via ProLayout redirect
-      navigate("/pro");
     } catch (err) {
       setError("Une erreur est survenue");
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const switchView = (mode: ViewMode) => {
+    setViewMode(mode);
+    setError("");
+    setMessage("");
   };
 
   if (isLoading) {
@@ -49,13 +75,30 @@ export function ProLogin() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-secondary/30 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-secondary/30 p-4 relative">
+      {/* Dark mode toggle */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={toggleTheme}
+        className="absolute top-4 right-4"
+        aria-label="Toggle theme"
+      >
+        {theme === 'dark' ? (
+          <Sun className="h-5 w-5" />
+        ) : (
+          <Moon className="h-5 w-5" />
+        )}
+      </Button>
+
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
           <img src={logo} alt="Outre-National" className="h-16 w-16 mx-auto mb-4" />
           <h1 className="text-2xl font-bold">Outre-National Pro</h1>
-          <p className="text-muted-foreground mt-1">Portail professionnel</p>
+          <p className="text-muted-foreground mt-1">
+            {viewMode === 'forgot-password' ? 'Réinitialisation du mot de passe' : 'Portail professionnel'}
+          </p>
         </div>
 
         {/* Login form */}
@@ -65,6 +108,12 @@ export function ProLogin() {
               <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
                 {error}
+              </div>
+            )}
+
+            {message && (
+              <div className="p-3 rounded-lg bg-green-500/10 text-green-600 dark:text-green-400 text-sm">
+                {message}
               </div>
             )}
 
@@ -80,37 +129,68 @@ export function ProLogin() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Mot de passe</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-              />
-            </div>
+            {viewMode === 'login' && (
+              <div className="space-y-2">
+                <Label htmlFor="password">Mot de passe</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+            )}
 
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
+              ) : viewMode === 'forgot-password' ? null : (
                 <LogIn className="w-4 h-4 mr-2" />
               )}
-              Se connecter
+              {viewMode === 'forgot-password' ? 'Envoyer le lien' : 'Se connecter'}
             </Button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-border text-center text-sm text-muted-foreground">
-            <p>Pas encore de compte professionnel ?</p>
-            <Link 
-              to="/pro/register" 
-              className="inline-block mt-2 text-primary hover:underline font-medium"
-            >
-              Créer un compte
-            </Link>
-          </div>
+          {/* Forgot password link */}
+          {viewMode === 'login' && (
+            <div className="mt-4 text-center">
+              <button
+                type="button"
+                onClick={() => switchView('forgot-password')}
+                className="text-sm text-muted-foreground hover:text-primary hover:underline"
+              >
+                Mot de passe oublié ?
+              </button>
+            </div>
+          )}
+
+          {/* Back to login */}
+          {viewMode === 'forgot-password' && (
+            <div className="mt-4 text-center">
+              <button
+                type="button"
+                onClick={() => switchView('login')}
+                className="text-sm text-muted-foreground hover:text-primary hover:underline inline-flex items-center gap-1"
+              >
+                <ArrowLeft className="w-3 h-3" />
+                Retour à la connexion
+              </button>
+            </div>
+          )}
+
+          {viewMode === 'login' && (
+            <div className="mt-6 pt-6 border-t border-border text-center text-sm text-muted-foreground">
+              <p>Pas encore de compte professionnel ?</p>
+              <Link 
+                to="/pro/register" 
+                className="inline-block mt-2 text-primary hover:underline font-medium"
+              >
+                Créer un compte
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* Back to main site */}
