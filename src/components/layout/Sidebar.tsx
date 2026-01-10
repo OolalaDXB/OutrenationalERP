@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { toast } from "@/hooks/use-toast";
 import { 
   LayoutDashboard, 
   ShoppingCart, 
@@ -117,6 +118,10 @@ export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
     setIsRefreshing(true);
     await refreshRole();
     setIsRefreshing(false);
+    toast({
+      title: "Rôle mis à jour",
+      description: `Votre rôle actuel : ${user?.role || 'viewer'}`,
+    });
   };
 
   // Get user initials and display name
