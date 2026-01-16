@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { StockIndicator } from "@/components/ui/stock-indicator";
 import { useProducts, useDeleteProduct, type Product } from "@/hooks/useProducts";
 import { useSuppliers } from "@/hooks/useSuppliers";
+import { useLabels } from "@/hooks/useLabels";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency } from "@/lib/format";
 import { ProductFormModal } from "@/components/forms/ProductFormModal";
@@ -32,12 +33,14 @@ const formatLabels: Record<string, string> = {
 export function ProductsPage() {
   const { data: products = [], isLoading: productsLoading } = useProducts();
   const { data: suppliers = [], isLoading: suppliersLoading } = useSuppliers();
+  const { data: labels = [], isLoading: labelsLoading } = useLabels();
   const deleteProduct = useDeleteProduct();
   const { toast } = useToast();
   const { canWrite, canDelete } = useAuth();
   
   const [searchTerm, setSearchTerm] = useState("");
   const [supplierFilter, setSupplierFilter] = useState("all");
+  const [labelFilter, setLabelFilter] = useState("all");
   const [formatFilter, setFormatFilter] = useState("all");
   const [stockFilter, setStockFilter] = useState("all");
   
@@ -49,7 +52,7 @@ export function ProductsPage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  const isLoading = productsLoading || suppliersLoading;
+  const isLoading = productsLoading || suppliersLoading || labelsLoading;
 
   // Formats uniques
   const formats = useMemo(() => {
@@ -67,6 +70,7 @@ export function ProductsPage() {
         product.sku.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesSupplier = supplierFilter === "all" || product.supplier_id === supplierFilter;
+      const matchesLabel = labelFilter === "all" || product.label_id === labelFilter;
       const matchesFormat = formatFilter === "all" || product.format === formatFilter;
 
       const stock = product.stock ?? 0;
@@ -80,9 +84,9 @@ export function ProductsPage() {
         matchesStock = stock === 0;
       }
 
-      return matchesSearch && matchesSupplier && matchesFormat && matchesStock;
+      return matchesSearch && matchesSupplier && matchesLabel && matchesFormat && matchesStock;
     });
-  }, [products, searchTerm, supplierFilter, formatFilter, stockFilter]);
+  }, [products, searchTerm, supplierFilter, labelFilter, formatFilter, stockFilter]);
 
   const handleCreateNew = () => {
     setEditingProduct(null);
@@ -153,6 +157,16 @@ export function ProductsPage() {
             <option value="all">Tous les fournisseurs</option>
             {suppliers.map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+          <select
+            className="px-3 py-2 rounded-md border border-border bg-card text-sm cursor-pointer"
+            value={labelFilter}
+            onChange={(e) => setLabelFilter(e.target.value)}
+          >
+            <option value="all">Tous les labels</option>
+            {labels.map((l) => (
+              <option key={l.id} value={l.id}>{l.name}</option>
             ))}
           </select>
           <select
