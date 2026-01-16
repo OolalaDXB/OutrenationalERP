@@ -1,13 +1,16 @@
 import { useMemo, useState } from "react";
 import { TrendingUp, ShoppingCart, Users, Euro, Package, DollarSign, Percent } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
-import { useProducts } from "@/hooks/useProducts";
+import { useProducts, Product } from "@/hooks/useProducts";
 import { useOrders } from "@/hooks/useOrders";
-import { useCustomers } from "@/hooks/useCustomers";
-import { useSuppliers } from "@/hooks/useSuppliers";
+import { useCustomers, Customer } from "@/hooks/useCustomers";
+import { useSuppliers, Supplier } from "@/hooks/useSuppliers";
 import { TopCustomersWidget } from "@/components/analytics/TopCustomersWidget";
 import { SupplierStatsWidget } from "@/components/analytics/SupplierStatsWidget";
 import { SupplierSalesEvolutionChart } from "@/components/analytics/SupplierSalesEvolutionChart";
+import { CustomerDrawer } from "@/components/drawers/CustomerDrawer";
+import { SupplierDrawer } from "@/components/drawers/SupplierDrawer";
+import { ProductDrawer } from "@/components/drawers/ProductDrawer";
 import {
   BarChart,
   Bar,
@@ -43,6 +46,26 @@ export function AnalyticsPage() {
   const [topCustomersPeriod, setTopCustomersPeriod] = useState("30days");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
+
+  // Drawer states
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+
+  const handleCustomerClick = (customerId: string) => {
+    const customer = customers.find(c => c.id === customerId);
+    if (customer) setSelectedCustomer(customer);
+  };
+
+  const handleSupplierClick = (supplierId: string) => {
+    const supplier = suppliers.find(s => s.id === supplierId);
+    if (supplier) setSelectedSupplier(supplier);
+  };
+
+  const handleProductClick = (productId: string) => {
+    const product = products.find(p => p.id === productId);
+    if (product) setSelectedProduct(product);
+  };
 
   // Calculate profitability stats
   const profitabilityStats = useMemo(() => {
@@ -392,10 +415,10 @@ export function AnalyticsPage() {
               </thead>
               <tbody>
                 {topProfitProducts.map((product, index) => (
-                  <tr key={product.id} className="border-b border-border/50 hover:bg-secondary/30">
+                  <tr key={product.id} className="border-b border-border/50 hover:bg-secondary/30 cursor-pointer" onClick={() => handleProductClick(product.id)}>
                     <td className="py-3 px-2">{index + 1}</td>
                     <td className="py-3 px-2">
-                      <div className="font-medium">{product.title}</div>
+                      <div className="font-medium hover:underline">{product.title}</div>
                       <div className="text-xs text-muted-foreground">{product.artist}</div>
                     </td>
                     <td className="py-3 px-2 text-right">{formatCurrency(product.sellingPrice)}</td>
@@ -431,6 +454,7 @@ export function AnalyticsPage() {
           setCustomStartDate(start);
           setCustomEndDate(end);
         }}
+        onCustomerClick={handleCustomerClick}
       />
 
       {/* Supplier Stats Widget */}
@@ -438,6 +462,7 @@ export function AnalyticsPage() {
         products={products}
         suppliers={suppliers}
         orders={orders}
+        onSupplierClick={handleSupplierClick}
       />
 
       {/* Supplier Sales Evolution Chart */}
@@ -517,6 +542,23 @@ export function AnalyticsPage() {
           </div>
         </div>
       )}
+
+      {/* Drawers */}
+      <CustomerDrawer
+        customer={selectedCustomer}
+        isOpen={!!selectedCustomer}
+        onClose={() => setSelectedCustomer(null)}
+      />
+      <SupplierDrawer
+        supplier={selectedSupplier}
+        isOpen={!!selectedSupplier}
+        onClose={() => setSelectedSupplier(null)}
+      />
+      <ProductDrawer
+        product={selectedProduct}
+        isOpen={!!selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+      />
     </div>
   );
 }

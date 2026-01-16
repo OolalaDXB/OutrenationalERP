@@ -16,6 +16,7 @@ const typeConfig: Record<NotificationType, { icon: typeof Bell; color: string; b
   payment: { icon: Euro, color: "text-success", bg: "bg-success-light" },
   supplier: { icon: Package, color: "text-primary", bg: "bg-primary-light" },
   info: { icon: Info, color: "text-muted-foreground", bg: "bg-secondary" },
+  incomplete_product: { icon: AlertTriangle, color: "text-warning-foreground", bg: "bg-warning-light" },
 };
 
 export function NotificationCenter({ onNavigate }: NotificationCenterProps) {

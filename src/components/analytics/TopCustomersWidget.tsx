@@ -33,6 +33,7 @@ interface TopCustomersWidgetProps {
   customStartDate?: string;
   customEndDate?: string;
   onCustomDateChange?: (start: string, end: string) => void;
+  onCustomerClick?: (customerId: string) => void;
 }
 
 export const periodPresets = [
@@ -90,7 +91,8 @@ export function TopCustomersWidget({
   onPeriodChange,
   customStartDate,
   customEndDate,
-  onCustomDateChange
+  onCustomDateChange,
+  onCustomerClick
 }: TopCustomersWidgetProps) {
   const dateRange = getDateRangeForPeriod(selectedPeriod, customStartDate, customEndDate);
 
@@ -449,8 +451,13 @@ export function TopCustomersWidget({
                       )}
                     </td>
                     <td className="py-3 px-2">
-                      <div className="font-medium">{customer.name}</div>
-                      <div className="text-xs text-muted-foreground">{customer.email}</div>
+                      <button 
+                        onClick={() => onCustomerClick?.(customer.customer_id)}
+                        className="text-left hover:underline"
+                      >
+                        <div className="font-medium">{customer.name}</div>
+                        <div className="text-xs text-muted-foreground">{customer.email}</div>
+                      </button>
                     </td>
                     <td className="py-3 px-2 text-right">
                       <span className="inline-flex items-center gap-1">

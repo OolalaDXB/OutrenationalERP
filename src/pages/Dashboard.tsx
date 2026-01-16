@@ -6,7 +6,8 @@ import { useDashboardKpis, useSupplierSalesView } from "@/hooks/useDashboard";
 import { formatCurrency } from "@/lib/format";
 import { PaymentDeadlinesWidget } from "@/components/dashboard/PaymentDeadlinesWidget";
 import { SupplierPayoutManager } from "@/components/suppliers/SupplierPayoutManager";
-import { useSuppliers } from "@/hooks/useSuppliers";
+import { SupplierDrawer } from "@/components/drawers/SupplierDrawer";
+import { useSuppliers, Supplier } from "@/hooks/useSuppliers";
 import type { Tables } from "@/integrations/supabase/types";
 
 type SupplierSalesRow = Tables<'v_supplier_sales'>;
@@ -16,7 +17,14 @@ export function Dashboard() {
   const { data: supplierSales = [], isLoading: salesLoading, isError: salesError, error: salesErr, refetch: refetchSales } = useSupplierSalesView();
   const { data: suppliers = [] } = useSuppliers();
   const [isPayoutManagerOpen, setIsPayoutManagerOpen] = useState(false);
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
 
+  const handleSupplierClick = (supplierId: string) => {
+    const supplier = suppliers.find(s => s.id === supplierId);
+    if (supplier) {
+      setSelectedSupplier(supplier);
+    }
+  };
   const isLoading = kpisLoading || salesLoading;
   const isError = kpisError || salesError;
   const errorMessage = kpisErr instanceof Error ? kpisErr.message : salesErr instanceof Error ? salesErr.message : "Erreur inconnue";
@@ -115,8 +123,13 @@ export function Dashboard() {
               {(supplierSales as SupplierSalesRow[]).map((item) => (
                 <tr key={item.supplier_id} className="border-b border-border last:border-b-0 hover:bg-secondary/50 transition-colors">
                   <td className="px-6 py-4">
-                    <div className="font-semibold text-primary">{item.supplier_name}</div>
-                    <div className="text-xs text-muted-foreground">{item.items_sold ?? 0} articles vendus</div>
+                    <button 
+                      onClick={() => item.supplier_id && handleSupplierClick(item.supplier_id)}
+                      className="text-left hover:underline"
+                    >
+                      <div className="font-semibold text-primary">{item.supplier_name}</div>
+                      <div className="text-xs text-muted-foreground">{item.items_sold ?? 0} articles vendus</div>
+                    </button>
                   </td>
                   <td className="px-6 py-4">
                     {item.supplier_type && (
@@ -154,6 +167,13 @@ export function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* Supplier Drawer */}
+      <SupplierDrawer
+        supplier={selectedSupplier}
+        isOpen={!!selectedSupplier}
+        onClose={() => setSelectedSupplier(null)}
+      />
     </div>
   );
 }
