@@ -31,8 +31,6 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
   });
   const updateProduct = useUpdateProduct();
   
-  const isEditMode = !!product;
-  
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   
   const [formData, setFormData] = useState<{
@@ -155,19 +153,19 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
     }
   }, [product, isOpen]);
 
-  const handleImagesChange = (newImages: string[]) => {
+  const handleImagesChange = useCallback((newImages: string[]) => {
     setImageUrls(newImages);
     setFormData(prev => ({ 
       ...prev, 
       image_urls: newImages.length > 0 ? newImages : null 
     }));
-  };
+  }, []);
 
-  const handleMainImageChange = (url: string | null) => {
+  const handleMainImageChange = useCallback((url: string | null) => {
     setFormData(prev => ({ ...prev, image_url: url }));
-  };
+  }, []);
 
-  const handleProductDataSelect = async (data: DiscogsProductData) => {
+  const handleProductDataSelect = useCallback(async (data: DiscogsProductData) => {
     setFormData(prev => ({
       ...prev,
       title: data.title || prev.title,
@@ -215,12 +213,15 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
         description: "Les informations Discogs ont été appliquées au formulaire",
       });
     }
-  };
+  }, [labels, createLabel, toast]);
 
-  if (!isOpen) return null;
-
+  // Derived state - computed after all hooks
+  const isEditMode = !!product;
   const selectedSupplier = suppliers.find(s => s.id === formData.supplier_id);
   const isLoading = createProduct.isPending || updateProduct.isPending;
+
+  // Early return AFTER all hooks
+  if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
