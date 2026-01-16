@@ -1,13 +1,14 @@
 import { useState, useMemo } from "react";
-import { X, Music, Disc, Euro, Package, Pencil, Trash2 } from "lucide-react";
+import { X, Music, Disc, Euro, Package, Pencil, Trash2, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useDeleteArtist, Artist as DbArtist } from "@/hooks/useArtists";
-import { useProducts } from "@/hooks/useProducts";
+import { useProducts, Product } from "@/hooks/useProducts";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
 import { ArtistFormModal } from "@/components/forms/ArtistFormModal";
+import { ProductDrawer } from "@/components/drawers/ProductDrawer";
 
 // Support both the local Artist interface from Artists.tsx and the database Artist type
 interface LocalArtist {
@@ -42,6 +43,13 @@ export function ArtistDrawer({ artist, isOpen, onClose }: ArtistDrawerProps) {
   const { data: allProducts = [] } = useProducts();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isProductDrawerOpen, setIsProductDrawerOpen] = useState(false);
+
+  const handleProductClick = (product: Product) => {
+    setSelectedProduct(product);
+    setIsProductDrawerOpen(true);
+  };
 
   // Produits de l'artiste
   const artistProducts = useMemo(() => {
@@ -129,7 +137,11 @@ export function ArtistDrawer({ artist, isOpen, onClose }: ArtistDrawerProps) {
               </h3>
               <div className="space-y-3">
                 {artistProducts.map((product) => (
-                  <div key={product.id} className="flex items-center gap-3 p-3 bg-secondary rounded-lg">
+                  <button
+                    key={product.id}
+                    onClick={() => handleProductClick(product)}
+                    className="w-full flex items-center gap-3 p-3 bg-secondary rounded-lg hover:bg-secondary/80 transition-colors text-left"
+                  >
                     {product.image_url ? (
                       <img
                         src={product.image_url}
@@ -150,13 +162,14 @@ export function ArtistDrawer({ artist, isOpen, onClose }: ArtistDrawerProps) {
                         <span>{product.sku}</span>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right mr-2">
                       <div className="font-semibold text-sm">{formatCurrency(product.selling_price)}</div>
                       <div className={`text-xs ${(product.stock || 0) > (product.stock_threshold || 0) ? 'text-success' : (product.stock || 0) > 0 ? 'text-warning' : 'text-danger'}`}>
                         {product.stock || 0} en stock
                       </div>
                     </div>
-                  </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  </button>
                 ))}
               </div>
             </div>
@@ -212,6 +225,13 @@ export function ArtistDrawer({ artist, isOpen, onClose }: ArtistDrawerProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Product Drawer */}
+      <ProductDrawer
+        product={selectedProduct}
+        isOpen={isProductDrawerOpen}
+        onClose={() => setIsProductDrawerOpen(false)}
+      />
     </>
   );
 }
