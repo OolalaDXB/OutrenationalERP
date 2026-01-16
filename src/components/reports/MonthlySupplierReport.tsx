@@ -306,6 +306,27 @@ export function MonthlySupplierReport({ isOpen, onClose, suppliers, orderItems }
     return Object.entries(byType).map(([name, value]) => ({ name, value }));
   }, [supplierSalesData]);
 
+  // Comparative chart data - Current vs Previous period
+  const comparisonChartData = useMemo(() => {
+    return [
+      {
+        name: "CA Brut",
+        current: totals.gross_sales,
+        previous: prevTotals.gross_sales,
+      },
+      {
+        name: "Marge ON",
+        current: totals.our_margin,
+        previous: prevTotals.our_margin,
+      },
+      {
+        name: "À reverser",
+        current: totals.supplier_due,
+        previous: prevTotals.supplier_due,
+      },
+    ];
+  }, [totals, prevTotals]);
+
   // Monthly trend (based on period)
   const monthlyTrend = useMemo(() => {
     const months = eachMonthOfInterval({
@@ -647,6 +668,35 @@ export function MonthlySupplierReport({ isOpen, onClose, suppliers, orderItems }
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Comparison chart - Current vs Previous period */}
+          <div className="bg-card rounded-xl border border-border p-4">
+            <h3 className="text-sm font-semibold mb-2">Comparaison avec la période précédente</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-sm bg-primary"></span>
+                {periodLabel}
+              </span>
+              <span className="mx-3">vs</span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-sm bg-muted-foreground/50"></span>
+                {prevPeriodLabel}
+              </span>
+            </p>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={comparisonChartData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={11} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k€`} />
+                <YAxis dataKey="name" type="category" stroke="hsl(var(--muted-foreground))" fontSize={11} width={80} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
+                  formatter={(value: number, name: string) => [formatCurrency(value), name === "current" ? periodLabel : prevPeriodLabel]}
+                />
+                <Bar dataKey="previous" fill="hsl(var(--muted-foreground) / 0.4)" radius={[0, 4, 4, 0]} name={prevPeriodLabel} />
+                <Bar dataKey="current" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} name={periodLabel} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
 
           {/* Monthly trend */}
