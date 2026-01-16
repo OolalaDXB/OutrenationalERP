@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Disc3, MapPin, Tag, Package, Euro, TrendingUp, Pencil, Trash2, ExternalLink, Plus, Minus, History, Loader2 } from "lucide-react";
+import { X, Disc3, MapPin, Tag, Package, Euro, TrendingUp, Pencil, Trash2, ExternalLink, Plus, Minus, History, Loader2, Building2, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { StockIndicator } from "@/components/ui/stock-indicator";
@@ -7,10 +7,12 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import type { Product } from "@/hooks/useProducts";
 import { useDeleteProduct } from "@/hooks/useProducts";
 import { useStockMovements, useAdjustStock } from "@/hooks/useStockMovements";
+import { useSupplier } from "@/hooks/useSuppliers";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
 import { ProductFormModal } from "@/components/forms/ProductFormModal";
+import { SupplierDrawer } from "@/components/drawers/SupplierDrawer";
 
 interface ProductDrawerProps {
   product: Product | null;
@@ -79,8 +81,10 @@ export function ProductDrawer({ product, isOpen, onClose }: ProductDrawerProps) 
   const deleteProduct = useDeleteProduct();
   const adjustStock = useAdjustStock();
   const { data: stockMovements = [], isLoading: movementsLoading } = useStockMovements(product?.id);
+  const { data: supplier } = useSupplier(product?.supplier_id || '');
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showSupplierDrawer, setShowSupplierDrawer] = useState(false);
 
   const handleDelete = async () => {
     if (!product) return;
@@ -359,21 +363,30 @@ export function ProductDrawer({ product, isOpen, onClose }: ProductDrawerProps) 
             {/* Supplier */}
             {product.supplier_name && (
               <div>
-                <h3 className="text-sm font-semibold mb-3">Fournisseur</h3>
-                <div className="bg-secondary rounded-lg p-4 flex items-center justify-between">
+                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <Building2 className="w-4 h-4" />
+                  Fournisseur
+                </h3>
+                <button 
+                  onClick={() => setShowSupplierDrawer(true)}
+                  className="w-full bg-secondary rounded-lg p-4 flex items-center justify-between hover:bg-secondary/80 transition-colors cursor-pointer text-left"
+                >
                   <div>
                     <div className="font-medium">{product.supplier_name}</div>
                     {product.supplier_type && (
                       <div className="text-xs text-muted-foreground capitalize">{product.supplier_type}</div>
                     )}
                   </div>
-                  {product.consignment_rate && product.supplier_type === "consignment" && (
-                    <div className="text-right">
-                      <div className="text-xs text-muted-foreground">Commission</div>
-                      <div className="font-medium">{(product.consignment_rate * 100).toFixed(0)}%</div>
-                    </div>
-                  )}
-                </div>
+                  <div className="flex items-center gap-2">
+                    {product.consignment_rate && product.supplier_type === "consignment" && (
+                      <div className="text-right mr-2">
+                        <div className="text-xs text-muted-foreground">Commission</div>
+                        <div className="font-medium">{(product.consignment_rate * 100).toFixed(0)}%</div>
+                      </div>
+                    )}
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                </button>
               </div>
             )}
 
@@ -475,6 +488,13 @@ export function ProductDrawer({ product, isOpen, onClose }: ProductDrawerProps) 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Supplier Drawer */}
+      <SupplierDrawer
+        supplier={supplier || null}
+        isOpen={showSupplierDrawer}
+        onClose={() => setShowSupplierDrawer(false)}
+      />
     </>
   );
 }

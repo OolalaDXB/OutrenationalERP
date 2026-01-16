@@ -2,6 +2,8 @@ import { useState, useMemo } from "react";
 import { ArrowUpCircle, ArrowDownCircle, Package, RefreshCw, TrendingUp, TrendingDown } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { products, orders, suppliers, formatDate } from "@/data/demo-data";
+import { ProductDrawer } from "@/components/drawers/ProductDrawer";
+import { useProducts } from "@/hooks/useProducts";
 
 type MovementType = "entry" | "exit" | "adjustment";
 
@@ -106,9 +108,20 @@ const typeStyles: Record<MovementType, { icon: typeof ArrowUpCircle; color: stri
 };
 
 export function StockMovementsPage() {
+  const { data: dbProducts = [] } = useProducts();
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [periodFilter, setPeriodFilter] = useState("all");
+  const [selectedProduct, setSelectedProduct] = useState<typeof dbProducts[0] | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  const handleProductClick = (productId: string) => {
+    const product = dbProducts.find(p => p.id === productId);
+    if (product) {
+      setSelectedProduct(product);
+      setIsDrawerOpen(true);
+    }
+  };
 
   // Filtrage
   const filteredMovements = useMemo(() => {
@@ -201,14 +214,18 @@ export function StockMovementsPage() {
             const Icon = typeInfo.icon;
 
             return (
-              <div key={movement.id} className="flex items-center gap-4 p-4 hover:bg-secondary/50 transition-colors">
+              <div 
+                key={movement.id} 
+                className="flex items-center gap-4 p-4 hover:bg-secondary/50 transition-colors cursor-pointer"
+                onClick={() => handleProductClick(movement.productId)}
+              >
                 <div className={`w-10 h-10 rounded-full ${typeInfo.bg} flex items-center justify-center flex-shrink-0`}>
                   <Icon className={`w-5 h-5 ${typeInfo.color}`} />
                 </div>
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-semibold truncate">{movement.productTitle}</span>
+                    <span className="font-semibold truncate hover:text-primary transition-colors">{movement.productTitle}</span>
                     <span className="text-xs text-muted-foreground font-mono">{movement.productSku}</span>
                   </div>
                   <div className="text-sm text-muted-foreground">{movement.artist}</div>
@@ -248,6 +265,13 @@ export function StockMovementsPage() {
           </div>
         )}
       </div>
+
+      {/* Product Drawer */}
+      <ProductDrawer
+        product={selectedProduct}
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+      />
     </div>
   );
 }
