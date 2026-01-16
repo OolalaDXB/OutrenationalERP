@@ -1,11 +1,24 @@
 import { useState, useEffect } from "react";
-import { X, Building2, Loader2 } from "lucide-react";
+import { X, Building2, Loader2, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useCreateSupplier, useUpdateSupplier, type Supplier, type SupplierInsert } from "@/hooks/useSuppliers";
 import type { Enums } from "@/integrations/supabase/types";
+import {
+  requiresState,
+  isValidVatNumberFormat,
+  US_STATES,
+  CANADIAN_PROVINCES,
+  UAE_EMIRATES,
+} from "@/lib/vat-utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface SupplierFormProps {
   isOpen: boolean;
@@ -29,6 +42,11 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormPro
     contact_name: string;
     phone: string;
     address: string;
+    city: string;
+    postal_code: string;
+    state: string;
+    vat_number: string;
+    website: string;
   }>({
     name: "",
     email: "",
@@ -38,7 +56,32 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormPro
     contact_name: "",
     phone: "",
     address: "",
+    city: "",
+    postal_code: "",
+    state: "",
+    vat_number: "",
+    website: "",
   });
+
+  const showStateField = requiresState(formData.country);
+  const hasValidVat = isValidVatNumberFormat(formData.vat_number);
+
+  // Get states/provinces based on country
+  const getStateOptions = () => {
+    const normalizedCountry = formData.country.toLowerCase().trim();
+    if (normalizedCountry.includes('états-unis') || normalizedCountry === 'usa' || normalizedCountry === 'united states') {
+      return US_STATES;
+    }
+    if (normalizedCountry === 'canada') {
+      return CANADIAN_PROVINCES;
+    }
+    if (normalizedCountry.includes('émirats') || normalizedCountry === 'uae' || normalizedCountry.includes('united arab emirates')) {
+      return UAE_EMIRATES;
+    }
+    return [];
+  };
+
+  const stateOptions = getStateOptions();
 
   // Populate form when editing
   useEffect(() => {
@@ -52,6 +95,11 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormPro
         contact_name: supplier.contact_name || "",
         phone: supplier.phone || "",
         address: supplier.address || "",
+        city: supplier.city || "",
+        postal_code: supplier.postal_code || "",
+        state: (supplier as any).state || "",
+        vat_number: (supplier as any).vat_number || "",
+        website: supplier.website || "",
       });
     } else {
       setFormData({
@@ -63,9 +111,21 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormPro
         contact_name: "",
         phone: "",
         address: "",
+        city: "",
+        postal_code: "",
+        state: "",
+        vat_number: "",
+        website: "",
       });
     }
   }, [supplier, isOpen]);
+
+  // Reset state when country changes
+  useEffect(() => {
+    if (!requiresState(formData.country)) {
+      setFormData(prev => ({ ...prev, state: "" }));
+    }
+  }, [formData.country]);
 
   if (!isOpen) return null;
 
@@ -88,14 +148,24 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormPro
         contact_name: formData.contact_name || null,
         phone: formData.phone || null,
         address: formData.address || null,
+        city: formData.city || null,
+        postal_code: formData.postal_code || null,
+        website: formData.website || null,
         active: true,
       };
 
+      // Add new fields (they may not be in types yet, so we cast)
+      const extendedData = {
+        ...supplierData,
+        state: formData.state || null,
+        vat_number: formData.vat_number || null,
+      } as SupplierInsert;
+
       if (isEditMode && supplier) {
-        await updateSupplier.mutateAsync({ id: supplier.id, ...supplierData });
+        await updateSupplier.mutateAsync({ id: supplier.id, ...extendedData });
         toast({ title: "Succès", description: "Fournisseur mis à jour avec succès" });
       } else {
-        await createSupplier.mutateAsync(supplierData);
+        await createSupplier.mutateAsync(extendedData);
         toast({ title: "Succès", description: "Fournisseur créé avec succès" });
       }
       onClose();
@@ -111,9 +181,9 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormPro
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-foreground/50" onClick={onClose} />
-      <div className="relative bg-card rounded-xl shadow-lg w-full max-w-lg mx-4 animate-fade-in">
+      <div className="relative bg-card rounded-xl shadow-lg w-full max-w-2xl mx-4 animate-fade-in max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-border">
+        <div className="flex items-center justify-between p-6 border-b border-border sticky top-0 bg-card z-10">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
               <Building2 className="w-5 h-5 text-primary" />
@@ -129,99 +199,204 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormPro
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <Label className="text-sm font-medium text-muted-foreground">Nom *</Label>
-              <Input
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Sublime Frequencies"
-                className="mt-1.5"
-              />
-            </div>
-
-            <div>
-              <Label className="text-sm font-medium text-muted-foreground">Type de contrat *</Label>
-              <select
-                value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
-                className="w-full mt-1.5 px-3 py-2 rounded-lg border border-border bg-card text-sm"
-              >
-                <option value="purchase">Achat ferme</option>
-                <option value="consignment">Dépôt-vente</option>
-                <option value="own">Production propre</option>
-              </select>
-            </div>
-
-            <div>
-              <Label className="text-sm font-medium text-muted-foreground">
-                Commission {formData.type === "consignment" ? "*" : "(N/A)"}
-              </Label>
-              <div className="relative mt-1.5">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Company Info */}
+          <div className="space-y-4">
+            <h3 className="font-medium text-sm">Informations générales</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <Label className="text-sm font-medium text-muted-foreground">Nom *</Label>
                 <Input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={formData.type === "consignment" ? formData.commission_rate * 100 : 0}
-                  onChange={(e) => setFormData({ ...formData, commission_rate: Number(e.target.value) / 100 })}
-                  disabled={formData.type !== "consignment"}
-                  className="pr-8"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Sublime Frequencies"
+                  className="mt-1.5"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Type de contrat *</Label>
+                <select
+                  value={formData.type}
+                  onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
+                  className="w-full mt-1.5 px-3 py-2 rounded-lg border border-border bg-card text-sm"
+                >
+                  <option value="purchase">Achat ferme</option>
+                  <option value="consignment">Dépôt-vente</option>
+                  <option value="own">Production propre</option>
+                </select>
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">
+                  Commission {formData.type === "consignment" ? "*" : "(N/A)"}
+                </Label>
+                <div className="relative mt-1.5">
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={formData.type === "consignment" ? formData.commission_rate * 100 : 0}
+                    onChange={(e) => setFormData({ ...formData, commission_rate: Number(e.target.value) / 100 })}
+                    disabled={formData.type !== "consignment"}
+                    className="pr-8"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  TVA Intracommunautaire
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>Format: Code pays (2 lettres) + numéro</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Ex: FR12345678901, DE123456789
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </Label>
+                <Input
+                  value={formData.vat_number}
+                  onChange={(e) => setFormData({ ...formData, vat_number: e.target.value.toUpperCase() })}
+                  placeholder="FR12345678901"
+                  className="mt-1.5"
+                />
+                {formData.vat_number && (
+                  <p className={`text-xs mt-1 ${hasValidVat ? 'text-green-600' : 'text-amber-600'}`}>
+                    {hasValidVat ? '✓ Format valide' : '⚠ Format invalide'}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Site web</Label>
+                <Input
+                  value={formData.website}
+                  onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                  placeholder="https://example.com"
+                  className="mt-1.5"
+                />
               </div>
             </div>
+          </div>
 
-            <div>
-              <Label className="text-sm font-medium text-muted-foreground">Email</Label>
-              <Input
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="contact@example.com"
-                className="mt-1.5"
-              />
+          {/* Contact */}
+          <div className="space-y-4">
+            <h3 className="font-medium text-sm">Contact</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Nom du contact</Label>
+                <Input
+                  value={formData.contact_name}
+                  onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
+                  placeholder="John Smith"
+                  className="mt-1.5"
+                />
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Email</Label>
+                <Input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="contact@example.com"
+                  className="mt-1.5"
+                />
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Téléphone</Label>
+                <Input
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder="+33 1 23 45 67 89"
+                  className="mt-1.5"
+                />
+              </div>
             </div>
+          </div>
 
-            <div>
-              <Label className="text-sm font-medium text-muted-foreground">Téléphone</Label>
-              <Input
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="+33 1 23 45 67 89"
-                className="mt-1.5"
-              />
-            </div>
+          {/* Address */}
+          <div className="space-y-4">
+            <h3 className="font-medium text-sm">Adresse</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <Label className="text-sm font-medium text-muted-foreground">Adresse</Label>
+                <Input
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  placeholder="Adresse complète"
+                  className="mt-1.5"
+                />
+              </div>
 
-            <div>
-              <Label className="text-sm font-medium text-muted-foreground">Contact</Label>
-              <Input
-                value={formData.contact_name}
-                onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
-                placeholder="Nom du contact"
-                className="mt-1.5"
-              />
-            </div>
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Code postal</Label>
+                <Input
+                  value={formData.postal_code}
+                  onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })}
+                  placeholder="75001"
+                  className="mt-1.5"
+                />
+              </div>
 
-            <div>
-              <Label className="text-sm font-medium text-muted-foreground">Pays</Label>
-              <Input
-                value={formData.country}
-                onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                placeholder="USA"
-                className="mt-1.5"
-              />
-            </div>
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Ville</Label>
+                <Input
+                  value={formData.city}
+                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                  placeholder="Paris"
+                  className="mt-1.5"
+                />
+              </div>
 
-            <div className="col-span-2">
-              <Label className="text-sm font-medium text-muted-foreground">Adresse</Label>
-              <Input
-                value={formData.address}
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                placeholder="Adresse complète"
-                className="mt-1.5"
-              />
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Pays</Label>
+                <Input
+                  value={formData.country}
+                  onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                  placeholder="France"
+                  className="mt-1.5"
+                />
+              </div>
+
+              {showStateField && (
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">
+                    {formData.country.toLowerCase().includes('émirats') || formData.country.toLowerCase() === 'uae' 
+                      ? 'Émirat' 
+                      : 'État / Province'}
+                  </Label>
+                  {stateOptions.length > 0 ? (
+                    <select
+                      value={formData.state}
+                      onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                      className="w-full mt-1.5 px-3 py-2 rounded-lg border border-border bg-card text-sm"
+                    >
+                      <option value="">Sélectionner...</option>
+                      {stateOptions.map((state) => (
+                        <option key={state} value={state}>{state}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <Input
+                      value={formData.state}
+                      onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                      placeholder="État / Province"
+                      className="mt-1.5"
+                    />
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
