@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { useSettings } from "@/hooks/useSettings";
 import { toast } from "@/hooks/use-toast";
 import { 
   LayoutDashboard, 
@@ -8,6 +9,7 @@ import {
   Package, 
   Users, 
   Palette,
+  Tag,
   Warehouse,
   ArrowUpDown,
   RefreshCw as RefreshCwIcon,
@@ -33,6 +35,7 @@ interface NavItem {
   href: string;
   badge?: number;
   adminOnly?: boolean;
+  featureFlag?: string;
 }
 
 interface NavSection {
@@ -53,7 +56,8 @@ const navigation: NavSection[] = [
     items: [
       { icon: Package, label: "Produits", href: "/products" },
       { icon: Users, label: "Fournisseurs", href: "/suppliers" },
-      { icon: Palette, label: "Artistes", href: "/artists" },
+      { icon: Tag, label: "Labels", href: "/labels" },
+      { icon: Palette, label: "Artistes", href: "/artists", featureFlag: "show_artists_section" },
     ],
   },
   {
@@ -113,6 +117,7 @@ interface SidebarProps {
 
 export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
   const { user, signOut, hasRole, refreshRole } = useAuth();
+  const { data: settings } = useSettings();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleLogout = async () => {
@@ -137,10 +142,19 @@ export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
   const userRole = user?.role || 'viewer';
   const RoleIcon = roleIcons[userRole] || Eye;
 
-  // Filter navigation based on role
+  // Filter navigation based on role and feature flags
   const filteredNavigation = navigation.map(section => ({
     ...section,
-    items: section.items.filter(item => !item.adminOnly || hasRole('admin'))
+    items: section.items.filter(item => {
+      // Check admin only
+      if (item.adminOnly && !hasRole('admin')) return false;
+      // Check feature flags
+      if (item.featureFlag) {
+        const flagValue = settings?.[item.featureFlag as keyof typeof settings];
+        if (!flagValue) return false;
+      }
+      return true;
+    })
   })).filter(section => section.items.length > 0);
 
   return (
