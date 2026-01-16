@@ -53,5 +53,6 @@ export const supplierTypeVariant: Record<string, BadgeVariant> = {
 export const supplierTypeLabel: Record<string, string> = {
   purchase: "Achat ferme",
   own: "Propre",
+  consignment: "Consignation",
   depot_vente: "Dépôt-vente",
 };
