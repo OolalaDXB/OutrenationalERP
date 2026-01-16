@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef } from "react";
-import { Warehouse, Package, AlertTriangle, XCircle, Loader2, Edit, Download, Upload, Printer } from "lucide-react";
+import { Warehouse, Package, AlertTriangle, XCircle, Loader2, Edit, Download, Upload, Printer, FileSpreadsheet } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { StockIndicator } from "@/components/ui/stock-indicator";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { useProducts, Product } from "@/hooks/useProducts";
 import { useAuth } from "@/hooks/useAuth";
 import { BulkStockAdjustmentModal } from "@/components/inventory/BulkStockAdjustmentModal";
 import { CSVImportModal } from "@/components/inventory/CSVImportModal";
+import { ImportExportModal } from "@/components/import-export/ImportExportModal";
 import { InventoryPrintReport } from "@/components/inventory/InventoryPrintReport";
 import { ProductDrawer } from "@/components/drawers/ProductDrawer";
 import { toast } from "@/hooks/use-toast";
@@ -23,6 +24,7 @@ export function InventoryPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showImportExportModal, setShowImportExportModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
@@ -217,12 +219,18 @@ export function InventoryPage() {
               </Button>
               <Button variant="outline" size="sm" onClick={exportToCSV}>
                 <Download className="w-4 h-4 mr-2" />
-                Exporter
+                CSV
               </Button>
+              {canWrite() && (
+                <Button variant="outline" size="sm" onClick={() => setShowImportExportModal(true)}>
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                  Import / Export XLS
+                </Button>
+              )}
               {canWrite() && (
                 <Button variant="outline" size="sm" onClick={() => setShowImportModal(true)}>
                   <Upload className="w-4 h-4 mr-2" />
-                  Importer
+                  Importer CSV
                 </Button>
               )}
               {canWrite() && selectedIds.size > 0 && (
@@ -339,6 +347,15 @@ export function InventoryPage() {
           isOpen={showImportModal}
           onClose={() => setShowImportModal(false)}
           onSuccess={handleImportSuccess}
+        />
+
+        {/* XLS Import/Export Modal */}
+        <ImportExportModal
+          isOpen={showImportExportModal}
+          onClose={() => setShowImportExportModal(false)}
+          entityType="products"
+          data={products as unknown as Record<string, unknown>[]}
+          onImportSuccess={handleImportSuccess}
         />
 
         {/* Product Drawer */}

@@ -1,16 +1,20 @@
 import { useState, useMemo } from "react";
-import { Plus, Loader2, Building2 } from "lucide-react";
+import { Plus, Loader2, Building2, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CustomerFormModal } from "@/components/forms/CustomerFormModal";
 import { CustomerDrawer } from "@/components/drawers/CustomerDrawer";
+import { ImportExportModal } from "@/components/import-export/ImportExportModal";
 import { useCustomers, type Customer } from "@/hooks/useCustomers";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { useAuth } from "@/hooks/useAuth";
+import { useQueryClient } from "@tanstack/react-query";
 
 export function CustomersPage() {
+  const queryClient = useQueryClient();
   const { data: customers = [], isLoading, error } = useCustomers();
   const { canWrite } = useAuth();
   const [showForm, setShowForm] = useState(false);
+  const [showImportExport, setShowImportExport] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [countryFilter, setCountryFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
@@ -75,12 +79,20 @@ export function CustomersPage() {
           <h2 className="text-lg font-semibold">Tous les clients</h2>
           <p className="text-sm text-muted-foreground">{filteredCustomers.length} clients</p>
         </div>
-        {canWrite() && (
-          <Button className="gap-2" onClick={() => setShowForm(true)}>
-            <Plus className="w-4 h-4" />
-            Nouveau client
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {canWrite() && (
+            <Button variant="outline" className="gap-2" onClick={() => setShowImportExport(true)}>
+              <FileSpreadsheet className="w-4 h-4" />
+              Import / Export
+            </Button>
+          )}
+          {canWrite() && (
+            <Button className="gap-2" onClick={() => setShowForm(true)}>
+              <Plus className="w-4 h-4" />
+              Nouveau client
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
@@ -184,6 +196,13 @@ export function CustomersPage() {
         customer={selectedCustomer}
         isOpen={isDrawerOpen}
         onClose={handleCloseDrawer}
+      />
+      <ImportExportModal
+        isOpen={showImportExport}
+        onClose={() => setShowImportExport(false)}
+        entityType="customers"
+        data={customers as unknown as Record<string, unknown>[]}
+        onImportSuccess={() => queryClient.invalidateQueries({ queryKey: ['customers'] })}
       />
     </div>
   );
