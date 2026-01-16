@@ -1,13 +1,35 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Camera, X, ScanLine, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 interface BarcodeScannerProps {
   onScan: (barcode: string) => void;
   onClose: () => void;
   isOpen: boolean;
 }
+
+// Play a success beep sound
+const playSuccessSound = () => {
+  try {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.value = 1200; // Higher pitch for success
+    oscillator.type = "sine";
+    
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.15);
+  } catch (err) {
+    console.warn("Could not play success sound:", err);
+  }
+};
 
 export function BarcodeScanner({ onScan, onClose, isOpen }: BarcodeScannerProps) {
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +66,8 @@ export function BarcodeScanner({ onScan, onClose, isOpen }: BarcodeScannerProps)
           aspectRatio: 1.5,
         },
         (decodedText) => {
+          // Play success sound
+          playSuccessSound();
           // Success callback
           onScan(decodedText);
           stopScanner();
