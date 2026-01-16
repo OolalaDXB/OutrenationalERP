@@ -1,14 +1,16 @@
-import { useState } from "react";
-import { X, Building2, Mail, Phone, MapPin, Package, Euro, TrendingUp, Pencil, Trash2 } from "lucide-react";
+import { useState, useMemo } from "react";
+import { X, Building2, Mail, Phone, MapPin, Package, Euro, TrendingUp, Pencil, Trash2, Disc, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, supplierTypeVariant, supplierTypeLabel } from "@/components/ui/status-badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import type { Supplier } from "@/hooks/useSuppliers";
 import { useDeleteSupplier } from "@/hooks/useSuppliers";
+import { useProducts, Product } from "@/hooks/useProducts";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
 import { SupplierFormModal } from "@/components/forms/SupplierFormModal";
+import { ProductDrawer } from "@/components/drawers/ProductDrawer";
 
 interface SupplierDrawerProps {
   supplier: Supplier | null;
@@ -19,8 +21,22 @@ interface SupplierDrawerProps {
 export function SupplierDrawer({ supplier, isOpen, onClose }: SupplierDrawerProps) {
   const { canWrite, canDelete } = useAuth();
   const deleteSupplier = useDeleteSupplier();
+  const { data: allProducts = [] } = useProducts();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isProductDrawerOpen, setIsProductDrawerOpen] = useState(false);
+
+  // Products from this supplier
+  const supplierProducts = useMemo(() => {
+    if (!supplier) return [];
+    return allProducts.filter((p) => p.supplier_id === supplier.id);
+  }, [allProducts, supplier]);
+
+  const handleProductClick = (product: Product) => {
+    setSelectedProduct(product);
+    setIsProductDrawerOpen(true);
+  };
 
   const handleDelete = async () => {
     if (!supplier) return;
@@ -152,9 +168,50 @@ export function SupplierDrawer({ supplier, isOpen, onClose }: SupplierDrawerProp
               </div>
             )}
 
+            {/* Products List */}
+            {supplierProducts.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <Disc className="w-4 h-4" />
+                  Produits ({supplierProducts.length})
+                </h3>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {supplierProducts.map((product) => (
+                    <button
+                      key={product.id}
+                      onClick={() => handleProductClick(product)}
+                      className="w-full flex items-center gap-3 p-3 bg-secondary rounded-lg hover:bg-secondary/80 transition-colors text-left"
+                    >
+                      {product.image_url ? (
+                        <img
+                          src={product.image_url}
+                          alt={product.title}
+                          className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-sidebar to-foreground flex items-center justify-center flex-shrink-0">
+                          <Disc className="w-4 h-4 text-muted-foreground/50" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">{product.title}</div>
+                        <div className="text-xs text-muted-foreground">{product.artist_name || "—"}</div>
+                      </div>
+                      <div className="text-right mr-2">
+                        <div className="text-sm font-medium">{formatCurrency(product.selling_price)}</div>
+                        <div className={`text-xs ${(product.stock || 0) > 0 ? 'text-success' : 'text-danger'}`}>
+                          {product.stock || 0} en stock
+                        </div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Actions */}
             <div className="flex gap-3">
-              <Button className="flex-1">Voir les produits</Button>
               <Button variant="secondary" className="flex-1">Générer relevé</Button>
             </div>
 
@@ -203,6 +260,13 @@ export function SupplierDrawer({ supplier, isOpen, onClose }: SupplierDrawerProp
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Product Drawer */}
+      <ProductDrawer
+        product={selectedProduct}
+        isOpen={isProductDrawerOpen}
+        onClose={() => setIsProductDrawerOpen(false)}
+      />
     </>
   );
 }
