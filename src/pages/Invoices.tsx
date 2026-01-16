@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { InvoiceFormModal } from "@/components/forms/InvoiceFormModal";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { Tables } from "@/integrations/supabase/types";
@@ -41,6 +42,7 @@ export function InvoicesPage() {
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [isFormOpen, setIsFormOpen] = useState(false);
 
   // Sync search term with URL params
   useEffect(() => {
@@ -245,11 +247,14 @@ export function InvoicesPage() {
             className="flex-1 min-w-[200px] max-w-[300px] px-3 py-2 rounded-md border border-border bg-card text-sm"
           />
         </div>
-        <Button className="gap-2">
+        <Button className="gap-2" onClick={() => setIsFormOpen(true)}>
           <Plus className="w-4 h-4" />
           Nouvelle facture
         </Button>
       </div>
+
+      {/* Invoice Form Modal */}
+      <InvoiceFormModal open={isFormOpen} onOpenChange={setIsFormOpen} />
 
       {/* Table */}
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
