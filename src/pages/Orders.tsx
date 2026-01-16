@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { ShoppingCart, Package, Truck, CheckCircle, Plus, Loader2, X } from "lucide-react";
+import { ShoppingCart, Package, Truck, CheckCircle, Plus, Loader2, X, CreditCard } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { StatusBadge, orderStatusVariant, orderStatusLabel } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { OrderDrawer } from "@/components/drawers/OrderDrawer";
 import { OrderFormModal } from "@/components/forms/OrderFormModal";
-import { useOrdersWithItems, useUpdateOrderStatus, useCancelOrder } from "@/hooks/useOrders";
+import { useOrdersWithItems, useUpdateOrderStatus, useCancelOrder, useUpdateOrder } from "@/hooks/useOrders";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -26,8 +26,10 @@ export function OrdersPage() {
   const { data: orders = [], isLoading, error } = useOrdersWithItems();
   const updateOrderStatus = useUpdateOrderStatus();
   const cancelOrder = useCancelOrder();
+  const updateOrder = useUpdateOrder();
   const { toast } = useToast();
   const { canWrite } = useAuth();
+  const [markingPaidId, setMarkingPaidId] = useState<string | null>(null);
   
   const [selectedOrder, setSelectedOrder] = useState<typeof orders[0] | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -88,6 +90,23 @@ export function OrdersPage() {
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
+  };
+
+  const handleMarkAsPaid = async (e: React.MouseEvent, orderId: string) => {
+    e.stopPropagation();
+    setMarkingPaidId(orderId);
+    try {
+      await updateOrder.mutateAsync({
+        id: orderId,
+        payment_status: 'paid',
+        paid_at: new Date().toISOString()
+      });
+      toast({ title: "Paiement confirmé", description: "La commande a été marquée comme payée." });
+    } catch (error) {
+      toast({ title: "Erreur", description: "Impossible de mettre à jour le paiement.", variant: "destructive" });
+    } finally {
+      setMarkingPaidId(null);
+    }
   };
 
   if (isLoading) {
@@ -207,9 +226,13 @@ export function OrdersPage() {
                 <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Commande</th>
                 <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Client</th>
                 <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Statut</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Paiement</th>
                 <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Articles</th>
                 <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Total</th>
                 <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Date</th>
+                {canWrite() && (
+                  <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Actions</th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -246,9 +269,41 @@ export function OrdersPage() {
                         </StatusBadge>
                       )}
                     </td>
+                    <td className="px-6 py-4">
+                      {order.payment_status === 'paid' ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-success">
+                          <CheckCircle className="w-3 h-3" />
+                          Payé
+                        </span>
+                      ) : order.payment_status === 'refunded' ? (
+                        <span className="text-xs font-medium text-danger">Remboursé</span>
+                      ) : (
+                        <span className="text-xs font-medium text-warning">En attente</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-sm text-muted-foreground">{itemsCount} article{itemsCount > 1 ? 's' : ''}</td>
                     <td className="px-6 py-4 font-semibold tabular-nums">{formatCurrency(order.total)}</td>
                     <td className="px-6 py-4 text-sm text-muted-foreground">{formatDateTime(order.created_at)}</td>
+                    {canWrite() && (
+                      <td className="px-6 py-4">
+                        {order.payment_status !== 'paid' && order.payment_status !== 'refunded' && order.status !== 'cancelled' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1"
+                            onClick={(e) => handleMarkAsPaid(e, order.id)}
+                            disabled={markingPaidId === order.id}
+                          >
+                            {markingPaidId === order.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <CreditCard className="w-3 h-3" />
+                            )}
+                            Payé
+                          </Button>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 );
               })}
