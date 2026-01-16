@@ -227,6 +227,7 @@ export function ProductsPage() {
             <tr>
               <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Produit</th>
               <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Fournisseur</th>
+              <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Label</th>
               <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Format</th>
               <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">État</th>
               <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Prix</th>
@@ -264,6 +265,7 @@ export function ProductsPage() {
                   </div>
                 </td>
                 <td className="px-6 py-4 text-sm">{product.supplier_name || '—'}</td>
+                <td className="px-6 py-4 text-sm">{product.label_name || '—'}</td>
                 <td className="px-6 py-4 text-sm">{formatLabels[product.format] || product.format.toUpperCase()}</td>
                 <td className="px-6 py-4">
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-secondary">

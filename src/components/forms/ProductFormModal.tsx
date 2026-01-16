@@ -24,6 +24,7 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
   const { toast } = useToast();
   const { data: suppliers = [] } = useSuppliers();
   const { data: labels = [] } = useLabels();
+  const createLabel = useCreateLabel();
   const { notifyIncompleteProduct } = useProductNotifications();
   const createProduct = useCreateProduct({
     onIncompleteProduct: notifyIncompleteProduct
@@ -178,13 +179,37 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
       );
       if (existingLabel) {
         setFormData(prev => ({ ...prev, label_id: existingLabel.id }));
+        toast({
+          title: "Données importées",
+          description: "Les informations Discogs ont été appliquées au formulaire",
+        });
+      } else {
+        // Create new label automatically
+        try {
+          const newLabel = await createLabel.mutateAsync({
+            name: data.label,
+          });
+          if (newLabel) {
+            setFormData(prev => ({ ...prev, label_id: newLabel.id }));
+            toast({
+              title: "Données importées + Label créé",
+              description: `Le label "${data.label}" a été créé automatiquement`,
+            });
+          }
+        } catch (error) {
+          toast({
+            title: "Données importées",
+            description: "Les informations ont été appliquées mais le label n'a pas pu être créé",
+            variant: "destructive",
+          });
+        }
       }
+    } else {
+      toast({
+        title: "Données importées",
+        description: "Les informations Discogs ont été appliquées au formulaire",
+      });
     }
-
-    toast({
-      title: "Données importées",
-      description: "Les informations Discogs ont été appliquées au formulaire",
-    });
   };
 
   if (!isOpen) return null;

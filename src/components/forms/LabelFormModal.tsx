@@ -12,16 +12,19 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useCreateLabel, useUpdateLabel, Label as LabelType } from "@/hooks/useLabels";
+import { useSuppliers } from "@/hooks/useSuppliers";
 
 interface LabelFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   label?: LabelType | null;
+  defaultSupplierId?: string;
 }
 
-export function LabelFormModal({ isOpen, onClose, label }: LabelFormModalProps) {
+export function LabelFormModal({ isOpen, onClose, label, defaultSupplierId }: LabelFormModalProps) {
   const createLabel = useCreateLabel();
   const updateLabel = useUpdateLabel();
+  const { data: suppliers = [] } = useSuppliers();
   const isEditing = !!label;
 
   const [formData, setFormData] = useState({
@@ -29,15 +32,18 @@ export function LabelFormModal({ isOpen, onClose, label }: LabelFormModalProps) 
     country: "",
     website: "",
     discogs_id: "",
+    supplier_id: "",
   });
 
   useEffect(() => {
     if (label) {
+      const labelAny = label as any;
       setFormData({
         name: label.name || "",
         country: label.country || "",
         website: label.website || "",
         discogs_id: label.discogs_id || "",
+        supplier_id: labelAny.supplier_id || "",
       });
     } else {
       setFormData({
@@ -45,9 +51,10 @@ export function LabelFormModal({ isOpen, onClose, label }: LabelFormModalProps) 
         country: "",
         website: "",
         discogs_id: "",
+        supplier_id: defaultSupplierId || "",
       });
     }
-  }, [label, isOpen]);
+  }, [label, isOpen, defaultSupplierId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,14 +67,16 @@ export function LabelFormModal({ isOpen, onClose, label }: LabelFormModalProps) 
           country: formData.country || null,
           website: formData.website || null,
           discogs_id: formData.discogs_id || null,
-        });
+          supplier_id: formData.supplier_id || null,
+        } as any);
       } else {
         await createLabel.mutateAsync({
           name: formData.name,
           country: formData.country || null,
           website: formData.website || null,
           discogs_id: formData.discogs_id || null,
-        });
+          supplier_id: formData.supplier_id || null,
+        } as any);
       }
       onClose();
     } catch (error) {
@@ -131,6 +140,21 @@ export function LabelFormModal({ isOpen, onClose, label }: LabelFormModalProps) 
               onChange={(e) => setFormData({ ...formData, discogs_id: e.target.value })}
               placeholder="Identifiant Discogs (optionnel)"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="supplier_id">Fournisseur</Label>
+            <select
+              id="supplier_id"
+              value={formData.supplier_id}
+              onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
+              className="w-full px-3 py-2 rounded-md border border-border bg-card text-sm"
+            >
+              <option value="">Aucun fournisseur</option>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
           </div>
 
           <DialogFooter>

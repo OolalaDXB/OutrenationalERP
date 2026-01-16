@@ -1,9 +1,9 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Tag, Disc, Loader2, Globe, Pencil, Trash2 } from "lucide-react";
+import { Plus, Tag, Disc, Loader2, Globe, Pencil, Trash2, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useLabels, useDeleteLabel, Label } from "@/hooks/useLabels";
+import { useLabels, useDeleteLabel, type LabelWithSupplier } from "@/hooks/useLabels";
 import { useProducts } from "@/hooks/useProducts";
 import { useSuppliers } from "@/hooks/useSuppliers";
 import { useAllSupplierLabels } from "@/hooks/useSupplierLabels";
@@ -33,9 +33,9 @@ export function LabelsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [supplierFilter, setSupplierFilter] = useState("all");
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingLabel, setEditingLabel] = useState<Label | null>(null);
-  const [deletingLabel, setDeletingLabel] = useState<Label | null>(null);
-  const [selectedLabel, setSelectedLabel] = useState<Label | null>(null);
+  const [editingLabel, setEditingLabel] = useState<LabelWithSupplier | null>(null);
+  const [deletingLabel, setDeletingLabel] = useState<LabelWithSupplier | null>(null);
+  const [selectedLabel, setSelectedLabel] = useState<LabelWithSupplier | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   // Calculate products count per label
@@ -75,7 +75,7 @@ export function LabelsPage() {
     );
   }, [labelsForSupplier, searchTerm]);
 
-  const handleEdit = (label: Label) => {
+  const handleEdit = (label: LabelWithSupplier) => {
     setEditingLabel(label);
     setIsFormOpen(true);
   };
@@ -97,7 +97,7 @@ export function LabelsPage() {
     navigate(`/products?label=${labelId}`);
   };
 
-  const handleCardClick = (label: Label) => {
+  const handleCardClick = (label: LabelWithSupplier) => {
     setSelectedLabel(label);
     setIsDrawerOpen(true);
   };
@@ -178,6 +178,12 @@ export function LabelsPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold truncate">{label.name}</div>
+                    {label.suppliers && (
+                      <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                        <Building2 className="w-3 h-3" />
+                        {label.suppliers.name}
+                      </div>
+                    )}
                     {label.country && (
                       <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                         <Globe className="w-3 h-3" />

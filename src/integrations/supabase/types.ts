@@ -442,6 +442,7 @@ export type Database = {
           id: string
           name: string
           slug: string | null
+          supplier_id: string | null
           updated_at: string | null
           website: string | null
         }
@@ -452,6 +453,7 @@ export type Database = {
           id?: string
           name: string
           slug?: string | null
+          supplier_id?: string | null
           updated_at?: string | null
           website?: string | null
         }
@@ -462,10 +464,26 @@ export type Database = {
           id?: string
           name?: string
           slug?: string | null
+          supplier_id?: string | null
           updated_at?: string | null
           website?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "labels_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "labels_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "v_supplier_sales"
+            referencedColumns: ["supplier_id"]
+          },
+        ]
       }
       order_items: {
         Row: {

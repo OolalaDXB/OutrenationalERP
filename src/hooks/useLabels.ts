@@ -7,17 +7,24 @@ export type Label = Tables<'labels'>;
 export type LabelInsert = TablesInsert<'labels'>;
 export type LabelUpdate = TablesUpdate<'labels'>;
 
+export interface LabelWithSupplier extends Label {
+  suppliers?: { id: string; name: string } | null;
+}
+
 export function useLabels() {
   return useQuery({
     queryKey: ['labels'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('labels')
-        .select('*')
+        .select(`
+          *,
+          suppliers:supplier_id (id, name)
+        `)
         .order('name', { ascending: true });
       
       if (error) throw error;
-      return data as Label[];
+      return data as LabelWithSupplier[];
     }
   });
 }

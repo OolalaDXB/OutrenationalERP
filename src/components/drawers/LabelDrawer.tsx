@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { X, Tag, Globe, Disc, Building2, Pencil, Trash2, ExternalLink, ChevronRight, Euro, TrendingUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { useDeleteLabel, Label } from "@/hooks/useLabels";
+import { useDeleteLabel, type LabelWithSupplier } from "@/hooks/useLabels";
 import { useProducts } from "@/hooks/useProducts";
 import { useSuppliersByLabel } from "@/hooks/useSupplierLabels";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,7 +21,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 
 interface LabelDrawerProps {
-  label: Label | null;
+  label: LabelWithSupplier | null;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -105,6 +105,17 @@ export function LabelDrawer({ label, isOpen, onClose }: LabelDrawerProps) {
           </div>
 
           <div className="p-6 space-y-6">
+            {/* Direct Supplier */}
+            {label.suppliers && (
+              <div className="bg-secondary rounded-lg p-4">
+                <div className="text-xs text-muted-foreground mb-1">Fournisseur principal</div>
+                <div className="flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-primary" />
+                  <span className="font-medium">{label.suppliers.name}</span>
+                </div>
+              </div>
+            )}
+
             {/* Website */}
             {label.website && (
               <div className="bg-secondary rounded-lg p-4">
