@@ -1,5 +1,6 @@
 import { Search } from "lucide-react";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
+import outreNationalLogo from "@/assets/outre-national-logo.png";
 
 interface HeaderProps {
   title: string;
@@ -10,11 +11,18 @@ interface HeaderProps {
 export function Header({ title, subtitle, onNavigate }: HeaderProps) {
   return (
     <header className="h-16 bg-card border-b border-border flex items-center justify-between px-8 sticky top-0 z-40">
-      <div className="flex items-center gap-3">
-        <h1 className="text-xl font-semibold text-foreground">{title}</h1>
-        {subtitle && (
-          <span className="text-sm text-muted-foreground">{subtitle}</span>
-        )}
+      <div className="flex items-center gap-4">
+        <img 
+          src={outreNationalLogo} 
+          alt="Outre National" 
+          className="w-8 h-8 rounded dark:invert"
+        />
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-semibold text-foreground">{title}</h1>
+          {subtitle && (
+            <span className="text-sm text-muted-foreground">{subtitle}</span>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-3">
