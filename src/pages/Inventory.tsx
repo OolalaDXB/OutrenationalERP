@@ -10,6 +10,7 @@ import { BulkStockAdjustmentModal } from "@/components/inventory/BulkStockAdjust
 import { CSVImportModal } from "@/components/inventory/CSVImportModal";
 import { ImportExportModal } from "@/components/import-export/ImportExportModal";
 import { InventoryPrintReport } from "@/components/inventory/InventoryPrintReport";
+import { IncompleteProductsSection } from "@/components/inventory/IncompleteProductsSection";
 import { ProductDrawer } from "@/components/drawers/ProductDrawer";
 import { toast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -207,6 +208,9 @@ export function InventoryPage() {
           <KpiCard icon={AlertTriangle} value={lowStockCount.toString()} label="Stock faible" variant="warning" />
           <KpiCard icon={XCircle} value={outOfStockCount.toString()} label="Ruptures" variant="danger" />
         </div>
+
+        {/* Incomplete Products Section */}
+        <IncompleteProductsSection />
 
         {/* Inventory Table */}
         <div>

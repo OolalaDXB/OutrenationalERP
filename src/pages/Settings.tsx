@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Settings, Save, Loader2, Upload, Image, X, Building, FileText, CreditCard, Receipt, Palette, ToggleLeft } from "lucide-react";
+import { Settings, Save, Loader2, Upload, Image, X, Building, FileText, CreditCard, Receipt, Palette, ToggleLeft, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,7 @@ import { useSettings, useUpdateSettings } from "@/hooks/useSettings";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { VatCacheSection } from "@/components/settings/VatCacheSection";
 
 export function SettingsPage() {
   const { toast } = useToast();
@@ -194,7 +195,7 @@ export function SettingsPage() {
       </div>
 
       <Tabs defaultValue="shop" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="shop" className="gap-2">
             <Building className="w-4 h-4" />
             Boutique
@@ -210,6 +211,10 @@ export function SettingsPage() {
           <TabsTrigger value="banking" className="gap-2">
             <CreditCard className="w-4 h-4" />
             Bancaire
+          </TabsTrigger>
+          <TabsTrigger value="vat-cache" className="gap-2">
+            <Database className="w-4 h-4" />
+            Cache TVA
           </TabsTrigger>
           <TabsTrigger value="features" className="gap-2">
             <ToggleLeft className="w-4 h-4" />
@@ -575,6 +580,11 @@ Les prix de nos produits sont indiqués en euros..."
               </div>
             )}
           </div>
+        </TabsContent>
+
+        {/* VAT Cache Tab */}
+        <TabsContent value="vat-cache" className="space-y-6">
+          <VatCacheSection />
         </TabsContent>
 
         {/* Features Tab */}
