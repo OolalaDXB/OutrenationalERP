@@ -1,18 +1,22 @@
 import { useState, useMemo } from "react";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, Building2, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { CustomerFormModal } from "@/components/forms/CustomerFormModal";
+import { CustomerFormModal, type CustomerFormData } from "@/components/forms/CustomerFormModal";
 import { CustomerDrawer } from "@/components/drawers/CustomerDrawer";
-import { useCustomers, type Customer } from "@/hooks/useCustomers";
+import { useCustomers, useCreateCustomer, type Customer } from "@/hooks/useCustomers";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
 export function CustomersPage() {
+  const { toast } = useToast();
+  const createCustomer = useCreateCustomer();
   const { data: customers = [], isLoading, error } = useCustomers();
   const { canWrite } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [countryFilter, setCountryFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
@@ -26,17 +30,20 @@ export function CustomersPage() {
   const filteredCustomers = useMemo(() => {
     return customers.filter((customer) => {
       const fullName = `${customer.first_name || ''} ${customer.last_name || ''}`.toLowerCase();
+      const companyName = (customer.company_name || '').toLowerCase();
       const matchesSearch =
         searchTerm === "" ||
         fullName.includes(searchTerm.toLowerCase()) ||
+        companyName.includes(searchTerm.toLowerCase()) ||
         customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (customer.city && customer.city.toLowerCase().includes(searchTerm.toLowerCase()));
 
       const matchesCountry = countryFilter === "all" || customer.country === countryFilter;
+      const matchesType = typeFilter === "all" || customer.customer_type === typeFilter;
 
-      return matchesSearch && matchesCountry;
+      return matchesSearch && matchesCountry && matchesType;
     });
-  }, [customers, searchTerm, countryFilter]);
+  }, [customers, searchTerm, countryFilter, typeFilter]);
 
   const handleRowClick = (customer: Customer) => {
     setSelectedCustomer(customer);
@@ -83,6 +90,15 @@ export function CustomersPage() {
         <div className="flex gap-3 p-4 border-b border-border bg-secondary flex-wrap">
           <select
             className="px-3 py-2 rounded-md border border-border bg-card text-sm cursor-pointer"
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+          >
+            <option value="all">Tous les types</option>
+            <option value="particulier">Particuliers</option>
+            <option value="professionnel">Professionnels</option>
+          </select>
+          <select
+            className="px-3 py-2 rounded-md border border-border bg-card text-sm cursor-pointer"
             value={countryFilter}
             onChange={(e) => setCountryFilter(e.target.value)}
           >
@@ -93,7 +109,7 @@ export function CustomersPage() {
           </select>
           <input
             type="text"
-            placeholder="Rechercher client, email, ville..."
+            placeholder="Rechercher client, entreprise, email, ville..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="flex-1 max-w-[300px] px-3 py-2 rounded-md border border-border bg-card text-sm"
@@ -119,12 +135,29 @@ export function CustomersPage() {
               >
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary-light flex items-center justify-center text-sm font-semibold text-primary">
-                      {(customer.first_name?.[0] || '?')}{(customer.last_name?.[0] || '')}
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
+                      customer.customer_type === 'professionnel' 
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' 
+                        : 'bg-primary/10 text-primary'
+                    }`}>
+                      {customer.customer_type === 'professionnel' ? (
+                        <Building2 className="w-5 h-5" />
+                      ) : (
+                        <>{(customer.first_name?.[0] || '?')}{(customer.last_name?.[0] || '')}</>
+                      )}
                     </div>
                     <div>
-                      <div className="font-semibold">{customer.first_name} {customer.last_name}</div>
-                      <div className="text-xs text-muted-foreground">{customer.email}</div>
+                      {customer.customer_type === 'professionnel' && customer.company_name ? (
+                        <>
+                          <div className="font-semibold">{customer.company_name}</div>
+                          <div className="text-xs text-muted-foreground">{customer.first_name} {customer.last_name} • {customer.email}</div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="font-semibold">{customer.first_name} {customer.last_name}</div>
+                          <div className="text-xs text-muted-foreground">{customer.email}</div>
+                        </>
+                      )}
                     </div>
                   </div>
                 </td>
@@ -149,7 +182,33 @@ export function CustomersPage() {
       <CustomerFormModal
         isOpen={showForm}
         onClose={() => setShowForm(false)}
-        onSubmit={(data) => console.log("New customer:", data)}
+        onSubmit={async (data: CustomerFormData) => {
+          try {
+            await createCustomer.mutateAsync({
+              email: data.email,
+              first_name: data.firstName,
+              last_name: data.lastName,
+              company_name: data.companyName || null,
+              phone: data.phone || null,
+              address: data.address || null,
+              address_line_2: data.addressLine2 || null,
+              city: data.city || null,
+              postal_code: data.postalCode || null,
+              state: data.state || null,
+              country: data.country || null,
+              customer_type: data.customerType,
+              vat_number: data.vatNumber || null,
+              website: data.website || null,
+            });
+            setShowForm(false);
+          } catch (error) {
+            toast({
+              title: "Erreur",
+              description: error instanceof Error ? error.message : "Impossible de créer le client",
+              variant: "destructive"
+            });
+          }
+        }}
       />
       <CustomerDrawer
         customer={selectedCustomer}
