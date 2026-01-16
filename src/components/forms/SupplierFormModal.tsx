@@ -154,7 +154,7 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormPro
         name: formData.name,
         email: formData.email || null,
         type: formData.type,
-        commission_rate: formData.type === "consignment" ? formData.commission_rate : null,
+        commission_rate: (formData.type === "consignment" || formData.type === "depot_vente") ? formData.commission_rate : null,
         country: formData.country || null,
         contact_name: formData.contact_name || null,
         phone: formData.phone || null,
@@ -233,14 +233,15 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormPro
                   className="w-full mt-1.5 px-3 py-2 rounded-lg border border-border bg-card text-sm"
                 >
                   <option value="purchase">Achat ferme</option>
-                  <option value="consignment">Dépôt-vente</option>
                   <option value="own">Production propre</option>
+                  <option value="consignment">Consignation</option>
+                  <option value="depot_vente">Dépôt-vente</option>
                 </select>
               </div>
 
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">
-                  Commission {formData.type === "consignment" ? "*" : "(N/A)"}
+                  Commission {(formData.type === "consignment" || formData.type === "depot_vente") ? "*" : "(N/A)"}
                 </Label>
                 <div className="relative mt-1.5">
                   <Input
@@ -248,9 +249,9 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormPro
                     min="0"
                     max="100"
                     step="1"
-                    value={formData.type === "consignment" ? formData.commission_rate * 100 : 0}
+                    value={(formData.type === "consignment" || formData.type === "depot_vente") ? formData.commission_rate * 100 : 0}
                     onChange={(e) => setFormData({ ...formData, commission_rate: Number(e.target.value) / 100 })}
-                    disabled={formData.type !== "consignment"}
+                    disabled={formData.type !== "consignment" && formData.type !== "depot_vente"}
                     className="pr-8"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
