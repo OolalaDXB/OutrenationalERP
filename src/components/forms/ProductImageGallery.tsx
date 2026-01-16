@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { X, Loader2, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { DiscogsImageSearch } from "./DiscogsImageSearch";
+import { DiscogsImageSearch, type DiscogsProductData } from "./DiscogsImageSearch";
 
 interface ProductImageGalleryProps {
   images: string[];
@@ -12,6 +12,7 @@ interface ProductImageGalleryProps {
   barcode?: string;
   title?: string;
   artist?: string;
+  onProductDataSelect?: (data: DiscogsProductData) => void;
 }
 
 export function ProductImageGallery({
@@ -22,6 +23,7 @@ export function ProductImageGallery({
   barcode,
   title,
   artist,
+  onProductDataSelect,
 }: ProductImageGalleryProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -126,6 +128,7 @@ export function ProductImageGallery({
           artist={artist}
           onImageSelect={handleDiscogsImageSelect}
           onImagesSelect={handleDiscogsImagesSelect}
+          onProductDataSelect={onProductDataSelect}
         />
       </div>
       

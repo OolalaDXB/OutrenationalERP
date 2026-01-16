@@ -6,12 +6,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useSuppliers } from "@/hooks/useSuppliers";
-import { useLabels } from "@/hooks/useLabels";
+import { useLabels, useCreateLabel } from "@/hooks/useLabels";
 import { useCreateProduct, useUpdateProduct, type Product, type ProductInsert } from "@/hooks/useProducts";
 import { useProductNotifications } from "@/hooks/useProductNotifications";
 import type { Enums } from "@/integrations/supabase/types";
 import { ProductImageGallery } from "./ProductImageGallery";
 import { CurrencyExchangeField } from "./CurrencyExchangeField";
+import type { DiscogsProductData } from "./DiscogsImageSearch";
 
 interface ProductFormProps {
   isOpen: boolean;
@@ -161,6 +162,31 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
     setFormData(prev => ({ ...prev, image_url: url }));
   };
 
+  const handleProductDataSelect = async (data: DiscogsProductData) => {
+    setFormData(prev => ({
+      ...prev,
+      title: data.title || prev.title,
+      artist_name: data.artist || prev.artist_name,
+      year_released: data.year || prev.year_released,
+      format: (data.format as Enums<'product_format'>) || prev.format,
+    }));
+
+    // Try to find or create label if provided
+    if (data.label) {
+      const existingLabel = labels.find(l => 
+        l.name.toLowerCase() === data.label!.toLowerCase()
+      );
+      if (existingLabel) {
+        setFormData(prev => ({ ...prev, label_id: existingLabel.id }));
+      }
+    }
+
+    toast({
+      title: "Données importées",
+      description: "Les informations Discogs ont été appliquées au formulaire",
+    });
+  };
+
   if (!isOpen) return null;
 
   const selectedSupplier = suppliers.find(s => s.id === formData.supplier_id);
@@ -258,6 +284,7 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
             barcode={formData.sku}
             title={formData.title}
             artist={formData.artist_name}
+            onProductDataSelect={handleProductDataSelect}
           />
 
           {/* Info produit */}
