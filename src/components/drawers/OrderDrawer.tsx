@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, ShoppingCart, MapPin, Truck, Clock, Package, Pencil, Trash2, Loader2, CreditCard, Copy, FileText, ExternalLink } from "lucide-react";
+import { X, ShoppingCart, MapPin, Truck, Clock, Package, Pencil, Trash2, Loader2, CreditCard, Copy, FileText, ExternalLink, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge, orderStatusVariant, orderStatusLabel } from "@/components/ui/status-badge";
@@ -17,6 +17,7 @@ import { toast } from "@/hooks/use-toast";
 import { OrderEditModal } from "@/components/forms/OrderEditModal";
 import { OrderFormModal } from "@/components/forms/OrderFormModal";
 import { ProductDrawer } from "@/components/drawers/ProductDrawer";
+import { OrderDocumentsDialog } from "@/components/orders/OrderDocumentsDialog";
 import { useNavigate } from "react-router-dom";
 
 type OrderWithItems = Order & { order_items?: OrderItem[] };
@@ -57,6 +58,7 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showRefundDialog, setShowRefundDialog] = useState(false);
   const [showShippedDialog, setShowShippedDialog] = useState(false);
+  const [showDocumentsDialog, setShowDocumentsDialog] = useState(false);
   const [trackingNumber, setTrackingNumber] = useState("");
   const [trackingUrl, setTrackingUrl] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -424,11 +426,15 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
               </div>
             </div>
 
-            {/* Invoice Link */}
-            <div className="pt-4 border-t border-border">
+            {/* Invoice & Documents Link */}
+            <div className="pt-4 border-t border-border space-y-2">
+              <Button variant="default" className="w-full" onClick={() => setShowDocumentsDialog(true)}>
+                <Printer className="w-4 h-4 mr-2" />
+                Facture & Bordereau
+              </Button>
               <Button variant="secondary" className="w-full" onClick={handleViewInvoice}>
                 <FileText className="w-4 h-4 mr-2" />
-                Voir la facture
+                Voir facture dans la liste
                 <ExternalLink className="w-3 h-3 ml-auto" />
               </Button>
             </div>
@@ -560,6 +566,15 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
         isOpen={isProductDrawerOpen}
         onClose={handleCloseProductDrawer}
       />
+
+      {/* Order Documents Dialog */}
+      {showDocumentsDialog && (
+        <OrderDocumentsDialog
+          order={order}
+          isOpen={showDocumentsDialog}
+          onClose={() => setShowDocumentsDialog(false)}
+        />
+      )}
     </>
   );
 }
