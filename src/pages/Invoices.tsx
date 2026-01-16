@@ -48,7 +48,7 @@ export function InvoicesPage() {
     if (urlSearch && urlSearch !== searchTerm) {
       setSearchTerm(urlSearch);
     }
-  }, [searchParams]);
+  }, [searchParams, searchTerm]);
 
   // Fetch invoices from Supabase
   const {
@@ -93,34 +93,7 @@ export function InvoicesPage() {
     },
   });
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (isError) {
-    const message = error instanceof Error ? error.message : "Erreur inconnue";
-    console.error("InvoicesPage query error:", error);
-
-    return (
-      <div className="space-y-3">
-        <div className="rounded-lg border border-border bg-card p-4">
-          <div className="text-sm font-semibold">Impossible de charger les factures</div>
-          <div className="mt-1 text-sm text-muted-foreground">{message}</div>
-          <div className="mt-3 flex gap-2">
-            <Button variant="outline" onClick={() => refetch()}>
-              Réessayer
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Filtrage
+  // Filtrage - MUST be before any conditional returns to respect hooks rules
   const filteredInvoices = useMemo(() => {
     return invoices.filter((invoice) => {
       const matchesSearch =
@@ -135,7 +108,7 @@ export function InvoicesPage() {
     });
   }, [invoices, searchTerm, statusFilter, typeFilter]);
 
-  // Stats
+  // Stats - MUST be before any conditional returns to respect hooks rules
   const stats = useMemo(() => {
     const totalAmount = invoices.reduce((sum, i) => sum + i.total, 0);
     const paidAmount = invoices
