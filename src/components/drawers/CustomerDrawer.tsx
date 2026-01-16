@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { X, Mail, Phone, MapPin, ShoppingCart, Euro, Calendar, Pencil, Trash2, Building2, Globe, FileText, UserCircle } from "lucide-react";
+import { X, Mail, Phone, MapPin, ShoppingCart, Euro, Calendar, Pencil, Trash2, Building2, Globe, FileText, UserCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, orderStatusVariant, orderStatusLabel } from "@/components/ui/status-badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
 import { CustomerFormModal } from "@/components/forms/CustomerFormModal";
+import { CustomerStatsWidget } from "@/components/customers/CustomerStatsWidget";
 import { getVatStatusLabel, isValidVatNumberFormat, type CustomerType } from "@/lib/vat-utils";
 
 interface CustomerDrawerProps {
@@ -24,6 +25,8 @@ export function CustomerDrawer({ customer, isOpen, onClose }: CustomerDrawerProp
   const deleteCustomer = useDeleteCustomer();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showStats, setShowStats] = useState(true);
+  const [showHistory, setShowHistory] = useState(true);
 
   // Commandes du client
   const customerOrders = useMemo(() => {
@@ -214,83 +217,84 @@ export function CustomerDrawer({ customer, isOpen, onClose }: CustomerDrawerProp
               </div>
             )}
 
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="bg-secondary rounded-lg p-4 text-center">
-                <div className="flex items-center justify-center gap-1 text-muted-foreground mb-2">
-                  <ShoppingCart className="w-4 h-4" />
-                </div>
-                <div className="text-2xl font-bold">{customer.orders_count || 0}</div>
-                <div className="text-xs text-muted-foreground">Commandes</div>
-              </div>
-              <div className="bg-secondary rounded-lg p-4 text-center">
-                <div className="flex items-center justify-center gap-1 text-muted-foreground mb-2">
+            {/* Stats Section with Period Selector */}
+            <div className="border border-border rounded-lg overflow-hidden">
+              <button
+                onClick={() => setShowStats(!showStats)}
+                className="w-full flex items-center justify-between p-3 bg-secondary/50 hover:bg-secondary transition-colors"
+              >
+                <h3 className="text-sm font-semibold flex items-center gap-2">
                   <Euro className="w-4 h-4" />
+                  Statistiques d'achat
+                </h3>
+                {showStats ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+              {showStats && (
+                <div className="p-4">
+                  <CustomerStatsWidget 
+                    customerId={customer.id} 
+                    orders={customerOrders as any} 
+                  />
                 </div>
-                <div className="text-2xl font-bold">{formatCurrency(customer.total_spent)}</div>
-                <div className="text-xs text-muted-foreground">Total dépensé</div>
-              </div>
-              <div className="bg-secondary rounded-lg p-4 text-center">
-                <div className="flex items-center justify-center gap-1 text-muted-foreground mb-2">
-                  <Calendar className="w-4 h-4" />
-                </div>
-                <div className="text-2xl font-bold">
-                  {(customer.orders_count || 0) > 0 
-                    ? Math.round((customer.total_spent || 0) / (customer.orders_count || 1)) 
-                    : 0}€
-                </div>
-                <div className="text-xs text-muted-foreground">Panier moyen</div>
-              </div>
+              )}
             </div>
 
             {/* Order History */}
-            <div>
-              <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                <ShoppingCart className="w-4 h-4" />
-                Historique des commandes ({customerOrders.length})
-              </h3>
-              <div className="space-y-3">
-                {customerOrders.length === 0 ? (
-                  <div className="bg-secondary rounded-lg p-6 text-center text-muted-foreground">
-                    Aucune commande
-                  </div>
-                ) : (
-                  customerOrders.map((order) => (
-                    <div key={order.id} className="bg-secondary rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-primary">{order.order_number}</span>
-                          {order.status && (
-                            <StatusBadge variant={orderStatusVariant[order.status]}>
-                              {orderStatusLabel[order.status]}
-                            </StatusBadge>
-                          )}
-                        </div>
-                        <span className="font-semibold">{formatCurrency(order.total)}</span>
-                      </div>
-                      <div className="text-xs text-muted-foreground flex items-center justify-between">
-                        <span>{order.order_items?.length || 0} article{(order.order_items?.length || 0) > 1 ? "s" : ""}</span>
-                        <span>{formatDateTime(order.created_at)}</span>
-                      </div>
-                      {/* Items preview */}
-                      {order.order_items && order.order_items.length > 0 && (
-                        <div className="mt-2 pt-2 border-t border-border/50">
-                          {order.order_items.slice(0, 2).map((item) => (
-                            <div key={item.id} className="text-xs text-muted-foreground truncate">
-                              {item.title} - {item.artist_name || '—'}
-                            </div>
-                          ))}
-                          {order.order_items.length > 2 && (
-                            <div className="text-xs text-primary">
-                              +{order.order_items.length - 2} autre{order.order_items.length - 2 > 1 ? "s" : ""}
-                            </div>
-                          )}
-                        </div>
-                      )}
+            <div className="border border-border rounded-lg overflow-hidden">
+              <button
+                onClick={() => setShowHistory(!showHistory)}
+                className="w-full flex items-center justify-between p-3 bg-secondary/50 hover:bg-secondary transition-colors"
+              >
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <ShoppingCart className="w-4 h-4" />
+                  Historique des commandes ({customerOrders.length})
+                </h3>
+                {showHistory ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+              {showHistory && (
+                <div className="p-3 space-y-3 max-h-[400px] overflow-y-auto">
+                  {customerOrders.length === 0 ? (
+                    <div className="bg-secondary rounded-lg p-6 text-center text-muted-foreground">
+                      Aucune commande
                     </div>
-                  ))
-                )}
-              </div>
+                  ) : (
+                    customerOrders.map((order) => (
+                      <div key={order.id} className="bg-secondary rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-primary">{order.order_number}</span>
+                            {order.status && (
+                              <StatusBadge variant={orderStatusVariant[order.status]}>
+                                {orderStatusLabel[order.status]}
+                              </StatusBadge>
+                            )}
+                          </div>
+                          <span className="font-semibold">{formatCurrency(order.total)}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground flex items-center justify-between">
+                          <span>{order.order_items?.length || 0} article{(order.order_items?.length || 0) > 1 ? "s" : ""}</span>
+                          <span>{formatDateTime(order.created_at)}</span>
+                        </div>
+                        {/* Items preview */}
+                        {order.order_items && order.order_items.length > 0 && (
+                          <div className="mt-2 pt-2 border-t border-border/50">
+                            {order.order_items.slice(0, 2).map((item) => (
+                              <div key={item.id} className="text-xs text-muted-foreground truncate">
+                                {item.title} - {item.artist_name || '—'}
+                              </div>
+                            ))}
+                            {order.order_items.length > 2 && (
+                              <div className="text-xs text-primary">
+                                +{order.order_items.length - 2} autre{order.order_items.length - 2 > 1 ? "s" : ""}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Actions */}

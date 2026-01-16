@@ -1,10 +1,11 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { TrendingUp, ShoppingCart, Users, Euro, Package, DollarSign, Percent } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { useProducts } from "@/hooks/useProducts";
 import { useOrders } from "@/hooks/useOrders";
 import { useCustomers } from "@/hooks/useCustomers";
 import { useSuppliers } from "@/hooks/useSuppliers";
+import { TopCustomersWidget } from "@/components/analytics/TopCustomersWidget";
 import {
   BarChart,
   Bar,
@@ -35,6 +36,11 @@ export function AnalyticsPage() {
   const { data: orders = [] } = useOrders();
   const { data: customers = [] } = useCustomers();
   const { data: suppliers = [] } = useSuppliers();
+  
+  // Top customers period state
+  const [topCustomersPeriod, setTopCustomersPeriod] = useState("30days");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
 
   // Calculate profitability stats
   const profitabilityStats = useMemo(() => {
@@ -410,6 +416,20 @@ export function AnalyticsPage() {
           </div>
         )}
       </div>
+
+      {/* Top Customers Widget */}
+      <TopCustomersWidget
+        orders={orders as any}
+        customers={customers}
+        selectedPeriod={topCustomersPeriod}
+        onPeriodChange={setTopCustomersPeriod}
+        customStartDate={customStartDate}
+        customEndDate={customEndDate}
+        onCustomDateChange={(start, end) => {
+          setCustomStartDate(start);
+          setCustomEndDate(end);
+        }}
+      />
 
       {/* Charts Row 2 */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
