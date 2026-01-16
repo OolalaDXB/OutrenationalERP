@@ -239,6 +239,9 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
             onImagesChange={handleImagesChange}
             mainImage={formData.image_url}
             onMainImageChange={handleMainImageChange}
+            barcode={formData.sku}
+            title={formData.title}
+            artist={formData.artist_name}
           />
 
           {/* Info produit */}

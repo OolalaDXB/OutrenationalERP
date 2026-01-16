@@ -1,14 +1,17 @@
 import { useState, useRef } from "react";
-import { Upload, X, Loader2, Image as ImageIcon, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { X, Loader2, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { DiscogsImageSearch } from "./DiscogsImageSearch";
 
 interface ProductImageGalleryProps {
   images: string[];
   onImagesChange: (images: string[]) => void;
   mainImage: string | null;
   onMainImageChange: (url: string | null) => void;
+  barcode?: string;
+  title?: string;
+  artist?: string;
 }
 
 export function ProductImageGallery({
@@ -16,6 +19,9 @@ export function ProductImageGallery({
   onImagesChange,
   mainImage,
   onMainImageChange,
+  barcode,
+  title,
+  artist,
 }: ProductImageGalleryProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -84,9 +90,44 @@ export function ProductImageGallery({
     toast({ title: "Image principale définie" });
   };
 
+  const handleDiscogsImageSelect = (url: string) => {
+    if (!images.includes(url)) {
+      const newImages = [...images, url];
+      onImagesChange(newImages);
+      if (!mainImage) {
+        onMainImageChange(url);
+      }
+      toast({ title: "Image ajoutée depuis Discogs" });
+    }
+  };
+
+  const handleDiscogsImagesSelect = (urls: string[]) => {
+    const newUrls = urls.filter(url => !images.includes(url));
+    if (newUrls.length > 0) {
+      const newImages = [...images, ...newUrls];
+      onImagesChange(newImages);
+      if (!mainImage && newUrls.length > 0) {
+        onMainImageChange(newUrls[0]);
+      }
+      toast({ 
+        title: "Images ajoutées depuis Discogs", 
+        description: `${newUrls.length} image(s) ajoutée(s)` 
+      });
+    }
+  };
+
   return (
     <div>
-      <h3 className="text-sm font-semibold mb-4">Photos du produit</h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold">Photos du produit</h3>
+        <DiscogsImageSearch
+          barcode={barcode}
+          title={title}
+          artist={artist}
+          onImageSelect={handleDiscogsImageSelect}
+          onImagesSelect={handleDiscogsImagesSelect}
+        />
+      </div>
       
       <div className="grid grid-cols-4 gap-3">
         {/* Existing images */}

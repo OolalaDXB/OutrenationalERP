@@ -2,3 +2,6 @@ project_id = "modgiywtysnpnyrgwuhn"
 
 [functions.validate-vat]
 verify_jwt = false
+
+[functions.discogs-search]
+verify_jwt = false
