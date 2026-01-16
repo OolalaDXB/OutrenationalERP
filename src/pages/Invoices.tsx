@@ -1,73 +1,22 @@
-import { useState, useMemo } from "react";
-import { FileText, Euro, Clock, CheckCircle, XCircle, Download, Plus, Eye } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { FileText, Euro, Clock, CheckCircle, XCircle, Download, Plus, Loader2 } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { orders, suppliers, formatCurrency, formatDate } from "@/data/demo-data";
+import { supabase } from "@/integrations/supabase/client";
+import { formatCurrency, formatDate } from "@/lib/format";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import type { Tables } from "@/integrations/supabase/types";
 
-interface Invoice {
-  id: string;
-  invoiceNumber: string;
-  type: "customer" | "supplier";
-  recipientName: string;
-  recipientEmail: string;
-  amount: number;
-  status: "draft" | "sent" | "paid" | "overdue" | "cancelled";
-  dueDate: string;
-  createdAt: string;
-  items: Array<{ description: string; quantity: number; unitPrice: number }>;
+type Invoice = Tables<"invoices">;
+type InvoiceItem = Tables<"invoice_items">;
+
+interface InvoiceWithItems extends Invoice {
+  invoice_items: InvoiceItem[];
 }
-
-// Générer des factures depuis les données existantes
-const generateInvoices = (): Invoice[] => {
-  const invoices: Invoice[] = [];
-
-  // Factures clients (depuis les commandes)
-  orders.forEach((order, index) => {
-    if (order.status !== "cancelled") {
-      invoices.push({
-        id: `inv-cust-${order.id}`,
-        invoiceNumber: `FC-2026-${String(index + 1).padStart(4, "0")}`,
-        type: "customer",
-        recipientName: order.customerName,
-        recipientEmail: order.customerEmail,
-        amount: order.total,
-        status: order.paymentStatus === "paid" ? "paid" : order.status === "pending" ? "sent" : "draft",
-        dueDate: order.createdAt,
-        createdAt: order.createdAt,
-        items: order.items.map((item) => ({
-          description: `${item.productTitle} - ${item.artist}`,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-        })),
-      });
-    }
-  });
-
-  // Factures fournisseurs (reversements dépôt-vente)
-  suppliers
-    .filter((s) => s.type === "consignment" && s.pendingPayout > 0)
-    .forEach((supplier, index) => {
-      invoices.push({
-        id: `inv-sup-${supplier.id}`,
-        invoiceNumber: `FF-2026-${String(index + 1).padStart(4, "0")}`,
-        type: "supplier",
-        recipientName: supplier.name,
-        recipientEmail: supplier.email || "",
-        amount: supplier.pendingPayout,
-        status: "draft",
-        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        createdAt: new Date().toISOString(),
-        items: [{ description: "Reversement dépôt-vente période en cours", quantity: 1, unitPrice: supplier.pendingPayout }],
-      });
-    });
-
-  return invoices.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-};
-
-const invoices = generateInvoices();
 
 const statusVariant: Record<string, "success" | "warning" | "danger" | "info" | "primary"> = {
   draft: "primary",
@@ -86,42 +35,70 @@ const statusLabel: Record<string, string> = {
 };
 
 export function InvoicesPage() {
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchParams] = useSearchParams();
+  const initialSearch = searchParams.get("search") || "";
+  
+  const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+
+  // Sync search term with URL params
+  useEffect(() => {
+    const urlSearch = searchParams.get("search") || "";
+    if (urlSearch && urlSearch !== searchTerm) {
+      setSearchTerm(urlSearch);
+    }
+  }, [searchParams]);
+
+  // Fetch invoices from Supabase
+  const { data: invoices = [], isLoading } = useQuery({
+    queryKey: ["invoices"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("invoices")
+        .select(`
+          *,
+          invoice_items (*)
+        `)
+        .order("created_at", { ascending: false });
+      
+      if (error) throw error;
+      return data as InvoiceWithItems[];
+    },
+  });
 
   // Filtrage
   const filteredInvoices = useMemo(() => {
     return invoices.filter((invoice) => {
       const matchesSearch =
         searchTerm === "" ||
-        invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        invoice.recipientName.toLowerCase().includes(searchTerm.toLowerCase());
+        invoice.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        invoice.recipient_name.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesStatus = statusFilter === "all" || invoice.status === statusFilter;
       const matchesType = typeFilter === "all" || invoice.type === typeFilter;
 
       return matchesSearch && matchesStatus && matchesType;
     });
-  }, [searchTerm, statusFilter, typeFilter]);
+  }, [invoices, searchTerm, statusFilter, typeFilter]);
 
   // Stats
   const stats = useMemo(() => {
-    const totalAmount = invoices.reduce((sum, i) => sum + i.amount, 0);
-    const paidAmount = invoices.filter((i) => i.status === "paid").reduce((sum, i) => sum + i.amount, 0);
-    const pendingAmount = invoices.filter((i) => i.status === "sent" || i.status === "draft").reduce((sum, i) => sum + i.amount, 0);
+    const totalAmount = invoices.reduce((sum, i) => sum + i.total, 0);
+    const paidAmount = invoices.filter((i) => i.status === "paid").reduce((sum, i) => sum + i.total, 0);
+    const pendingAmount = invoices.filter((i) => i.status === "sent" || i.status === "draft").reduce((sum, i) => sum + i.total, 0);
     const overdueCount = invoices.filter((i) => i.status === "overdue").length;
 
     return { totalAmount, paidAmount, pendingAmount, overdueCount };
-  }, []);
+  }, [invoices]);
 
   // Génération PDF
-  const generatePDF = (invoice: Invoice) => {
+  const generatePDF = (invoice: InvoiceWithItems) => {
     const doc = new jsPDF();
 
     // Header
     doc.setFontSize(20);
-    doc.setTextColor(113, 75, 103); // Primary color
+    doc.setTextColor(113, 75, 103);
     doc.text("OUTRE-NATIONAL", 20, 25);
 
     doc.setFontSize(10);
@@ -131,49 +108,75 @@ export function InvoicesPage() {
     // Invoice info
     doc.setFontSize(16);
     doc.setTextColor(0);
-    doc.text(`Facture ${invoice.invoiceNumber}`, 120, 25);
+    doc.text(`Facture ${invoice.invoice_number}`, 120, 25);
 
     doc.setFontSize(10);
     doc.setTextColor(100);
-    doc.text(`Date: ${formatDate(invoice.createdAt)}`, 120, 35);
-    doc.text(`Échéance: ${formatDate(invoice.dueDate)}`, 120, 42);
+    doc.text(`Date: ${formatDate(invoice.issue_date)}`, 120, 35);
+    if (invoice.due_date) {
+      doc.text(`Échéance: ${formatDate(invoice.due_date)}`, 120, 42);
+    }
 
     // Recipient
     doc.setFontSize(12);
     doc.setTextColor(0);
     doc.text("Destinataire:", 20, 55);
     doc.setFontSize(10);
-    doc.text(invoice.recipientName, 20, 62);
-    if (invoice.recipientEmail) {
-      doc.text(invoice.recipientEmail, 20, 69);
+    doc.text(invoice.recipient_name, 20, 62);
+    if (invoice.recipient_email) {
+      doc.text(invoice.recipient_email, 20, 69);
+    }
+    if (invoice.recipient_address) {
+      doc.text(invoice.recipient_address, 20, 76);
     }
 
     // Table
     autoTable(doc, {
-      startY: 85,
+      startY: 95,
       head: [["Description", "Qté", "Prix unit.", "Total"]],
-      body: invoice.items.map((item) => [
+      body: invoice.invoice_items.map((item) => [
         item.description,
         item.quantity.toString(),
-        formatCurrency(item.unitPrice),
-        formatCurrency(item.quantity * item.unitPrice),
+        formatCurrency(item.unit_price),
+        formatCurrency(item.total_price),
       ]),
-      foot: [["", "", "Total", formatCurrency(invoice.amount)]],
+      foot: [
+        ["", "", "Sous-total", formatCurrency(invoice.subtotal)],
+        ...(invoice.tax_amount ? [["", "", "TVA", formatCurrency(invoice.tax_amount)]] : []),
+        ["", "", "Total", formatCurrency(invoice.total)],
+      ],
       theme: "striped",
       headStyles: { fillColor: [113, 75, 103] },
       footStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: "bold" },
     });
 
+    // Notes
+    const finalY = (doc as any).lastAutoTable.finalY + 15;
+    if (invoice.notes) {
+      doc.setFontSize(9);
+      doc.setTextColor(100);
+      doc.text("Notes:", 20, finalY);
+      doc.text(invoice.notes, 20, finalY + 5);
+    }
+
     // Footer
-    const finalY = (doc as any).lastAutoTable.finalY + 20;
+    const footerY = finalY + 25;
     doc.setFontSize(9);
     doc.setTextColor(100);
-    doc.text("Outre-National - Paris, France", 20, finalY);
-    doc.text("contact@outre-national.com", 20, finalY + 5);
+    doc.text("Outre-National - Paris, France", 20, footerY);
+    doc.text("contact@outre-national.com", 20, footerY + 5);
 
     // Save
-    doc.save(`${invoice.invoiceNumber}.pdf`);
+    doc.save(`${invoice.invoice_number}.pdf`);
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -195,7 +198,7 @@ export function InvoicesPage() {
           >
             <option value="all">Tous les types</option>
             <option value="customer">Factures clients</option>
-            <option value="supplier">Factures fournisseurs</option>
+            <option value="supplier_payout">Reversements fournisseurs</option>
           </select>
           <select
             className="px-3 py-2 rounded-md border border-border bg-card text-sm cursor-pointer"
@@ -244,7 +247,7 @@ export function InvoicesPage() {
                     <div className="w-10 h-10 rounded-lg bg-primary-light flex items-center justify-center">
                       <FileText className="w-5 h-5 text-primary" />
                     </div>
-                    <span className="font-semibold text-primary">{invoice.invoiceNumber}</span>
+                    <span className="font-semibold text-primary">{invoice.invoice_number}</span>
                   </div>
                 </td>
                 <td className="px-6 py-4">
@@ -254,17 +257,17 @@ export function InvoicesPage() {
                 </td>
                 <td className="px-6 py-4">
                   <div>
-                    <div className="font-medium">{invoice.recipientName}</div>
-                    <div className="text-xs text-muted-foreground">{invoice.recipientEmail}</div>
+                    <div className="font-medium">{invoice.recipient_name}</div>
+                    <div className="text-xs text-muted-foreground">{invoice.recipient_email}</div>
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <StatusBadge variant={statusVariant[invoice.status]}>
-                    {statusLabel[invoice.status]}
+                  <StatusBadge variant={statusVariant[invoice.status || "draft"]}>
+                    {statusLabel[invoice.status || "draft"]}
                   </StatusBadge>
                 </td>
-                <td className="px-6 py-4 font-semibold tabular-nums">{formatCurrency(invoice.amount)}</td>
-                <td className="px-6 py-4 text-sm text-muted-foreground">{formatDate(invoice.createdAt)}</td>
+                <td className="px-6 py-4 font-semibold tabular-nums">{formatCurrency(invoice.total)}</td>
+                <td className="px-6 py-4 text-sm text-muted-foreground">{formatDate(invoice.issue_date)}</td>
                 <td className="px-6 py-4">
                   <div className="flex gap-2">
                     <button
@@ -283,7 +286,7 @@ export function InvoicesPage() {
 
         {filteredInvoices.length === 0 && (
           <div className="p-12 text-center text-muted-foreground">
-            Aucune facture trouvée
+            {invoices.length === 0 ? "Aucune facture enregistrée" : "Aucune facture trouvée pour cette recherche"}
           </div>
         )}
       </div>
