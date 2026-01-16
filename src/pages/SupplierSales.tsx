@@ -12,6 +12,7 @@ import { formatCurrency } from "@/lib/format";
 import { SupplierSalesReport } from "@/components/reports/SupplierSalesReport";
 import { MonthlySupplierReport } from "@/components/reports/MonthlySupplierReport";
 import { SupplierPayoutManager } from "@/components/suppliers/SupplierPayoutManager";
+import { SupplierDrawer } from "@/components/drawers/SupplierDrawer";
 import {
   BarChart,
   Bar,
@@ -39,6 +40,12 @@ export function SupplierSalesPage() {
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [isMonthlyReportOpen, setIsMonthlyReportOpen] = useState(false);
   const [isPayoutManagerOpen, setIsPayoutManagerOpen] = useState(false);
+  const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
+
+  const selectedSupplier = useMemo(() => {
+    if (!selectedSupplierId) return null;
+    return suppliers.find(s => s.id === selectedSupplierId) || null;
+  }, [selectedSupplierId, suppliers]);
 
   // Calculate pending payouts
   const pendingPayoutsTotal = useMemo(() => {
@@ -365,7 +372,14 @@ export function SupplierSalesPage() {
                 <tbody>
                   {profitabilityBySupplier.filter(s => s.total_stock > 0).map((data) => (
                     <tr key={data.supplier_id} className="border-b border-border/50 hover:bg-secondary/30">
-                      <td className="py-3 px-4 font-medium">{data.supplier_name}</td>
+                      <td className="py-3 px-4 font-medium">
+                        <button
+                          onClick={() => setSelectedSupplierId(data.supplier_id)}
+                          className="text-primary hover:underline cursor-pointer text-left"
+                        >
+                          {data.supplier_name}
+                        </button>
+                      </td>
                       <td className="py-3 px-4 text-center">
                         <StatusBadge variant={supplierTypeVariant[data.supplier_type as keyof typeof supplierTypeVariant]}>
                           {supplierTypeLabel[data.supplier_type as keyof typeof supplierTypeLabel]}
@@ -489,7 +503,12 @@ export function SupplierSalesPage() {
                         {(report.supplier_name || '??').split(' ').slice(0, 2).map(n => n[0]).join('')}
                       </div>
                       <div>
-                        <div className="font-semibold">{report.supplier_name}</div>
+                        <button
+                          onClick={() => report.supplier_id && setSelectedSupplierId(report.supplier_id)}
+                          className="font-semibold text-primary hover:underline cursor-pointer text-left"
+                        >
+                          {report.supplier_name}
+                        </button>
                         {report.supplier_type && (
                           <StatusBadge variant={supplierTypeVariant[report.supplier_type]}>
                             {supplierTypeLabel[report.supplier_type]}
@@ -560,6 +579,13 @@ export function SupplierSalesPage() {
           />
         </>
       )}
+
+      {/* Supplier Drawer */}
+      <SupplierDrawer
+        supplier={selectedSupplier}
+        isOpen={!!selectedSupplierId}
+        onClose={() => setSelectedSupplierId(null)}
+      />
     </div>
   );
 }
