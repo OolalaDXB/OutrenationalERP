@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { addInvoiceHistory } from "@/hooks/useInvoiceHistory";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Invoice = Tables<"invoices">;
@@ -171,8 +172,30 @@ export function InvoiceEditModal({ open, onOpenChange, invoice }: InvoiceEditMod
 
       if (itemsError) throw itemsError;
 
+      // Record history
+      const changes: Record<string, { old: unknown; new: unknown }> = {};
+      if (invoice.invoice_number !== invoiceNumber.trim()) {
+        changes.invoice_number = { old: invoice.invoice_number, new: invoiceNumber.trim() };
+      }
+      if (invoice.status !== status) {
+        changes.status = { old: invoice.status, new: status };
+      }
+      if (invoice.recipient_name !== recipientName.trim()) {
+        changes.recipient_name = { old: invoice.recipient_name, new: recipientName.trim() };
+      }
+      if (invoice.total !== total) {
+        changes.total = { old: invoice.total, new: total };
+      }
+      
+      await addInvoiceHistory(
+        invoice.id,
+        Object.keys(changes).includes("status") ? "status_changed" : "updated",
+        Object.keys(changes).length > 0 ? changes : undefined
+      );
+
       toast.success("Facture modifiée avec succès");
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["invoice-history", invoice.id] });
       onOpenChange(false);
     } catch (error) {
       console.error("Error updating invoice:", error);

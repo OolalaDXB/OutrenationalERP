@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { addInvoiceHistory } from "@/hooks/useInvoiceHistory";
 
 interface InvoiceFormModalProps {
   open: boolean;
@@ -140,6 +141,9 @@ export function InvoiceFormModal({ open, onOpenChange }: InvoiceFormModalProps) 
         .insert(invoiceItems);
 
       if (itemsError) throw itemsError;
+
+      // Record history
+      await addInvoiceHistory(invoice.id, "created");
 
       toast.success("Facture créée avec succès");
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
