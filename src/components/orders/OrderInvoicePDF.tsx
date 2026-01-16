@@ -40,8 +40,7 @@ export async function generateOrderInvoicePDF({ order, settings, invoiceNumber }
   doc.setTextColor(100);
   
   const companyInfo = [
-    settings.shop_name,
-    settings.legal_name !== settings.shop_name ? settings.legal_name : null,
+    settings.legal_name || settings.shop_name,
     settings.shop_address,
     `${settings.shop_postal_code || ''} ${settings.shop_city || ''}`.trim(),
     settings.shop_country,
@@ -49,6 +48,7 @@ export async function generateOrderInvoicePDF({ order, settings, invoiceNumber }
     settings.shop_email ? `Email : ${settings.shop_email}` : null,
     settings.siret ? `SIRET : ${settings.siret}` : null,
     settings.vat_number ? `TVA : ${settings.vat_number}` : null,
+    settings.eori ? `EORI : ${settings.eori}` : null,
   ].filter(Boolean);
 
   companyInfo.forEach((line, i) => {
@@ -185,17 +185,58 @@ export async function generateOrderInvoicePDF({ order, settings, invoiceNumber }
     doc.setFont("helvetica", "normal");
     doc.setTextColor(0, 128, 0);
     doc.text(`Payé le ${formatDate(order.paid_at)}${order.payment_method ? ` - ${order.payment_method}` : ''}`, 14, yPos);
+    yPos += 8;
+  } else {
+    yPos += 45;
+  }
+
+  // Payment terms
+  if (settings.payment_terms_text) {
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80);
+    const splitTerms = doc.splitTextToSize(settings.payment_terms_text, pageWidth - 28);
+    doc.text(splitTerms, 14, yPos);
+    yPos += splitTerms.length * 4 + 5;
+  }
+
+  // Bank details
+  if (settings.iban || settings.bic) {
+    doc.setFontSize(9);
+    doc.setTextColor(60);
+    doc.setFont("helvetica", "bold");
+    doc.text("Coordonnées bancaires :", 14, yPos);
+    doc.setFont("helvetica", "normal");
+    yPos += 5;
+    
+    const bankInfo = [
+      settings.bank_name,
+      settings.iban ? `IBAN : ${settings.iban}` : null,
+      settings.bic ? `BIC : ${settings.bic}` : null,
+    ].filter(Boolean).join(' / ');
+    
+    doc.text(bankInfo, 14, yPos);
+    yPos += 8;
+  }
+
+  // Legal mentions
+  if (settings.legal_mentions) {
+    doc.setFontSize(8);
+    doc.setTextColor(100);
+    const splitLegal = doc.splitTextToSize(settings.legal_mentions, pageWidth - 28);
+    doc.text(splitLegal, 14, yPos);
   }
 
   // Footer
-  const footerY = doc.internal.pageSize.getHeight() - 20;
+  const footerY = doc.internal.pageSize.getHeight() - 15;
   doc.setFontSize(8);
   doc.setTextColor(120);
   doc.setFont("helvetica", "normal");
   
   const footerText = [
-    `${settings.shop_name}${settings.siret ? ` - SIRET : ${settings.siret}` : ''}`,
-    settings.vat_number ? `TVA Intracommunautaire : ${settings.vat_number}` : '',
+    settings.legal_name || settings.shop_name,
+    settings.siret ? `SIRET : ${settings.siret}` : null,
+    settings.vat_number ? `TVA : ${settings.vat_number}` : null,
   ].filter(Boolean).join(' - ');
   
   doc.text(footerText, pageWidth / 2, footerY, { align: 'center' });

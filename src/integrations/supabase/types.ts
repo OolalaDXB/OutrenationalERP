@@ -1034,12 +1034,18 @@ export type Database = {
       }
       settings: {
         Row: {
+          bank_name: string | null
+          bic: string | null
           created_at: string | null
           default_currency: string | null
+          eori: string | null
+          iban: string | null
           id: string
           invoice_next_number: number | null
           invoice_prefix: string | null
+          legal_mentions: string | null
           legal_name: string | null
+          payment_terms_text: string | null
           payout_invoice_next_number: number | null
           payout_invoice_prefix: string | null
           primary_color: string | null
@@ -1057,12 +1063,18 @@ export type Database = {
           vat_rate: number | null
         }
         Insert: {
+          bank_name?: string | null
+          bic?: string | null
           created_at?: string | null
           default_currency?: string | null
+          eori?: string | null
+          iban?: string | null
           id?: string
           invoice_next_number?: number | null
           invoice_prefix?: string | null
+          legal_mentions?: string | null
           legal_name?: string | null
+          payment_terms_text?: string | null
           payout_invoice_next_number?: number | null
           payout_invoice_prefix?: string | null
           primary_color?: string | null
@@ -1080,12 +1092,18 @@ export type Database = {
           vat_rate?: number | null
         }
         Update: {
+          bank_name?: string | null
+          bic?: string | null
           created_at?: string | null
           default_currency?: string | null
+          eori?: string | null
+          iban?: string | null
           id?: string
           invoice_next_number?: number | null
           invoice_prefix?: string | null
+          legal_mentions?: string | null
           legal_name?: string | null
+          payment_terms_text?: string | null
           payout_invoice_next_number?: number | null
           payout_invoice_prefix?: string | null
           primary_color?: string | null
