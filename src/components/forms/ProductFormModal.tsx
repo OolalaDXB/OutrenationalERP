@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { X, Package, Loader2 } from "lucide-react";
+import { X, Package, Loader2, Wand2 } from "lucide-react";
+import { useDiscogsSearch } from "@/hooks/useDiscogsSearch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -321,7 +322,15 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
 
           {/* Info produit */}
           <div>
-            <h3 className="text-sm font-semibold mb-4">Informations produit</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold">Informations produit</h3>
+              <AutoCompleteButton
+                barcode={formData.sku}
+                title={formData.title}
+                artist={formData.artist_name}
+                onProductDataSelect={handleProductDataSelect}
+              />
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <Label className="text-sm font-medium text-muted-foreground">Titre *</Label>
@@ -716,5 +725,103 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
         </form>
       </div>
     </div>
+  );
+}
+
+// Composant AutoComplete séparé pour éviter les problèmes de hooks
+function AutoCompleteButton({
+  barcode,
+  title,
+  artist,
+  onProductDataSelect,
+}: {
+  barcode?: string;
+  title?: string;
+  artist?: string;
+  onProductDataSelect: (data: DiscogsProductData) => void;
+}) {
+  const { isSearching, searchByBarcode, searchByQuery } = useDiscogsSearch();
+  const { toast } = useToast();
+  const { data: labels = [] } = useLabels();
+  const createLabel = useCreateLabel();
+
+  const handleAutoComplete = async () => {
+    let results: any[] = [];
+    
+    if (barcode) {
+      results = await searchByBarcode(barcode);
+    } else if (title || artist) {
+      const query = [artist, title].filter(Boolean).join(" - ");
+      results = await searchByQuery(query);
+    }
+
+    if (results.length > 0) {
+      const result = results[0];
+      
+      // Parse title to extract artist and album title
+      const titleParts = result.title.split(" - ");
+      const artistName = titleParts.length > 1 ? titleParts[0].trim() : undefined;
+      const albumTitle = titleParts.length > 1 ? titleParts.slice(1).join(" - ").trim() : result.title;
+      
+      // Map Discogs format to our format enum
+      const formatMap: Record<string, string> = {
+        'LP': 'lp',
+        'Album': 'lp',
+        '2xLP': '2lp',
+        '3xLP': '3lp',
+        'CD': 'cd',
+        'Box Set': 'boxset',
+        '7"': '7inch',
+        '10"': '10inch',
+        '12"': '12inch',
+        'Cassette': 'cassette',
+      };
+      
+      const discogsFormat = result.format?.[0] || '';
+      let mappedFormat: string | undefined;
+      for (const [key, value] of Object.entries(formatMap)) {
+        if (discogsFormat.toLowerCase().includes(key.toLowerCase())) {
+          mappedFormat = value;
+          break;
+        }
+      }
+      
+      const data: DiscogsProductData = {
+        title: albumTitle,
+        artist: artistName,
+        label: result.label?.[0],
+        year: result.year ? parseInt(result.year, 10) : undefined,
+        format: mappedFormat,
+        catalogNumber: result.catno,
+      };
+      
+      onProductDataSelect(data);
+    } else {
+      toast({
+        title: "Aucun résultat",
+        description: "Aucun résultat trouvé sur Discogs. Essayez de modifier le titre ou l'artiste.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const canSearch = !!(barcode || title || artist);
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={handleAutoComplete}
+      disabled={isSearching || !canSearch}
+      className="gap-2"
+    >
+      {isSearching ? (
+        <Loader2 className="w-4 h-4 animate-spin" />
+      ) : (
+        <Wand2 className="w-4 h-4" />
+      )}
+      Compléter automatiquement
+    </Button>
   );
 }
