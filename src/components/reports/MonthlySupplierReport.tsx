@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback } from "react";
-import { format, startOfMonth, endOfMonth, subMonths, eachMonthOfInterval, subYears } from "date-fns";
+import { format, startOfMonth, endOfMonth, subMonths, eachMonthOfInterval, subYears, startOfYear, endOfYear, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
-import { FileText, X, Building2, Loader2, TrendingUp, TrendingDown, Package, Euro, Percent, ChevronLeft, ChevronRight, BarChart3 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { FileText, X, Building2, Loader2, TrendingUp, TrendingDown, Package, Euro, Percent, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/format";
@@ -66,34 +67,81 @@ interface SupplierMonthlyData {
   commission_rate: number;
 }
 
+type PeriodPreset = "this_month" | "last_month" | "this_quarter" | "this_year" | "last_year" | "custom";
+
 export function MonthlySupplierReport({ isOpen, onClose, suppliers, orderItems }: MonthlySupplierReportProps) {
   const { toast } = useToast();
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [periodPreset, setPeriodPreset] = useState<PeriodPreset>("this_month");
+  const [customStartDate, setCustomStartDate] = useState<string>(format(startOfMonth(new Date()), "yyyy-MM-dd"));
+  const [customEndDate, setCustomEndDate] = useState<string>(format(endOfMonth(new Date()), "yyyy-MM-dd"));
   const [isExporting, setIsExporting] = useState(false);
 
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(currentMonth);
-  const periodLabel = format(currentMonth, "MMMM yyyy", { locale: fr });
+  // Calculate date range based on period preset
+  const { periodStart, periodEnd, periodLabel } = useMemo(() => {
+    const now = new Date();
+    let start: Date;
+    let end: Date;
+    let label: string;
 
-  // Navigate months
-  const goToPreviousMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
-  const goToNextMonth = () => setCurrentMonth(subMonths(currentMonth, -1));
-  const isCurrentMonth = format(currentMonth, "yyyy-MM") === format(new Date(), "yyyy-MM");
+    switch (periodPreset) {
+      case "this_month":
+        start = startOfMonth(now);
+        end = endOfMonth(now);
+        label = format(now, "MMMM yyyy", { locale: fr });
+        break;
+      case "last_month":
+        const lastMonth = subMonths(now, 1);
+        start = startOfMonth(lastMonth);
+        end = endOfMonth(lastMonth);
+        label = format(lastMonth, "MMMM yyyy", { locale: fr });
+        break;
+      case "this_quarter":
+        const quarterStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+        const quarterEnd = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3 + 3, 0);
+        start = quarterStart;
+        end = quarterEnd;
+        const quarterNum = Math.floor(now.getMonth() / 3) + 1;
+        label = `T${quarterNum} ${now.getFullYear()}`;
+        break;
+      case "this_year":
+        start = startOfYear(now);
+        end = endOfYear(now);
+        label = `Année ${now.getFullYear()}`;
+        break;
+      case "last_year":
+        const lastYear = subYears(now, 1);
+        start = startOfYear(lastYear);
+        end = endOfYear(lastYear);
+        label = `Année ${lastYear.getFullYear()}`;
+        break;
+      case "custom":
+        start = customStartDate ? parseISO(customStartDate) : startOfMonth(now);
+        end = customEndDate ? parseISO(customEndDate) : endOfMonth(now);
+        label = `${format(start, "d MMM yyyy", { locale: fr })} - ${format(end, "d MMM yyyy", { locale: fr })}`;
+        break;
+      default:
+        start = startOfMonth(now);
+        end = endOfMonth(now);
+        label = format(now, "MMMM yyyy", { locale: fr });
+    }
 
-  // Filter order items for the selected month
-  const monthlyItems = useMemo(() => {
+    return { periodStart: start, periodEnd: end, periodLabel: label };
+  }, [periodPreset, customStartDate, customEndDate]);
+
+  // Filter order items for the selected period
+  const filteredItems = useMemo(() => {
     return orderItems.filter(item => {
       if (!item.created_at) return false;
       const itemDate = new Date(item.created_at);
-      return itemDate >= monthStart && itemDate <= monthEnd;
+      return itemDate >= periodStart && itemDate <= periodEnd;
     });
-  }, [orderItems, monthStart, monthEnd]);
+  }, [orderItems, periodStart, periodEnd]);
 
-  // Calculate sales by supplier for the month
+  // Calculate sales by supplier for the period
   const supplierSalesData = useMemo(() => {
     const salesBySupplier: Record<string, SupplierMonthlyData> = {};
 
-    monthlyItems.forEach(item => {
+    filteredItems.forEach(item => {
       const supplierId = item.supplier_id;
       if (!supplierId) return;
 
@@ -128,7 +176,7 @@ export function MonthlySupplierReport({ isOpen, onClose, suppliers, orderItems }
     });
 
     return Object.values(salesBySupplier).sort((a, b) => b.gross_sales - a.gross_sales);
-  }, [monthlyItems, suppliers]);
+  }, [filteredItems, suppliers]);
 
   // Monthly totals
   const totals = useMemo(() => ({
@@ -163,14 +211,14 @@ export function MonthlySupplierReport({ isOpen, onClose, suppliers, orderItems }
     return Object.entries(byType).map(([name, value]) => ({ name, value }));
   }, [supplierSalesData]);
 
-  // Monthly trend (last 6 months)
+  // Monthly trend (based on period)
   const monthlyTrend = useMemo(() => {
-    const last6Months = eachMonthOfInterval({
-      start: subMonths(monthStart, 5),
-      end: monthStart
+    const months = eachMonthOfInterval({
+      start: subMonths(periodStart, 5),
+      end: periodStart
     });
 
-    return last6Months.map(month => {
+    return months.map(month => {
       const mStart = startOfMonth(month);
       const mEnd = endOfMonth(month);
       
@@ -187,7 +235,7 @@ export function MonthlySupplierReport({ isOpen, onClose, suppliers, orderItems }
         sales,
       };
     });
-  }, [orderItems, monthStart]);
+  }, [orderItems, periodStart]);
 
   // Export to PDF
   const exportToPDF = useCallback(async () => {
@@ -203,7 +251,7 @@ export function MonthlySupplierReport({ isOpen, onClose, suppliers, orderItems }
       
       doc.setFontSize(14);
       doc.setTextColor(60);
-      doc.text(format(currentMonth, "MMMM yyyy", { locale: fr }).toUpperCase(), pageWidth / 2, 28, { align: "center" });
+      doc.text(periodLabel.toUpperCase(), pageWidth / 2, 28, { align: "center" });
       
       doc.setFontSize(10);
       doc.setTextColor(100);
@@ -301,17 +349,17 @@ export function MonthlySupplierReport({ isOpen, onClose, suppliers, orderItems }
         );
       }
 
-      const fileName = `rapport-mensuel-${format(currentMonth, "yyyy-MM")}.pdf`;
+      const fileName = `rapport-ventes-${format(new Date(), "yyyy-MM-dd")}.pdf`;
       doc.save(fileName);
       
-      toast({ title: "Export réussi", description: `Le rapport ${periodLabel} a été téléchargé` });
+      toast({ title: "Export réussi", description: `Le rapport a été téléchargé` });
     } catch (error) {
       console.error("Export error:", error);
       toast({ title: "Erreur", description: "Impossible de générer le rapport PDF", variant: "destructive" });
     } finally {
       setIsExporting(false);
     }
-  }, [currentMonth, supplierSalesData, totals, marginPercentage, periodLabel, toast]);
+  }, [supplierSalesData, totals, marginPercentage, periodLabel, toast]);
 
   if (!isOpen) return null;
 
@@ -326,23 +374,12 @@ export function MonthlySupplierReport({ isOpen, onClose, suppliers, orderItems }
               <BarChart3 className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold">Rapport mensuel des ventes</h2>
+              <h2 className="text-lg font-semibold">Rapport des ventes</h2>
               <p className="text-sm text-muted-foreground">Analyse par fournisseur</p>
             </div>
           </div>
           
-          <div className="flex items-center gap-4">
-            {/* Month navigation */}
-            <div className="flex items-center gap-2 bg-secondary rounded-lg p-1">
-              <Button variant="ghost" size="icon" onClick={goToPreviousMonth} className="h-8 w-8">
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <span className="px-3 font-medium capitalize">{periodLabel}</span>
-              <Button variant="ghost" size="icon" onClick={goToNextMonth} disabled={isCurrentMonth} className="h-8 w-8">
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
-
+          <div className="flex items-center gap-3">
             <Button onClick={exportToPDF} disabled={isExporting || supplierSalesData.length === 0} className="gap-2">
               {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
               Exporter PDF
@@ -351,6 +388,54 @@ export function MonthlySupplierReport({ isOpen, onClose, suppliers, orderItems }
             <button onClick={onClose} className="p-2 rounded-lg hover:bg-secondary transition-colors">
               <X className="w-5 h-5 text-muted-foreground" />
             </button>
+          </div>
+        </div>
+
+        {/* Period Selection */}
+        <div className="p-4 border-b border-border bg-secondary/30">
+          <div className="flex flex-wrap items-end gap-4">
+            <div>
+              <label className="text-sm font-medium text-muted-foreground block mb-1.5">Période</label>
+              <select
+                value={periodPreset}
+                onChange={(e) => setPeriodPreset(e.target.value as PeriodPreset)}
+                className="px-3 py-2 rounded-lg border border-border bg-card text-sm cursor-pointer min-w-[160px]"
+              >
+                <option value="this_month">Ce mois</option>
+                <option value="last_month">Mois dernier</option>
+                <option value="this_quarter">Ce trimestre</option>
+                <option value="this_year">Cette année</option>
+                <option value="last_year">Année dernière</option>
+                <option value="custom">Personnalisé</option>
+              </select>
+            </div>
+
+            {periodPreset === "custom" && (
+              <>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground block mb-1.5">Du</label>
+                  <Input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="w-auto"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground block mb-1.5">Au</label>
+                  <Input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="w-auto"
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="ml-auto text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">{periodLabel}</span>
+            </div>
           </div>
         </div>
 
