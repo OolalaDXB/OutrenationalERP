@@ -34,6 +34,11 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
     format: Enums<'product_format'>;
     selling_price: number;
     purchase_price: number | null;
+    marketplace_fees: number;
+    import_fees: number;
+    shipping_cost: number;
+    exchange_rate: number;
+    currency: string;
     description: string;
     stock: number;
     stock_threshold: number;
@@ -52,6 +57,11 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
     format: "lp",
     selling_price: 0,
     purchase_price: null,
+    marketplace_fees: 0,
+    import_fees: 0,
+    shipping_cost: 0,
+    exchange_rate: 1,
+    currency: "EUR",
     description: "",
     stock: 0,
     stock_threshold: 10,
@@ -67,6 +77,7 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
   // Populate form when editing
   useEffect(() => {
     if (product) {
+      const productAny = product as any;
       setFormData({
         sku: product.sku || "",
         title: product.title || "",
@@ -75,6 +86,11 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
         format: product.format || "lp",
         selling_price: product.selling_price || 0,
         purchase_price: product.purchase_price || null,
+        marketplace_fees: productAny.marketplace_fees || 0,
+        import_fees: productAny.import_fees || 0,
+        shipping_cost: productAny.shipping_cost || 0,
+        exchange_rate: productAny.exchange_rate || 1,
+        currency: productAny.currency || "EUR",
         description: product.description || "",
         stock: product.stock || 0,
         stock_threshold: product.stock_threshold || 10,
@@ -102,6 +118,11 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
         format: "lp",
         selling_price: 0,
         purchase_price: null,
+        marketplace_fees: 0,
+        import_fees: 0,
+        shipping_cost: 0,
+        exchange_rate: 1,
+        currency: "EUR",
         description: "",
         stock: 0,
         stock_threshold: 10,
@@ -142,7 +163,13 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
     }
 
     try {
-      const productData: ProductInsert = {
+      const productData: ProductInsert & {
+        marketplace_fees?: number;
+        import_fees?: number;
+        shipping_cost?: number;
+        exchange_rate?: number;
+        currency?: string;
+      } = {
         sku: formData.sku || `SKU-${Date.now()}`,
         title: formData.title,
         artist_name: formData.artist_name || null,
@@ -150,6 +177,11 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
         format: formData.format,
         selling_price: formData.selling_price,
         purchase_price: formData.purchase_price,
+        marketplace_fees: formData.marketplace_fees,
+        import_fees: formData.import_fees,
+        shipping_cost: formData.shipping_cost,
+        exchange_rate: formData.exchange_rate,
+        currency: formData.currency,
         description: formData.description || null,
         stock: formData.stock,
         stock_threshold: formData.stock_threshold,
@@ -346,7 +378,7 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
             </p>
           </div>
 
-          {/* Prix */}
+          {/* Prix et coûts */}
           <div>
             <h3 className="text-sm font-semibold mb-4">Tarification</h3>
             <div className="grid grid-cols-2 gap-4">
@@ -366,9 +398,19 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
               </div>
 
               <div>
-                <Label className="text-sm font-medium text-muted-foreground">
-                  Prix d'achat {selectedSupplier?.type === "purchase" ? "*" : "(N/A)"}
-                </Label>
+                <Label className="text-sm font-medium text-muted-foreground">Devise d'achat</Label>
+                <select
+                  value={formData.currency}
+                  onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                  className="w-full mt-1.5 px-3 py-2 rounded-lg border border-border bg-card text-sm"
+                >
+                  <option value="EUR">EUR (€)</option>
+                  <option value="USD">USD ($)</option>
+                </select>
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Prix d'achat</Label>
                 <div className="relative mt-1.5">
                   <Input
                     type="number"
@@ -376,13 +418,141 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
                     step="0.01"
                     value={formData.purchase_price || 0}
                     onChange={(e) => setFormData({ ...formData, purchase_price: Number(e.target.value) || null })}
-                    disabled={selectedSupplier?.type !== "purchase"}
+                    className="pr-8"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                    {formData.currency === "USD" ? "$" : "€"}
+                  </span>
+                </div>
+              </div>
+
+              {formData.currency === "USD" && (
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Taux de change (USD→EUR)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.0001"
+                    value={formData.exchange_rate}
+                    onChange={(e) => setFormData({ ...formData, exchange_rate: Number(e.target.value) })}
+                    placeholder="0.92"
+                    className="mt-1.5"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Frais annexes */}
+          <div>
+            <h3 className="text-sm font-semibold mb-4">Frais annexes</h3>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Frais Marketplace</Label>
+                <div className="relative mt-1.5">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.marketplace_fees}
+                    onChange={(e) => setFormData({ ...formData, marketplace_fees: Number(e.target.value) })}
+                    className="pr-8"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">€</span>
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Frais d'import</Label>
+                <div className="relative mt-1.5">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.import_fees}
+                    onChange={(e) => setFormData({ ...formData, import_fees: Number(e.target.value) })}
+                    className="pr-8"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">€</span>
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Frais de port</Label>
+                <div className="relative mt-1.5">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.shipping_cost}
+                    onChange={(e) => setFormData({ ...formData, shipping_cost: Number(e.target.value) })}
                     className="pr-8"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">€</span>
                 </div>
               </div>
             </div>
+
+            {/* Récapitulatif coût total */}
+            {(formData.purchase_price || 0) > 0 && (
+              <div className="mt-4 p-3 bg-secondary/50 rounded-lg">
+                <div className="text-sm font-medium mb-2">Récapitulatif des coûts</div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Prix d'achat:</span>
+                    <span>
+                      {formData.currency === "USD" 
+                        ? `$${(formData.purchase_price || 0).toFixed(2)} × ${formData.exchange_rate} = €${((formData.purchase_price || 0) * formData.exchange_rate).toFixed(2)}`
+                        : `€${(formData.purchase_price || 0).toFixed(2)}`
+                      }
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Frais marketplace:</span>
+                    <span>€{formData.marketplace_fees.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Frais import:</span>
+                    <span>€{formData.import_fees.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Frais de port:</span>
+                    <span>€{formData.shipping_cost.toFixed(2)}</span>
+                  </div>
+                </div>
+                <div className="mt-2 pt-2 border-t border-border flex justify-between font-semibold text-sm">
+                  <span>Coût total:</span>
+                  <span>
+                    €{(
+                      ((formData.purchase_price || 0) * (formData.currency === "USD" ? formData.exchange_rate : 1)) +
+                      formData.marketplace_fees +
+                      formData.import_fees +
+                      formData.shipping_cost
+                    ).toFixed(2)}
+                  </span>
+                </div>
+                <div className="mt-1 flex justify-between text-xs">
+                  <span className="text-muted-foreground">Marge estimée:</span>
+                  <span className={`font-medium ${
+                    formData.selling_price - (
+                      ((formData.purchase_price || 0) * (formData.currency === "USD" ? formData.exchange_rate : 1)) +
+                      formData.marketplace_fees +
+                      formData.import_fees +
+                      formData.shipping_cost
+                    ) > 0 ? "text-green-600" : "text-red-600"
+                  }`}>
+                    €{(
+                      formData.selling_price - (
+                        ((formData.purchase_price || 0) * (formData.currency === "USD" ? formData.exchange_rate : 1)) +
+                        formData.marketplace_fees +
+                        formData.import_fees +
+                        formData.shipping_cost
+                      )
+                    ).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Stock */}

@@ -740,22 +740,27 @@ export type Database = {
           cost_price: number | null
           country_of_origin: string | null
           created_at: string | null
+          currency: string | null
           description: string | null
           discogs_id: string | null
           discogs_url: string | null
+          exchange_rate: number | null
           featured: boolean | null
           format: Database["public"]["Enums"]["product_format"]
           id: string
           image_url: string | null
           image_urls: string[] | null
+          import_fees: number | null
           label_id: string | null
           label_name: string | null
           location: string | null
+          marketplace_fees: number | null
           meta_description: string | null
           meta_title: string | null
           published_at: string | null
           purchase_price: number | null
           selling_price: number
+          shipping_cost: number | null
           sku: string
           status: Database["public"]["Enums"]["product_status"] | null
           stock: number | null
@@ -785,22 +790,27 @@ export type Database = {
           cost_price?: number | null
           country_of_origin?: string | null
           created_at?: string | null
+          currency?: string | null
           description?: string | null
           discogs_id?: string | null
           discogs_url?: string | null
+          exchange_rate?: number | null
           featured?: boolean | null
           format?: Database["public"]["Enums"]["product_format"]
           id?: string
           image_url?: string | null
           image_urls?: string[] | null
+          import_fees?: number | null
           label_id?: string | null
           label_name?: string | null
           location?: string | null
+          marketplace_fees?: number | null
           meta_description?: string | null
           meta_title?: string | null
           published_at?: string | null
           purchase_price?: number | null
           selling_price: number
+          shipping_cost?: number | null
           sku: string
           status?: Database["public"]["Enums"]["product_status"] | null
           stock?: number | null
@@ -830,22 +840,27 @@ export type Database = {
           cost_price?: number | null
           country_of_origin?: string | null
           created_at?: string | null
+          currency?: string | null
           description?: string | null
           discogs_id?: string | null
           discogs_url?: string | null
+          exchange_rate?: number | null
           featured?: boolean | null
           format?: Database["public"]["Enums"]["product_format"]
           id?: string
           image_url?: string | null
           image_urls?: string[] | null
+          import_fees?: number | null
           label_id?: string | null
           label_name?: string | null
           location?: string | null
+          marketplace_fees?: number | null
           meta_description?: string | null
           meta_title?: string | null
           published_at?: string | null
           purchase_price?: number | null
           selling_price?: number
+          shipping_cost?: number | null
           sku?: string
           status?: Database["public"]["Enums"]["product_status"] | null
           stock?: number | null
