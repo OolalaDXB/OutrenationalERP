@@ -1040,6 +1040,8 @@ export type Database = {
           invoice_next_number: number | null
           invoice_prefix: string | null
           legal_name: string | null
+          payout_invoice_next_number: number | null
+          payout_invoice_prefix: string | null
           primary_color: string | null
           shop_address: string | null
           shop_city: string | null
@@ -1061,6 +1063,8 @@ export type Database = {
           invoice_next_number?: number | null
           invoice_prefix?: string | null
           legal_name?: string | null
+          payout_invoice_next_number?: number | null
+          payout_invoice_prefix?: string | null
           primary_color?: string | null
           shop_address?: string | null
           shop_city?: string | null
@@ -1082,6 +1086,8 @@ export type Database = {
           invoice_next_number?: number | null
           invoice_prefix?: string | null
           legal_name?: string | null
+          payout_invoice_next_number?: number | null
+          payout_invoice_prefix?: string | null
           primary_color?: string | null
           shop_address?: string | null
           shop_city?: string | null
