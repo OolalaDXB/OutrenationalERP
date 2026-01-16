@@ -21,7 +21,7 @@ export interface Settings {
   payout_invoice_next_number: number | null;
   primary_color: string | null;
   shop_logo_url: string | null;
-  // New invoice customization fields
+  // Invoice customization fields
   payment_terms_text: string | null;
   legal_mentions: string | null;
   bank_name: string | null;
@@ -29,6 +29,8 @@ export interface Settings {
   bic: string | null;
   eori: string | null;
   cgv: string | null;
+  // Feature toggles
+  show_artists_section: boolean | null;
 }
 
 export function useSettings() {

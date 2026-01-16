@@ -1058,6 +1058,7 @@ export type Database = {
           shop_name: string
           shop_phone: string | null
           shop_postal_code: string | null
+          show_artists_section: boolean | null
           siret: string | null
           updated_at: string | null
           vat_number: string | null
@@ -1088,6 +1089,7 @@ export type Database = {
           shop_name: string
           shop_phone?: string | null
           shop_postal_code?: string | null
+          show_artists_section?: boolean | null
           siret?: string | null
           updated_at?: string | null
           vat_number?: string | null
@@ -1118,6 +1120,7 @@ export type Database = {
           shop_name?: string
           shop_phone?: string | null
           shop_postal_code?: string | null
+          show_artists_section?: boolean | null
           siret?: string | null
           updated_at?: string | null
           vat_number?: string | null

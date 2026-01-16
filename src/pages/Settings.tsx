@@ -1,9 +1,10 @@
 import { useState, useRef } from "react";
-import { Settings, Save, Loader2, Upload, Image, X, Building, FileText, CreditCard, Receipt } from "lucide-react";
+import { Settings, Save, Loader2, Upload, Image, X, Building, FileText, CreditCard, Receipt, Palette, ToggleLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { useSettings, useUpdateSettings } from "@/hooks/useSettings";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,6 +43,8 @@ export function SettingsPage() {
     bic: "",
     eori: "",
     cgv: "",
+    // Feature toggles
+    show_artists_section: false,
   });
 
   // Initialize form when settings load
@@ -72,6 +75,7 @@ export function SettingsPage() {
         bic: settings.bic || "",
         eori: settings.eori || "",
         cgv: settings.cgv || "",
+        show_artists_section: settings.show_artists_section || false,
       });
     }
   });
@@ -103,6 +107,7 @@ export function SettingsPage() {
       bic: settings.bic || "",
       eori: settings.eori || "",
       cgv: settings.cgv || "",
+      show_artists_section: settings.show_artists_section || false,
     });
   }
 
@@ -189,7 +194,7 @@ export function SettingsPage() {
       </div>
 
       <Tabs defaultValue="shop" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="shop" className="gap-2">
             <Building className="w-4 h-4" />
             Boutique
@@ -205,6 +210,10 @@ export function SettingsPage() {
           <TabsTrigger value="banking" className="gap-2">
             <CreditCard className="w-4 h-4" />
             Bancaire
+          </TabsTrigger>
+          <TabsTrigger value="features" className="gap-2">
+            <ToggleLeft className="w-4 h-4" />
+            Fonctions
           </TabsTrigger>
         </TabsList>
 
@@ -565,6 +574,41 @@ Les prix de nos produits sont indiqués en euros..."
                 </p>
               </div>
             )}
+          </div>
+        </TabsContent>
+
+        {/* Features Tab */}
+        <TabsContent value="features" className="space-y-6">
+          <div className="bg-card rounded-xl border border-border p-6">
+            <h2 className="text-lg font-semibold mb-2">Modules optionnels</h2>
+            <p className="text-sm text-muted-foreground mb-6">
+              Activez ou désactivez les sections du catalogue selon vos besoins.
+            </p>
+
+            <div className="space-y-4">
+              {/* Artists Toggle */}
+              <div className="flex items-center justify-between p-4 bg-secondary/30 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Palette className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Section Artistes</p>
+                    <p className="text-sm text-muted-foreground">
+                      Afficher la gestion des artistes dans le menu Catalogue
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={formData.show_artists_section}
+                  onCheckedChange={(checked) => setFormData({ ...formData, show_artists_section: checked })}
+                />
+              </div>
+
+              <p className="text-xs text-muted-foreground mt-4">
+                💡 La section Labels est toujours active car elle représente la structure principale du catalogue (Fournisseur → Labels → Produits).
+              </p>
+            </div>
           </div>
         </TabsContent>
       </Tabs>

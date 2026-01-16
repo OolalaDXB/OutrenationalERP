@@ -14,6 +14,7 @@ import { ProductsPage } from "@/pages/Products";
 import { InventoryPage } from "@/pages/Inventory";
 import { CustomersPage } from "@/pages/Customers";
 import { ArtistsPage } from "@/pages/Artists";
+import { LabelsPage } from "@/pages/Labels";
 import { SupplierSalesPage } from "@/pages/SupplierSales";
 import { ReorderPage } from "@/pages/Reorder";
 import { InvoicesPage } from "@/pages/Invoices";
@@ -45,6 +46,7 @@ const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   "/orders": { title: "Commandes", subtitle: "Gestion des commandes" },
   "/products": { title: "Produits", subtitle: "Catalogue produits" },
   "/suppliers": { title: "Fournisseurs", subtitle: "Gestion fournisseurs" },
+  "/labels": { title: "Labels", subtitle: "Catalogue labels" },
   "/artists": { title: "Artistes", subtitle: "Catalogue artistes" },
   "/inventory": { title: "Inventaire", subtitle: "État des stocks" },
   "/movements": { title: "Mouvements", subtitle: "Historique stock" },
@@ -80,6 +82,7 @@ const BackofficeContent = forwardRef<HTMLDivElement>(function BackofficeContent(
       case "/orders": return <OrdersPage />;
       case "/products": return <ProductsPage />;
       case "/suppliers": return <SuppliersPage />;
+      case "/labels": return <LabelsPage />;
       case "/inventory": return <InventoryPage />;
       case "/customers": return <CustomersPage />;
       case "/artists": return <ArtistsPage />;
