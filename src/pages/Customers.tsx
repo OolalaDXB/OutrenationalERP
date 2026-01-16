@@ -1,16 +1,13 @@
 import { useState, useMemo } from "react";
-import { Plus, Loader2, Building2, UserCircle } from "lucide-react";
+import { Plus, Loader2, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { CustomerFormModal, type CustomerFormData } from "@/components/forms/CustomerFormModal";
+import { CustomerFormModal } from "@/components/forms/CustomerFormModal";
 import { CustomerDrawer } from "@/components/drawers/CustomerDrawer";
-import { useCustomers, useCreateCustomer, type Customer } from "@/hooks/useCustomers";
+import { useCustomers, type Customer } from "@/hooks/useCustomers";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/hooks/use-toast";
 
 export function CustomersPage() {
-  const { toast } = useToast();
-  const createCustomer = useCreateCustomer();
   const { data: customers = [], isLoading, error } = useCustomers();
   const { canWrite } = useAuth();
   const [showForm, setShowForm] = useState(false);
@@ -182,33 +179,6 @@ export function CustomersPage() {
       <CustomerFormModal
         isOpen={showForm}
         onClose={() => setShowForm(false)}
-        onSubmit={async (data: CustomerFormData) => {
-          try {
-            await createCustomer.mutateAsync({
-              email: data.email,
-              first_name: data.firstName,
-              last_name: data.lastName,
-              company_name: data.companyName || null,
-              phone: data.phone || null,
-              address: data.address || null,
-              address_line_2: data.addressLine2 || null,
-              city: data.city || null,
-              postal_code: data.postalCode || null,
-              state: data.state || null,
-              country: data.country || null,
-              customer_type: data.customerType,
-              vat_number: data.vatNumber || null,
-              website: data.website || null,
-            });
-            setShowForm(false);
-          } catch (error) {
-            toast({
-              title: "Erreur",
-              description: error instanceof Error ? error.message : "Impossible de créer le client",
-              variant: "destructive"
-            });
-          }
-        }}
       />
       <CustomerDrawer
         customer={selectedCustomer}

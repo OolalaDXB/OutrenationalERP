@@ -319,6 +319,13 @@ export function CustomerDrawer({ customer, isOpen, onClose }: CustomerDrawerProp
         </div>
       </div>
 
+      {/* Edit Modal */}
+      <CustomerFormModal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        customer={customer}
+      />
+
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
