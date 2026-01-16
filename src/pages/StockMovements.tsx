@@ -25,6 +25,8 @@ const typeStyles: Record<StockMovementType, { icon: typeof ArrowUpCircle; color:
   loss: { icon: ArrowDownCircle, color: "text-destructive", bg: "bg-destructive/10", label: "Perte" },
   consignment_in: { icon: ArrowUpCircle, color: "text-primary", bg: "bg-primary/10", label: "Entrée dépôt-vente" },
   consignment_out: { icon: ArrowDownCircle, color: "text-primary", bg: "bg-primary/10", label: "Sortie dépôt-vente" },
+  sale_adjustment: { icon: RefreshCw, color: "text-warning-foreground", bg: "bg-warning/10", label: "Ajustement vente" },
+  sale_reversal: { icon: RefreshCw, color: "text-info", bg: "bg-info/10", label: "Annulation vente" },
 };
 
 const periodPresets = [

@@ -9,10 +9,20 @@ import {
   Truck, 
   BarChart3,
   CircleDollarSign,
-  Layers
+  Layers,
+  CalendarClock,
+  Table
 } from "lucide-react";
 
-export interface WidgetVisibility {
+// Dashboard widgets
+export interface DashboardWidgetVisibility {
+  dashboard_kpi_cards: boolean;
+  dashboard_payment_deadlines: boolean;
+  dashboard_supplier_performance: boolean;
+}
+
+// Analytics widgets
+export interface AnalyticsWidgetVisibility {
   kpi_cards: boolean;
   profitability_summary: boolean;
   sales_evolution: boolean;
@@ -26,7 +36,15 @@ export interface WidgetVisibility {
   products_by_currency: boolean;
 }
 
+// Combined visibility
+export interface WidgetVisibility extends DashboardWidgetVisibility, AnalyticsWidgetVisibility {}
+
 export const defaultWidgetVisibility: WidgetVisibility = {
+  // Dashboard
+  dashboard_kpi_cards: true,
+  dashboard_payment_deadlines: true,
+  dashboard_supplier_performance: true,
+  // Analytics
   kpi_cards: true,
   profitability_summary: true,
   sales_evolution: true,
@@ -40,7 +58,15 @@ export const defaultWidgetVisibility: WidgetVisibility = {
   products_by_currency: true,
 };
 
-const widgetConfig: { key: keyof WidgetVisibility; label: string; description: string; icon: typeof TrendingUp }[] = [
+type WidgetConfig = { key: keyof WidgetVisibility; label: string; description: string; icon: typeof TrendingUp };
+
+const dashboardWidgetConfig: WidgetConfig[] = [
+  { key: "dashboard_kpi_cards", label: "Cartes KPI", description: "CA, commandes, nouveaux clients, alertes stock", icon: TrendingUp },
+  { key: "dashboard_payment_deadlines", label: "Échéances de paiement", description: "Prochains versements fournisseurs", icon: CalendarClock },
+  { key: "dashboard_supplier_performance", label: "Performance fournisseurs", description: "Tableau des ventes par fournisseur", icon: Table },
+];
+
+const analyticsWidgetConfig: WidgetConfig[] = [
   { key: "kpi_cards", label: "Cartes KPI", description: "CA, commandes, clients, produits, marge", icon: TrendingUp },
   { key: "profitability_summary", label: "Résumé de rentabilité", description: "Vue d'ensemble des coûts et marges du stock", icon: DollarSign },
   { key: "sales_evolution", label: "Évolution des ventes", description: "Graphique linéaire des ventes mensuelles", icon: LineChart },
@@ -64,22 +90,14 @@ export function WidgetVisibilitySection({ visibility, onChange }: WidgetVisibili
     onChange({ ...visibility, [key]: checked });
   };
 
+  const allWidgets = [...dashboardWidgetConfig, ...analyticsWidgetConfig];
   const enabledCount = Object.values(visibility).filter(Boolean).length;
 
-  return (
-    <div className="bg-card rounded-xl border border-border p-6">
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-lg font-semibold">Widgets Analytics</h2>
-        <span className="text-sm text-muted-foreground">
-          {enabledCount}/{widgetConfig.length} actifs
-        </span>
-      </div>
-      <p className="text-sm text-muted-foreground mb-6">
-        Choisissez les graphiques et widgets à afficher sur la page Analytics.
-      </p>
-
+  const renderWidgetGrid = (config: WidgetConfig[], title: string) => (
+    <div className="mb-6">
+      <h3 className="text-sm font-medium text-muted-foreground mb-3">{title}</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {widgetConfig.map(({ key, label, description, icon: Icon }) => (
+        {config.map(({ key, label, description, icon: Icon }) => (
           <div 
             key={key}
             className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${
@@ -108,32 +126,42 @@ export function WidgetVisibilitySection({ visibility, onChange }: WidgetVisibili
           </div>
         ))}
       </div>
+    </div>
+  );
 
-      <div className="flex gap-2 mt-4">
+  const setAllTo = (value: boolean) => {
+    const newVisibility = { ...visibility };
+    allWidgets.forEach(({ key }) => {
+      newVisibility[key] = value;
+    });
+    onChange(newVisibility);
+  };
+
+  return (
+    <div className="bg-card rounded-xl border border-border p-6">
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-lg font-semibold">Personnalisation des widgets</h2>
+        <span className="text-sm text-muted-foreground">
+          {enabledCount}/{allWidgets.length} actifs
+        </span>
+      </div>
+      <p className="text-sm text-muted-foreground mb-6">
+        Choisissez les graphiques et widgets à afficher sur le Dashboard et la page Analytics.
+      </p>
+
+      {renderWidgetGrid(dashboardWidgetConfig, "Dashboard")}
+      {renderWidgetGrid(analyticsWidgetConfig, "Analytics")}
+
+      <div className="flex gap-2">
         <button
-          onClick={() => onChange(defaultWidgetVisibility)}
+          onClick={() => setAllTo(true)}
           className="text-xs text-primary hover:underline"
         >
           Tout activer
         </button>
         <span className="text-xs text-muted-foreground">•</span>
         <button
-          onClick={() => {
-            const allFalse: WidgetVisibility = {
-              kpi_cards: false,
-              profitability_summary: false,
-              sales_evolution: false,
-              cost_breakdown: false,
-              top_profit_products: false,
-              top_customers: false,
-              supplier_stats: false,
-              supplier_sales_evolution: false,
-              orders_by_month: false,
-              stock_by_format: false,
-              products_by_currency: false,
-            };
-            onChange(allFalse);
-          }}
+          onClick={() => setAllTo(false)}
           className="text-xs text-muted-foreground hover:underline"
         >
           Tout désactiver
