@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { 
   AlertTriangle, 
   Tag, 
@@ -8,19 +8,22 @@ import {
   ChevronDown,
   ChevronUp,
   Package,
-  Pencil
+  Pencil,
+  Filter,
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useIncompleteProducts } from "@/hooks/useIncompleteProducts";
 import { useProducts } from "@/hooks/useProducts";
 import { ProductFormModal } from "@/components/forms/ProductFormModal";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
-const missingFieldLabels: Record<string, { label: string; icon: React.ElementType; color: string }> = {
-  label: { label: "Label", icon: Tag, color: "bg-purple-100 text-purple-700" },
-  supplier: { label: "Fournisseur", icon: Building2, color: "bg-blue-100 text-blue-700" },
-  barcode: { label: "Code-barres", icon: Barcode, color: "bg-amber-100 text-amber-700" },
-  sku: { label: "SKU", icon: Hash, color: "bg-red-100 text-red-700" },
+const missingFieldLabels: Record<string, { label: string; icon: React.ElementType; color: string; activeColor: string }> = {
+  label: { label: "Label", icon: Tag, color: "bg-purple-100 text-purple-700", activeColor: "bg-purple-500 text-white" },
+  supplier: { label: "Fournisseur", icon: Building2, color: "bg-blue-100 text-blue-700", activeColor: "bg-blue-500 text-white" },
+  barcode: { label: "Code-barres", icon: Barcode, color: "bg-amber-100 text-amber-700", activeColor: "bg-amber-500 text-white" },
+  sku: { label: "SKU", icon: Hash, color: "bg-red-100 text-red-700", activeColor: "bg-red-500 text-white" },
 };
 
 export function IncompleteProductsSection() {
@@ -28,8 +31,19 @@ export function IncompleteProductsSection() {
   const { data: allProducts } = useProducts();
   const [isExpanded, setIsExpanded] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [activeFilters, setActiveFilters] = useState<string[]>([]);
   
-  const displayedProducts = isExpanded ? incompleteProducts : incompleteProducts?.slice(0, 5);
+  // Filter products based on active filters
+  const filteredProducts = useMemo(() => {
+    if (!incompleteProducts) return [];
+    if (activeFilters.length === 0) return incompleteProducts;
+    
+    return incompleteProducts.filter(product =>
+      activeFilters.some(filter => product.missing_fields.includes(filter))
+    );
+  }, [incompleteProducts, activeFilters]);
+  
+  const displayedProducts = isExpanded ? filteredProducts : filteredProducts?.slice(0, 5);
   
   // Get full product for editing
   const editingProduct = editingProductId 
@@ -71,28 +85,78 @@ export function IncompleteProductsSection() {
             </div>
           </div>
           
-          {/* Summary badges */}
-          <div className="flex gap-2">
-            {Object.entries(
-              incompleteProducts.reduce((acc, p) => {
-                p.missing_fields.forEach(f => {
-                  acc[f] = (acc[f] || 0) + 1;
-                });
-                return acc;
-              }, {} as Record<string, number>)
-            ).map(([field, count]) => {
-              const config = missingFieldLabels[field];
-              if (!config) return null;
-              const Icon = config.icon;
-              return (
-                <Badge key={field} variant="secondary" className={config.color}>
-                  <Icon className="w-3 h-3 mr-1" />
-                  {count}
-                </Badge>
-              );
-            })}
-          </div>
         </div>
+        
+        {/* Filter buttons */}
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground mr-2">
+            <Filter className="w-4 h-4" />
+            <span>Filtrer :</span>
+          </div>
+          
+          {Object.entries(
+            incompleteProducts.reduce((acc, p) => {
+              p.missing_fields.forEach(f => {
+                acc[f] = (acc[f] || 0) + 1;
+              });
+              return acc;
+            }, {} as Record<string, number>)
+          ).map(([field, count]) => {
+            const config = missingFieldLabels[field];
+            if (!config) return null;
+            const Icon = config.icon;
+            const isActive = activeFilters.includes(field);
+            
+            return (
+              <button
+                key={field}
+                onClick={() => {
+                  setActiveFilters(prev =>
+                    prev.includes(field)
+                      ? prev.filter(f => f !== field)
+                      : [...prev, field]
+                  );
+                }}
+                className={`
+                  inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium
+                  transition-all duration-200 border
+                  ${isActive 
+                    ? `${config.activeColor} border-transparent shadow-sm` 
+                    : `${config.color} border-transparent hover:border-current/20`
+                  }
+                `}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {config.label}
+                <span className={`
+                  ml-0.5 px-1.5 py-0.5 rounded-full text-xs
+                  ${isActive ? 'bg-white/20' : 'bg-black/10'}
+                `}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+          
+          {activeFilters.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setActiveFilters([])}
+              className="h-8 px-2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-4 h-4 mr-1" />
+              Effacer
+            </Button>
+          )}
+        </div>
+        
+        {/* Results count when filtered */}
+        {activeFilters.length > 0 && (
+          <p className="text-sm text-muted-foreground mb-3">
+            {filteredProducts.length} produit{filteredProducts.length > 1 ? 's' : ''} trouvé{filteredProducts.length > 1 ? 's' : ''}
+          </p>
+        )}
         
         {/* Products list */}
         <div className="space-y-2">
@@ -144,7 +208,7 @@ export function IncompleteProductsSection() {
         </div>
         
         {/* Expand/Collapse button */}
-        {incompleteProducts.length > 5 && (
+        {filteredProducts.length > 5 && (
           <Button
             variant="ghost"
             size="sm"
@@ -159,7 +223,7 @@ export function IncompleteProductsSection() {
             ) : (
               <>
                 <ChevronDown className="w-4 h-4 mr-2" />
-                Voir les {incompleteProducts.length - 5} autres
+                Voir les {filteredProducts.length - 5} autres
               </>
             )}
           </Button>
