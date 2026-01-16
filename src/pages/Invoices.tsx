@@ -1,13 +1,14 @@
 import { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { FileText, Euro, Clock, CheckCircle, XCircle, Download, Plus, Loader2 } from "lucide-react";
+import { FileText, Euro, Clock, CheckCircle, XCircle, Download, Plus, Pencil } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { InvoiceFormModal } from "@/components/forms/InvoiceFormModal";
+import { InvoiceEditModal } from "@/components/forms/InvoiceEditModal";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { Tables } from "@/integrations/supabase/types";
@@ -43,6 +44,7 @@ export function InvoicesPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState<InvoiceWithItems | null>(null);
 
   // Sync search term with URL params
   useEffect(() => {
@@ -255,6 +257,13 @@ export function InvoicesPage() {
 
       {/* Invoice Form Modal */}
       <InvoiceFormModal open={isFormOpen} onOpenChange={setIsFormOpen} />
+      
+      {/* Invoice Edit Modal */}
+      <InvoiceEditModal 
+        open={!!editingInvoice} 
+        onOpenChange={(open) => !open && setEditingInvoice(null)} 
+        invoice={editingInvoice} 
+      />
 
       {/* Table */}
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
@@ -301,6 +310,13 @@ export function InvoicesPage() {
                 <td className="px-6 py-4 text-sm text-muted-foreground">{formatDate(invoice.issue_date)}</td>
                 <td className="px-6 py-4">
                   <div className="flex gap-2">
+                    <button
+                      onClick={() => setEditingInvoice(invoice)}
+                      className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground"
+                      title="Modifier"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
                     <button
                       onClick={() => generatePDF(invoice)}
                       className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground"
