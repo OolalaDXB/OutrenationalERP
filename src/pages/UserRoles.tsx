@@ -162,10 +162,20 @@ export function UserRolesPage() {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">
-                        {userWithRole.email.substring(0, 2).toUpperCase()}
+                        {userWithRole.first_name && userWithRole.last_name 
+                          ? `${userWithRole.first_name[0]}${userWithRole.last_name[0]}`.toUpperCase()
+                          : userWithRole.email.substring(0, 2).toUpperCase()
+                        }
                       </div>
                       <div>
-                        <div className="font-medium">{userWithRole.email}</div>
+                        {(userWithRole.first_name || userWithRole.last_name) && (
+                          <div className="font-medium">
+                            {[userWithRole.first_name, userWithRole.last_name].filter(Boolean).join(' ')}
+                          </div>
+                        )}
+                        <div className={userWithRole.first_name || userWithRole.last_name ? "text-sm text-muted-foreground" : "font-medium"}>
+                          {userWithRole.email}
+                        </div>
                         {isCurrentUser && (
                           <span className="text-xs text-muted-foreground">(vous)</span>
                         )}
