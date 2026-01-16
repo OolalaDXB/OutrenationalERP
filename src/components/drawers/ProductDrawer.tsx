@@ -3,6 +3,7 @@ import { X, Disc3, MapPin, Tag, Package, Euro, TrendingUp, Pencil, Trash2, Exter
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { StockIndicator } from "@/components/ui/stock-indicator";
+import { ProductImageGalleryViewer } from "@/components/ui/product-image-gallery-viewer";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import type { Product } from "@/hooks/useProducts";
 import { useDeleteProduct } from "@/hooks/useProducts";
@@ -130,17 +131,17 @@ export function ProductDrawer({ product, isOpen, onClose }: ProductDrawerProps) 
           {/* Header */}
           <div className="sticky top-0 bg-card flex items-center justify-between p-6 border-b border-border z-10">
             <div className="flex items-center gap-3">
-              {product.image_url ? (
-                <img
-                  src={product.image_url}
-                  alt={product.title}
-                  className="w-14 h-14 rounded-lg object-cover"
-                />
-              ) : (
-                <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-sidebar to-foreground flex items-center justify-center">
+              <div className="w-14 h-14 rounded-lg overflow-hidden bg-gradient-to-br from-sidebar to-foreground flex items-center justify-center">
+                {product.image_url ? (
+                  <img
+                    src={product.image_url}
+                    alt={product.title}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
                   <Disc3 className="w-6 h-6 text-muted-foreground/50" />
-                </div>
-              )}
+                )}
+              </div>
               <div>
                 <h2 className="text-lg font-semibold line-clamp-1">{product.title}</h2>
                 <div className="flex items-center gap-2 mt-1">
@@ -169,6 +170,15 @@ export function ProductDrawer({ product, isOpen, onClose }: ProductDrawerProps) 
           </div>
 
           <div className="p-6 space-y-6">
+            {/* Image Gallery */}
+            {(product.image_url || (product.image_urls && product.image_urls.length > 0)) && (
+              <ProductImageGalleryViewer
+                images={product.image_urls || []}
+                mainImage={product.image_url}
+                title={product.title}
+              />
+            )}
+
             {/* Product Info */}
             <div className="bg-secondary rounded-lg p-4 space-y-3">
               <div className="flex items-center gap-3 text-sm">

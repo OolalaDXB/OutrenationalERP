@@ -218,6 +218,9 @@ export function ProCatalog() {
                   <span className="text-xs uppercase text-muted-foreground bg-secondary px-2 py-0.5 rounded">
                     {product.format}
                   </span>
+                  <span className="text-xs font-medium bg-primary/10 text-primary px-2 py-0.5 rounded">
+                    {product.condition_media || 'M'}
+                  </span>
                 </div>
 
                 {/* Pricing */}

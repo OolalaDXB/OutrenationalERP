@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { X, Package, Loader2, Upload, Image as ImageIcon } from "lucide-react";
+import { useState, useEffect } from "react";
+import { X, Package, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useSuppliers } from "@/hooks/useSuppliers";
 import { useCreateProduct, useUpdateProduct, type Product, type ProductInsert } from "@/hooks/useProducts";
 import type { Enums } from "@/integrations/supabase/types";
-import { supabase } from "@/integrations/supabase/client";
+import { ProductImageGallery } from "./ProductImageGallery";
 
 interface ProductFormProps {
   isOpen: boolean;
@@ -24,9 +24,7 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
   
   const isEditMode = !!product;
   
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
   
   const [formData, setFormData] = useState<{
     sku: string;
@@ -45,6 +43,7 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
     condition_sleeve: Enums<'vinyl_condition'>;
     year_released: number | null;
     image_url: string | null;
+    image_urls: string[] | null;
   }>({
     sku: "",
     title: "",
@@ -62,6 +61,7 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
     condition_sleeve: "M",
     year_released: null,
     image_url: null,
+    image_urls: null,
   });
 
   // Populate form when editing
@@ -84,8 +84,14 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
         condition_sleeve: product.condition_sleeve || "M",
         year_released: product.year_released || null,
         image_url: product.image_url || null,
+        image_urls: product.image_urls || null,
       });
-      setImagePreview(product.image_url || null);
+      // Set gallery images from product
+      const allImages = product.image_urls || [];
+      if (product.image_url && !allImages.includes(product.image_url)) {
+        allImages.unshift(product.image_url);
+      }
+      setImageUrls(allImages);
     } else {
       // Reset form for create mode
       setFormData({
@@ -105,42 +111,22 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
         condition_sleeve: "M",
         year_released: null,
         image_url: null,
+        image_urls: null,
       });
-      setImagePreview(null);
+      setImageUrls([]);
     }
   }, [product, isOpen]);
 
-  const handleImageUpload = async (file: File) => {
-    if (!file) return;
-    
-    setIsUploading(true);
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `products/${fileName}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('product-images')
-        .upload(filePath, file);
-      
-      if (uploadError) throw uploadError;
-      
-      const { data: { publicUrl } } = supabase.storage
-        .from('product-images')
-        .getPublicUrl(filePath);
-      
-      setFormData(prev => ({ ...prev, image_url: publicUrl }));
-      setImagePreview(publicUrl);
-      toast({ title: "Image téléchargée", description: "L'image a été ajoutée au produit" });
-    } catch (error) {
-      toast({ 
-        title: "Erreur", 
-        description: "Impossible de télécharger l'image", 
-        variant: "destructive" 
-      });
-    } finally {
-      setIsUploading(false);
-    }
+  const handleImagesChange = (newImages: string[]) => {
+    setImageUrls(newImages);
+    setFormData(prev => ({ 
+      ...prev, 
+      image_urls: newImages.length > 0 ? newImages : null 
+    }));
+  };
+
+  const handleMainImageChange = (url: string | null) => {
+    setFormData(prev => ({ ...prev, image_url: url }));
   };
 
   if (!isOpen) return null;
@@ -173,6 +159,7 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
         condition_sleeve: formData.condition_sleeve,
         year_released: formData.year_released,
         image_url: formData.image_url,
+        image_urls: formData.image_urls,
       };
 
       if (isEditMode && product) {
@@ -214,49 +201,13 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Image */}
-          <div>
-            <h3 className="text-sm font-semibold mb-4">Photo du produit</h3>
-            <div className="flex items-start gap-4">
-              <div 
-                onClick={() => fileInputRef.current?.click()}
-                className="w-24 h-24 rounded-lg border-2 border-dashed border-border hover:border-primary/50 flex items-center justify-center cursor-pointer transition-colors overflow-hidden bg-secondary/30"
-              >
-                {imagePreview ? (
-                  <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
-                ) : isUploading ? (
-                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                ) : (
-                  <ImageIcon className="w-6 h-6 text-muted-foreground" />
-                )}
-              </div>
-              <div className="flex-1">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleImageUpload(file);
-                  }}
-                />
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  {isUploading ? "Téléchargement..." : "Ajouter une image"}
-                </Button>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Utilisez cette option si l'image n'a pas été trouvée automatiquement via le code-barres ou SKU
-                </p>
-              </div>
-            </div>
-          </div>
+          {/* Image Gallery */}
+          <ProductImageGallery
+            images={imageUrls}
+            onImagesChange={handleImagesChange}
+            mainImage={formData.image_url}
+            onMainImageChange={handleMainImageChange}
+          />
 
           {/* Info produit */}
           <div>

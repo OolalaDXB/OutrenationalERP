@@ -191,6 +191,7 @@ export function ProductsPage() {
               <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Produit</th>
               <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Fournisseur</th>
               <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Format</th>
+              <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">État</th>
               <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Prix</th>
               <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Stock</th>
               <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Emplacement</th>
@@ -227,6 +228,11 @@ export function ProductsPage() {
                 </td>
                 <td className="px-6 py-4 text-sm">{product.supplier_name || '—'}</td>
                 <td className="px-6 py-4 text-sm">{formatLabels[product.format] || product.format.toUpperCase()}</td>
+                <td className="px-6 py-4">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-secondary">
+                    {product.condition_media || 'M'}
+                  </span>
+                </td>
                 <td className="px-6 py-4 font-semibold tabular-nums">{formatCurrency(product.selling_price)}</td>
                 <td className="px-6 py-4">
                   <StockIndicator current={product.stock ?? 0} threshold={product.stock_threshold ?? 5} />
