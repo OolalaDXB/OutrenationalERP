@@ -1,8 +1,12 @@
-import { Euro, ShoppingCart, Users, AlertTriangle, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { Euro, ShoppingCart, AlertTriangle, Loader2, Users } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { StatusBadge, supplierTypeVariant, supplierTypeLabel } from "@/components/ui/status-badge";
 import { useDashboardKpis, useSupplierSalesView } from "@/hooks/useDashboard";
 import { formatCurrency } from "@/lib/format";
+import { PaymentDeadlinesWidget } from "@/components/dashboard/PaymentDeadlinesWidget";
+import { SupplierPayoutManager } from "@/components/suppliers/SupplierPayoutManager";
+import { useSuppliers } from "@/hooks/useSuppliers";
 import type { Tables } from "@/integrations/supabase/types";
 
 type SupplierSalesRow = Tables<'v_supplier_sales'>;
@@ -10,6 +14,8 @@ type SupplierSalesRow = Tables<'v_supplier_sales'>;
 export function Dashboard() {
   const { data: kpis, isLoading: kpisLoading, isError: kpisError, error: kpisErr, refetch: refetchKpis } = useDashboardKpis();
   const { data: supplierSales = [], isLoading: salesLoading, isError: salesError, error: salesErr, refetch: refetchSales } = useSupplierSalesView();
+  const { data: suppliers = [] } = useSuppliers();
+  const [isPayoutManagerOpen, setIsPayoutManagerOpen] = useState(false);
 
   const isLoading = kpisLoading || salesLoading;
   const isError = kpisError || salesError;
@@ -56,8 +62,8 @@ export function Dashboard() {
         />
         <KpiCard
           icon={Users}
-          value={(kpis?.active_suppliers ?? 0).toString()}
-          label="Fournisseurs actifs"
+          value={(kpis?.new_customers_30d ?? 0).toString()}
+          label="Nouveaux clients (30j)"
           variant="info"
         />
         <KpiCard
@@ -67,6 +73,22 @@ export function Dashboard() {
           variant="danger"
         />
       </div>
+
+      {/* Payment Deadlines Widget */}
+      <PaymentDeadlinesWidget onOpenPayoutManager={() => setIsPayoutManagerOpen(true)} />
+
+      {/* Payout Manager Modal */}
+      <SupplierPayoutManager
+        isOpen={isPayoutManagerOpen}
+        onClose={() => setIsPayoutManagerOpen(false)}
+        suppliers={suppliers.map(s => ({
+          id: s.id,
+          name: s.name,
+          type: s.type,
+          commission_rate: s.commission_rate || undefined,
+          email: s.email || undefined
+        }))}
+      />
 
       {/* Supplier Performance Table */}
       <div>

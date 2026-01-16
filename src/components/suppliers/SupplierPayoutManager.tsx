@@ -19,6 +19,7 @@ import {
   type SupplierPayoutInsert 
 } from "@/hooks/useSupplierPayouts";
 import { generateSupplierPayoutInvoicePDF } from "./SupplierPayoutInvoicePDF";
+import { getNextPayoutInvoiceNumber } from "@/hooks/useSettings";
 
 interface SupplierPayoutManagerProps {
   isOpen: boolean;
@@ -116,6 +117,9 @@ export function SupplierPayoutManager({ isOpen, onClose, suppliers, prefillData 
     if (!selectedPayout) return;
 
     try {
+      // Get sequential invoice number
+      const invoiceNum = await getNextPayoutInvoiceNumber();
+      
       await markAsPaid.mutateAsync({
         id: selectedPayout.id,
         payment_reference: paymentReference,
@@ -124,7 +128,6 @@ export function SupplierPayoutManager({ isOpen, onClose, suppliers, prefillData 
       // Generate invoice PDF automatically
       const supplier = selectedPayout.suppliers;
       if (supplier) {
-        const invoiceNumber = `REV-${format(new Date(), "yyyyMMdd")}-${selectedPayout.id.slice(0, 8).toUpperCase()}`;
         generateSupplierPayoutInvoicePDF(
           {
             ...selectedPayout,
@@ -139,9 +142,9 @@ export function SupplierPayoutManager({ isOpen, onClose, suppliers, prefillData 
             bic: supplier.bic,
             bank_name: supplier.bank_name,
           },
-          invoiceNumber
+          invoiceNum.full
         );
-        toast({ title: "Succès", description: "Reversement validé et facture PDF générée" });
+        toast({ title: "Succès", description: `Reversement validé - Facture ${invoiceNum.full} générée` });
       } else {
         toast({ title: "Succès", description: "Reversement marqué comme payé" });
       }
