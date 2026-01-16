@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { InvoiceFormModal } from "@/components/forms/InvoiceFormModal";
 import { InvoiceEditModal } from "@/components/forms/InvoiceEditModal";
+import { InvoiceDrawer } from "@/components/drawers/InvoiceDrawer";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,6 +59,7 @@ export function InvoicesPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<InvoiceWithItems | null>(null);
   const [deletingInvoice, setDeletingInvoice] = useState<InvoiceWithItems | null>(null);
+  const [viewingInvoice, setViewingInvoice] = useState<InvoiceWithItems | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Sync search term with URL params
@@ -408,6 +410,13 @@ export function InvoicesPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Invoice Detail Drawer */}
+      <InvoiceDrawer
+        open={!!viewingInvoice}
+        onOpenChange={(open) => !open && setViewingInvoice(null)}
+        invoice={viewingInvoice}
+      />
+
       {/* Table */}
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <table className="w-full border-collapse">
@@ -424,7 +433,11 @@ export function InvoicesPage() {
           </thead>
           <tbody>
             {filteredInvoices.map((invoice) => (
-              <tr key={invoice.id} className="border-b border-border last:border-b-0 hover:bg-secondary/50 transition-colors">
+              <tr 
+                key={invoice.id} 
+                className="border-b border-border last:border-b-0 hover:bg-secondary/50 transition-colors cursor-pointer"
+                onClick={() => setViewingInvoice(invoice)}
+              >
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-lg bg-primary-light flex items-center justify-center">
@@ -451,7 +464,7 @@ export function InvoicesPage() {
                 </td>
                 <td className="px-6 py-4 font-semibold tabular-nums">{formatCurrency(invoice.total)}</td>
                 <td className="px-6 py-4 text-sm text-muted-foreground">{formatDate(invoice.issue_date)}</td>
-                <td className="px-6 py-4">
+                <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                   <div className="flex gap-1">
                     {invoice.status !== "paid" && (
                       <button
