@@ -1,9 +1,11 @@
-import { useState, useEffect } from "react";
-import { X, UserCircle, Building2, Info } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { X, UserCircle, Building2, Info, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { useCreateCustomer, useUpdateCustomer, type Customer } from "@/hooks/useCustomers";
+import { useViesValidation } from "@/hooks/useViesValidation";
 import { 
   requiresState, 
   getVatZone, 
@@ -24,7 +26,7 @@ import {
 interface CustomerFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: CustomerFormData) => void;
+  customer?: Customer | null; // For edit mode
 }
 
 export interface CustomerFormData {
@@ -44,8 +46,14 @@ export interface CustomerFormData {
   website: string;
 }
 
-export function CustomerFormModal({ isOpen, onClose, onSubmit }: CustomerFormProps) {
+export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormProps) {
   const { toast } = useToast();
+  const createCustomer = useCreateCustomer();
+  const updateCustomer = useUpdateCustomer();
+  const { validateVat, isValidating: isValidatingVat, result: viesResult, error: viesError, reset: resetVies } = useViesValidation();
+  
+  const isEditMode = !!customer;
+
   const [formData, setFormData] = useState<CustomerFormData>({
     email: "",
     firstName: "",
@@ -63,12 +71,55 @@ export function CustomerFormModal({ isOpen, onClose, onSubmit }: CustomerFormPro
     website: "",
   });
 
+  // Populate form when editing
+  useEffect(() => {
+    if (customer) {
+      setFormData({
+        email: customer.email || "",
+        firstName: customer.first_name || "",
+        lastName: customer.last_name || "",
+        companyName: customer.company_name || "",
+        phone: customer.phone || "",
+        address: customer.address || "",
+        addressLine2: customer.address_line_2 || "",
+        city: customer.city || "",
+        postalCode: customer.postal_code || "",
+        state: (customer as any).state || "",
+        country: customer.country || "France",
+        customerType: (customer.customer_type as CustomerType) || "particulier",
+        vatNumber: customer.vat_number || "",
+        website: (customer as any).website || "",
+      });
+      resetVies();
+    } else {
+      setFormData({
+        email: "",
+        firstName: "",
+        lastName: "",
+        companyName: "",
+        phone: "",
+        address: "",
+        addressLine2: "",
+        city: "",
+        postalCode: "",
+        state: "",
+        country: "France",
+        customerType: "particulier",
+        vatNumber: "",
+        website: "",
+      });
+      resetVies();
+    }
+  }, [customer, isOpen, resetVies]);
+
   const showStateField = requiresState(formData.country);
   const vatZone = getVatZone(formData.country);
-  const hasValidVat = isValidVatNumberFormat(formData.vatNumber);
-  const vatStatus = getVatStatusLabel(formData.country, formData.customerType, hasValidVat);
+  const hasValidVatFormat = isValidVatNumberFormat(formData.vatNumber);
+  const isVatVerified = viesResult?.valid === true;
+  const vatStatus = getVatStatusLabel(formData.country, formData.customerType, isVatVerified || hasValidVatFormat);
   const showVatField = formData.customerType === 'professionnel';
   const showCompanyFields = formData.customerType === 'professionnel';
+  const isLoading = createCustomer.isPending || updateCustomer.isPending;
 
   // Get states/provinces based on country
   const getStateOptions = () => {
@@ -94,9 +145,16 @@ export function CustomerFormModal({ isOpen, onClose, onSubmit }: CustomerFormPro
     }
   }, [formData.country]);
 
+  // Validate VAT when it changes and has valid format
+  const handleVatValidation = useCallback(async () => {
+    if (hasValidVatFormat && formData.vatNumber.length >= 4) {
+      await validateVat(formData.vatNumber);
+    }
+  }, [formData.vatNumber, hasValidVatFormat, validateVat]);
+
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.email || !formData.firstName || !formData.lastName) {
       toast({ title: "Erreur", description: "Veuillez remplir les champs obligatoires", variant: "destructive" });
@@ -106,25 +164,40 @@ export function CustomerFormModal({ isOpen, onClose, onSubmit }: CustomerFormPro
       toast({ title: "Erreur", description: "Le nom de l'entreprise est requis pour un client professionnel", variant: "destructive" });
       return;
     }
-    onSubmit(formData);
-    toast({ title: "Succès", description: "Client créé avec succès" });
-    onClose();
-    setFormData({
-      email: "",
-      firstName: "",
-      lastName: "",
-      companyName: "",
-      phone: "",
-      address: "",
-      addressLine2: "",
-      city: "",
-      postalCode: "",
-      state: "",
-      country: "France",
-      customerType: "particulier",
-      vatNumber: "",
-      website: "",
-    });
+
+    try {
+      const customerData = {
+        email: formData.email,
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        company_name: formData.companyName || null,
+        phone: formData.phone || null,
+        address: formData.address || null,
+        address_line_2: formData.addressLine2 || null,
+        city: formData.city || null,
+        postal_code: formData.postalCode || null,
+        state: formData.state || null,
+        country: formData.country || null,
+        customer_type: formData.customerType,
+        vat_number: formData.vatNumber || null,
+        website: formData.website || null,
+      };
+
+      if (isEditMode && customer) {
+        await updateCustomer.mutateAsync({ id: customer.id, ...customerData });
+        toast({ title: "Succès", description: "Client mis à jour avec succès" });
+      } else {
+        await createCustomer.mutateAsync(customerData);
+        toast({ title: "Succès", description: "Client créé avec succès" });
+      }
+      onClose();
+    } catch (error) {
+      toast({ 
+        title: "Erreur", 
+        description: error instanceof Error ? error.message : "Une erreur est survenue", 
+        variant: "destructive" 
+      });
+    }
   };
 
   return (
@@ -142,8 +215,8 @@ export function CustomerFormModal({ isOpen, onClose, onSubmit }: CustomerFormPro
               )}
             </div>
             <div>
-              <h2 className="text-lg font-semibold">Nouveau client</h2>
-              <p className="text-sm text-muted-foreground">Ajouter un client</p>
+              <h2 className="text-lg font-semibold">{isEditMode ? "Modifier le client" : "Nouveau client"}</h2>
+              <p className="text-sm text-muted-foreground">{isEditMode ? "Modifier les informations" : "Ajouter un client"}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-secondary transition-colors">
@@ -206,7 +279,7 @@ export function CustomerFormModal({ isOpen, onClose, onSubmit }: CustomerFormPro
                     className="mt-1.5"
                   />
                 </div>
-                <div>
+                <div className="col-span-2">
                   <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     TVA Intracommunautaire
                     <TooltipProvider>
@@ -223,16 +296,71 @@ export function CustomerFormModal({ isOpen, onClose, onSubmit }: CustomerFormPro
                       </Tooltip>
                     </TooltipProvider>
                   </Label>
-                  <Input
-                    value={formData.vatNumber}
-                    onChange={(e) => setFormData({ ...formData, vatNumber: e.target.value.toUpperCase() })}
-                    placeholder="FR12345678901"
-                    className="mt-1.5"
-                  />
+                  <div className="flex gap-2 mt-1.5">
+                    <Input
+                      value={formData.vatNumber}
+                      onChange={(e) => {
+                        setFormData({ ...formData, vatNumber: e.target.value.toUpperCase() });
+                        resetVies();
+                      }}
+                      placeholder="FR12345678901"
+                      className="flex-1"
+                    />
+                    <Button 
+                      type="button" 
+                      variant="outline"
+                      onClick={handleVatValidation}
+                      disabled={!hasValidVatFormat || isValidatingVat}
+                      className="shrink-0"
+                    >
+                      {isValidatingVat ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        "Vérifier VIES"
+                      )}
+                    </Button>
+                  </div>
+                  {/* VAT Validation Status */}
                   {formData.vatNumber && (
-                    <p className={`text-xs mt-1 ${hasValidVat ? 'text-green-600' : 'text-amber-600'}`}>
-                      {hasValidVat ? '✓ Format valide' : '⚠ Format invalide'}
-                    </p>
+                    <div className="mt-2 space-y-1">
+                      {!hasValidVatFormat && (
+                        <p className="text-xs text-amber-600 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          Format invalide
+                        </p>
+                      )}
+                      {hasValidVatFormat && !viesResult && !viesError && !isValidatingVat && (
+                        <p className="text-xs text-muted-foreground">
+                          ✓ Format valide - Cliquez sur "Vérifier VIES" pour valider
+                        </p>
+                      )}
+                      {viesError && (
+                        <p className="text-xs text-amber-600 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          {viesError}
+                        </p>
+                      )}
+                      {viesResult?.valid === true && (
+                        <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded text-xs text-green-700 dark:text-green-300">
+                          <div className="flex items-center gap-1 font-medium">
+                            <CheckCircle className="w-3 h-3" />
+                            Numéro de TVA valide
+                          </div>
+                          {viesResult.name && (
+                            <div className="mt-1">Entreprise: {viesResult.name}</div>
+                          )}
+                          {viesResult.address && (
+                            <div className="mt-0.5 text-green-600 dark:text-green-400">{viesResult.address}</div>
+                          )}
+                        </div>
+                      )}
+                      {viesResult?.valid === false && (
+                        <p className="text-xs text-red-600 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          Numéro de TVA non valide dans VIES
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
                 <div>
@@ -391,11 +519,12 @@ export function CustomerFormModal({ isOpen, onClose, onSubmit }: CustomerFormPro
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-border">
-            <Button type="button" variant="secondary" onClick={onClose}>
+            <Button type="button" variant="secondary" onClick={onClose} disabled={isLoading}>
               Annuler
             </Button>
-            <Button type="submit">
-              Créer le client
+            <Button type="submit" disabled={isLoading}>
+              {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {isEditMode ? "Enregistrer" : "Créer le client"}
             </Button>
           </div>
         </form>

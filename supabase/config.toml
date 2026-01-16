@@ -1,1 +1,4 @@
 project_id = "modgiywtysnpnyrgwuhn"
+
+[functions.validate-vat]
+verify_jwt = false
