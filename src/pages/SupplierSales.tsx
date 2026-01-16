@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Euro, Package, ArrowUpRight, ArrowDownRight, Download, Loader2, TrendingUp, Percent, DollarSign, FileSpreadsheet, FileText, Calendar, CreditCard } from "lucide-react";
+import { Euro, Package, ArrowUpRight, ArrowDownRight, Download, Loader2, TrendingUp, Percent, DollarSign, FileSpreadsheet, FileText, Calendar, CreditCard, BarChart3 } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, supplierTypeVariant, supplierTypeLabel } from "@/components/ui/status-badge";
@@ -10,6 +10,7 @@ import { useAllOrderItems } from "@/hooks/useOrders";
 import { useSupplierPayouts } from "@/hooks/useSupplierPayouts";
 import { formatCurrency } from "@/lib/format";
 import { SupplierSalesReport } from "@/components/reports/SupplierSalesReport";
+import { MonthlySupplierReport } from "@/components/reports/MonthlySupplierReport";
 import { SupplierPayoutManager } from "@/components/suppliers/SupplierPayoutManager";
 import {
   BarChart,
@@ -36,6 +37,7 @@ export function SupplierSalesPage() {
   const [selectedPeriod, setSelectedPeriod] = useState("all");
   const [viewMode, setViewMode] = useState<"sales" | "profitability">("profitability");
   const [isReportOpen, setIsReportOpen] = useState(false);
+  const [isMonthlyReportOpen, setIsMonthlyReportOpen] = useState(false);
   const [isPayoutManagerOpen, setIsPayoutManagerOpen] = useState(false);
 
   // Calculate pending payouts
@@ -466,6 +468,10 @@ export function SupplierSalesPage() {
                 <Calendar className="w-4 h-4" />
                 Relevé de ventes
               </Button>
+              <Button variant="default" className="gap-2" onClick={() => setIsMonthlyReportOpen(true)}>
+                <BarChart3 className="w-4 h-4" />
+                Rapport mensuel
+              </Button>
             </div>
           </div>
 
@@ -534,6 +540,14 @@ export function SupplierSalesPage() {
           <SupplierSalesReport
             isOpen={isReportOpen}
             onClose={() => setIsReportOpen(false)}
+            suppliers={suppliers.map(s => ({ id: s.id, name: s.name, type: s.type, commission_rate: s.commission_rate || 0 }))}
+            orderItems={orderItems as any}
+          />
+
+          {/* Monthly Supplier Report Modal */}
+          <MonthlySupplierReport
+            isOpen={isMonthlyReportOpen}
+            onClose={() => setIsMonthlyReportOpen(false)}
             suppliers={suppliers.map(s => ({ id: s.id, name: s.name, type: s.type, commission_rate: s.commission_rate || 0 }))}
             orderItems={orderItems as any}
           />
