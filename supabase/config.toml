@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.discogs-search]
 verify_jwt = false
+
+[functions.exchange-rates]
+verify_jwt = false
