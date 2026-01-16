@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { X, Package, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -533,7 +533,9 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
             <CurrencyExchangeField
               currency={formData.currency}
               exchangeRate={formData.exchange_rate}
-              onExchangeRateChange={useCallback((rate: number) => setFormData(prev => ({ ...prev, exchange_rate: rate })), [])}
+              onExchangeRateChange={(rate: number) =>
+                setFormData(prev => ({ ...prev, exchange_rate: rate }))
+              }
               purchasePrice={formData.purchase_price}
             />
           </div>
