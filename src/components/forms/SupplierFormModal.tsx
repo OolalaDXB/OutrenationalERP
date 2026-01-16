@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { X, Building2, Loader2, Info } from "lucide-react";
+import { X, Building2, Loader2, Info, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useCreateSupplier, useUpdateSupplier, type Supplier, type SupplierInsert } from "@/hooks/useSuppliers";
+import { useViesValidation, type ViesValidationResult } from "@/hooks/useViesValidation";
 import type { Enums } from "@/integrations/supabase/types";
 import {
   requiresState,
@@ -12,6 +13,7 @@ import {
   US_STATES,
   CANADIAN_PROVINCES,
   UAE_EMIRATES,
+  EU_COUNTRIES,
 } from "@/lib/vat-utils";
 import {
   Tooltip,
@@ -30,6 +32,7 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormPro
   const { toast } = useToast();
   const createSupplier = useCreateSupplier();
   const updateSupplier = useUpdateSupplier();
+  const { validateVat, isValidating, result: viesResult, error: viesError, reset: resetVies } = useViesValidation();
   
   const isEditMode = !!supplier;
 
@@ -63,8 +66,16 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormPro
     website: "",
   });
 
+  const [vatValidationStatus, setVatValidationStatus] = useState<'idle' | 'valid' | 'invalid'>('idle');
+
   const showStateField = requiresState(formData.country);
-  const hasValidVat = isValidVatNumberFormat(formData.vat_number);
+  const hasValidVatFormat = isValidVatNumberFormat(formData.vat_number);
+  
+  // Check if country is in EU (VIES validation available)
+  const isEuCountry = EU_COUNTRIES.some(eu => 
+    formData.country.toLowerCase().includes(eu.toLowerCase()) ||
+    formData.vat_number.substring(0, 2).toUpperCase() === eu.substring(0, 2).toUpperCase()
+  );
 
   // Get states/provinces based on country
   const getStateOptions = () => {
@@ -246,7 +257,7 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormPro
                 </div>
               </div>
 
-              <div>
+              <div className="col-span-2">
                 <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   TVA Intracommunautaire
                   <TooltipProvider>
@@ -263,16 +274,80 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormPro
                     </Tooltip>
                   </TooltipProvider>
                 </Label>
-                <Input
-                  value={formData.vat_number}
-                  onChange={(e) => setFormData({ ...formData, vat_number: e.target.value.toUpperCase() })}
-                  placeholder="FR12345678901"
-                  className="mt-1.5"
-                />
+                <div className="flex gap-2 mt-1.5">
+                  <Input
+                    value={formData.vat_number}
+                    onChange={(e) => {
+                      setFormData({ ...formData, vat_number: e.target.value.toUpperCase() });
+                      setVatValidationStatus('idle');
+                      resetVies();
+                    }}
+                    placeholder="FR12345678901"
+                    className="flex-1"
+                  />
+                  {hasValidVatFormat && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        const result = await validateVat(formData.vat_number);
+                        if (result) {
+                          setVatValidationStatus(result.valid ? 'valid' : 'invalid');
+                          if (result.valid && result.name) {
+                            toast({
+                              title: result.cached ? "TVA validée (cache)" : "TVA validée",
+                              description: `Entreprise: ${result.name}`,
+                            });
+                          }
+                        }
+                      }}
+                      disabled={isValidating}
+                      className="shrink-0"
+                    >
+                      {isValidating ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4" />
+                      )}
+                      <span className="ml-1">Vérifier</span>
+                    </Button>
+                  )}
+                </div>
+                
+                {/* Format validation */}
                 {formData.vat_number && (
-                  <p className={`text-xs mt-1 ${hasValidVat ? 'text-green-600' : 'text-amber-600'}`}>
-                    {hasValidVat ? '✓ Format valide' : '⚠ Format invalide'}
+                  <p className={`text-xs mt-1 ${hasValidVatFormat ? 'text-green-600' : 'text-amber-600'}`}>
+                    {hasValidVatFormat ? '✓ Format valide' : '⚠ Format invalide'}
                   </p>
+                )}
+                
+                {/* VIES validation result */}
+                {viesResult && (
+                  <div className={`flex items-center gap-2 mt-2 p-2 rounded-lg ${
+                    viesResult.valid ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                  }`}>
+                    {viesResult.valid ? (
+                      <CheckCircle2 className="w-4 h-4" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4" />
+                    )}
+                    <div className="text-sm">
+                      {viesResult.valid ? (
+                        <>
+                          <span className="font-medium">TVA valide{viesResult.cached ? ' (cache)' : ''}</span>
+                          {viesResult.name && <span className="ml-1">- {viesResult.name}</span>}
+                        </>
+                      ) : (
+                        <span className="font-medium">TVA invalide</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {/* VIES error */}
+                {viesError && (
+                  <p className="text-xs mt-1 text-amber-600">{viesError}</p>
                 )}
               </div>
 
