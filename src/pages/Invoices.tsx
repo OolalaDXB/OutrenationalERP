@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { addInvoiceHistory } from "@/hooks/useInvoiceHistory";
 import { InvoiceFormModal } from "@/components/forms/InvoiceFormModal";
 import { InvoiceEditModal } from "@/components/forms/InvoiceEditModal";
 import { InvoiceDrawer } from "@/components/drawers/InvoiceDrawer";
@@ -300,6 +301,11 @@ export function InvoicesPage() {
 
       if (itemsError) throw itemsError;
 
+      // Record history for duplicated invoice
+      await addInvoiceHistory(newInvoice.id, "duplicated", {
+        source_invoice: { old: null, new: invoice.invoice_number }
+      });
+
       toast.success("Facture dupliquée avec succès");
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
     } catch (error) {
@@ -322,8 +328,14 @@ export function InvoicesPage() {
 
       if (error) throw error;
 
+      // Record history
+      await addInvoiceHistory(invoice.id, "status_changed", {
+        status: { old: invoice.status, new: "paid" }
+      });
+
       toast.success("Facture marquée comme payée");
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["invoice-history", invoice.id] });
     } catch (error) {
       console.error("Error marking invoice as paid:", error);
       toast.error("Erreur lors de la mise à jour de la facture");

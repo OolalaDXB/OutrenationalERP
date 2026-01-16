@@ -1,4 +1,4 @@
-import { FileText, Mail, MapPin, Calendar, User, Pencil, Copy, Download, Check } from "lucide-react";
+import { FileText, Mail, MapPin, Calendar, User, Pencil, Copy, Download, Check, History, Clock } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -8,6 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { useInvoiceHistory } from "@/hooks/useInvoiceHistory";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Invoice = Tables<"invoices">;
@@ -287,6 +288,9 @@ export function InvoiceDrawer({
             </div>
           )}
 
+          {/* Historique */}
+          <HistorySection invoiceId={invoice.id} />
+
           {/* Métadonnées */}
           <div className="pt-4 border-t">
             <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
@@ -309,5 +313,100 @@ export function InvoiceDrawer({
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+// Separate component for history to use hook
+function HistorySection({ invoiceId }: { invoiceId: string }) {
+  const { data: history = [], isLoading } = useInvoiceHistory(invoiceId);
+
+  const actionLabels: Record<string, string> = {
+    created: "Création",
+    updated: "Modification",
+    status_changed: "Changement de statut",
+    duplicated: "Duplication",
+  };
+
+  const formatChange = (key: string, value: { old: unknown; new: unknown }) => {
+    const fieldLabels: Record<string, string> = {
+      invoice_number: "Numéro",
+      status: "Statut",
+      recipient_name: "Destinataire",
+      total: "Total",
+      type: "Type",
+      issue_date: "Date d'émission",
+      due_date: "Date d'échéance",
+    };
+    
+    const statusLabels: Record<string, string> = {
+      draft: "Brouillon",
+      sent: "Envoyée",
+      paid: "Payée",
+      overdue: "En retard",
+      cancelled: "Annulée",
+    };
+
+    const label = fieldLabels[key] || key;
+    let oldVal = String(value.old ?? "-");
+    let newVal = String(value.new ?? "-");
+
+    if (key === "status") {
+      oldVal = statusLabels[oldVal] || oldVal;
+      newVal = statusLabels[newVal] || newVal;
+    }
+
+    if (key === "total") {
+      oldVal = formatCurrency(Number(value.old) || 0);
+      newVal = formatCurrency(Number(value.new) || 0);
+    }
+
+    return `${label}: ${oldVal} → ${newVal}`;
+  };
+
+  if (history.length === 0 && !isLoading) {
+    return null;
+  }
+
+  return (
+    <div>
+      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
+        <History className="w-4 h-4" />
+        Historique
+      </h3>
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Chargement...</p>
+      ) : (
+        <div className="space-y-2 max-h-48 overflow-y-auto">
+          {history.map((entry) => (
+            <div 
+              key={entry.id} 
+              className="p-3 bg-secondary/30 rounded-lg text-sm"
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-medium text-primary">
+                  {actionLabels[entry.action] || entry.action}
+                </span>
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {formatDate(entry.created_at)}
+                </span>
+              </div>
+              {entry.user_email && (
+                <p className="text-xs text-muted-foreground mb-1">
+                  Par {entry.user_email}
+                </p>
+              )}
+              {entry.changes && Object.keys(entry.changes).length > 0 && (
+                <div className="text-xs text-muted-foreground space-y-0.5 mt-2 pt-2 border-t border-border/50">
+                  {Object.entries(entry.changes).map(([key, value]) => (
+                    <p key={key}>{formatChange(key, value as { old: unknown; new: unknown })}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
