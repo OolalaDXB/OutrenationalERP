@@ -15,6 +15,7 @@ export interface DiscogsResult {
   country?: string;
   label?: string[];
   format?: string[];
+  catno?: string;
   thumb: string;
   cover_image: string;
   images: DiscogsImage[];

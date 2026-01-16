@@ -1,8 +1,17 @@
 import { useState } from "react";
-import { Search, Loader2, Image as ImageIcon, Check, X, Disc3 } from "lucide-react";
+import { Search, Loader2, Image as ImageIcon, Check, X, Disc3, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDiscogsSearch, type DiscogsResult } from "@/hooks/useDiscogsSearch";
+
+export interface DiscogsProductData {
+  title?: string;
+  artist?: string;
+  label?: string;
+  year?: number;
+  format?: string;
+  catalogNumber?: string;
+}
 
 interface DiscogsImageSearchProps {
   barcode?: string;
@@ -10,6 +19,7 @@ interface DiscogsImageSearchProps {
   artist?: string;
   onImageSelect: (imageUrl: string) => void;
   onImagesSelect?: (imageUrls: string[]) => void;
+  onProductDataSelect?: (data: DiscogsProductData) => void;
 }
 
 export function DiscogsImageSearch({
@@ -18,6 +28,7 @@ export function DiscogsImageSearch({
   artist,
   onImageSelect,
   onImagesSelect,
+  onProductDataSelect,
 }: DiscogsImageSearchProps) {
   const { isSearching, error, results, searchByBarcode, searchByQuery, clearResults } = useDiscogsSearch();
   const [showResults, setShowResults] = useState(false);
@@ -54,6 +65,49 @@ export function DiscogsImageSearch({
     setShowResults(false);
     clearResults();
     setSelectedImages(new Set());
+  };
+
+  const handleUseProductData = (result: DiscogsResult) => {
+    if (!onProductDataSelect) return;
+    
+    // Parse title to extract artist and album title (format: "Artist - Title")
+    const titleParts = result.title.split(" - ");
+    const artistName = titleParts.length > 1 ? titleParts[0].trim() : undefined;
+    const albumTitle = titleParts.length > 1 ? titleParts.slice(1).join(" - ").trim() : result.title;
+    
+    // Map Discogs format to our format enum
+    const formatMap: Record<string, string> = {
+      'LP': 'lp',
+      'Album': 'lp',
+      '2xLP': '2lp',
+      '3xLP': '3lp',
+      'CD': 'cd',
+      'Box Set': 'boxset',
+      '7"': '7inch',
+      '10"': '10inch',
+      '12"': '12inch',
+      'Cassette': 'cassette',
+    };
+    
+    const discogsFormat = result.format?.[0] || '';
+    let mappedFormat: string | undefined;
+    for (const [key, value] of Object.entries(formatMap)) {
+      if (discogsFormat.toLowerCase().includes(key.toLowerCase())) {
+        mappedFormat = value;
+        break;
+      }
+    }
+    
+    const data: DiscogsProductData = {
+      title: albumTitle,
+      artist: artistName,
+      label: result.label?.[0],
+      year: result.year ? parseInt(result.year, 10) : undefined,
+      format: mappedFormat,
+      catalogNumber: result.catno,
+    };
+    
+    onProductDataSelect(data);
   };
 
   const handleClose = () => {
@@ -120,6 +174,7 @@ export function DiscogsImageSearch({
                 result={result}
                 selectedImages={selectedImages}
                 onSelectImage={handleSelectImage}
+                onUseProductData={onProductDataSelect ? handleUseProductData : undefined}
               />
             ))}
           </div>
@@ -137,10 +192,12 @@ function DiscogsResultCard({
   result,
   selectedImages,
   onSelectImage,
+  onUseProductData,
 }: {
   result: DiscogsResult;
   selectedImages: Set<string>;
   onSelectImage: (url: string) => void;
+  onUseProductData?: (result: DiscogsResult) => void;
 }) {
   const allImages = result.images.length > 0 
     ? result.images.map(img => img.uri)
@@ -166,8 +223,21 @@ function DiscogsResultCard({
             {result.year && <span>{result.year}</span>}
             {result.label?.[0] && <span> • {result.label[0]}</span>}
             {result.format?.[0] && <span> • {result.format[0]}</span>}
+            {result.catno && <span> • {result.catno}</span>}
           </div>
         </div>
+        {onUseProductData && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onUseProductData(result)}
+            className="gap-1 shrink-0"
+          >
+            <FileDown className="w-3 h-3" />
+            Utiliser
+          </Button>
+        )}
       </div>
 
       {allImages.length > 0 && (
