@@ -89,3 +89,24 @@ export function useDeleteUserRole() {
     }
   });
 }
+
+export function useUpdateUserInfo() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ userId, firstName, lastName }: { userId: string; firstName: string; lastName: string }) => {
+      const { error } = await supabase
+        .from('users')
+        .update({ 
+          first_name: firstName || null, 
+          last_name: lastName || null 
+        })
+        .eq('auth_user_id', userId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users-with-roles'] });
+    }
+  });
+}

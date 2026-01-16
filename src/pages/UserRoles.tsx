@@ -1,8 +1,10 @@
-import { useState } from "react";
-import { Loader2, Shield, ShieldCheck, Eye, UserCog } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Loader2, Shield, ShieldCheck, Eye, UserCog, Pencil, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useUsersWithRoles, useUpdateUserRole, type UserWithRole } from "@/hooks/useUserRoles";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useUsersWithRoles, useUpdateUserRole, useUpdateUserInfo, type UserWithRole } from "@/hooks/useUserRoles";
 import { useAuth, type AppRole } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -19,6 +21,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const roleConfig: Record<AppRole, { label: string; icon: React.ElementType; color: string; description: string }> = {
   admin: { 
@@ -44,9 +54,27 @@ const roleConfig: Record<AppRole, { label: string; icon: React.ElementType; colo
 export function UserRolesPage() {
   const { data: users = [], isLoading } = useUsersWithRoles();
   const updateRole = useUpdateUserRole();
+  const updateUserInfo = useUpdateUserInfo();
   const { user: currentUser, hasRole } = useAuth();
   const { toast } = useToast();
   const [updatingUser, setUpdatingUser] = useState<string | null>(null);
+  const [roleFilter, setRoleFilter] = useState<AppRole | 'all'>('all');
+  
+  // Edit user dialog state
+  const [editingUser, setEditingUser] = useState<UserWithRole | null>(null);
+  const [editFirstName, setEditFirstName] = useState("");
+  const [editLastName, setEditLastName] = useState("");
+
+  const filteredUsers = useMemo(() => {
+    if (roleFilter === 'all') return users;
+    return users.filter(u => u.role === roleFilter);
+  }, [users, roleFilter]);
+
+  const roleCounts = useMemo(() => {
+    const counts: Record<AppRole, number> = { admin: 0, staff: 0, viewer: 0 };
+    users.forEach(u => counts[u.role]++);
+    return counts;
+  }, [users]);
 
   const handleRoleChange = async (userWithRole: UserWithRole, newRole: AppRole) => {
     if (userWithRole.user_id === currentUser?.id) {
@@ -73,6 +101,35 @@ export function UserRolesPage() {
       });
     } finally {
       setUpdatingUser(null);
+    }
+  };
+
+  const handleOpenEditDialog = (userWithRole: UserWithRole) => {
+    setEditingUser(userWithRole);
+    setEditFirstName(userWithRole.first_name || "");
+    setEditLastName(userWithRole.last_name || "");
+  };
+
+  const handleSaveUserInfo = async () => {
+    if (!editingUser) return;
+
+    try {
+      await updateUserInfo.mutateAsync({
+        userId: editingUser.user_id,
+        firstName: editFirstName.trim(),
+        lastName: editLastName.trim()
+      });
+      toast({
+        title: "Utilisateur mis à jour",
+        description: "Les informations ont été enregistrées"
+      });
+      setEditingUser(null);
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour l'utilisateur",
+        variant: "destructive"
+      });
     }
   };
 
@@ -107,6 +164,51 @@ export function UserRolesPage() {
           </h2>
           <p className="text-sm text-muted-foreground">{users.length} utilisateur(s)</p>
         </div>
+        
+        {/* Role Filter */}
+        <div className="flex items-center gap-2">
+          <Filter className="w-4 h-4 text-muted-foreground" />
+          <Select value={roleFilter} onValueChange={(v) => setRoleFilter(v as AppRole | 'all')}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filtrer par rôle" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">
+                <div className="flex items-center justify-between w-full gap-4">
+                  <span>Tous les rôles</span>
+                  <Badge variant="secondary" className="text-xs">{users.length}</Badge>
+                </div>
+              </SelectItem>
+              <SelectItem value="admin">
+                <div className="flex items-center justify-between w-full gap-4">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-red-500" />
+                    Administrateurs
+                  </div>
+                  <Badge variant="secondary" className="text-xs">{roleCounts.admin}</Badge>
+                </div>
+              </SelectItem>
+              <SelectItem value="staff">
+                <div className="flex items-center justify-between w-full gap-4">
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-blue-500" />
+                    Staff
+                  </div>
+                  <Badge variant="secondary" className="text-xs">{roleCounts.staff}</Badge>
+                </div>
+              </SelectItem>
+              <SelectItem value="viewer">
+                <div className="flex items-center justify-between w-full gap-4">
+                  <div className="flex items-center gap-2">
+                    <Eye className="w-4 h-4 text-gray-500" />
+                    Viewers
+                  </div>
+                  <Badge variant="secondary" className="text-xs">{roleCounts.viewer}</Badge>
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Role Legend */}
@@ -114,11 +216,18 @@ export function UserRolesPage() {
         {(Object.entries(roleConfig) as [AppRole, typeof roleConfig[AppRole]][]).map(([role, config]) => {
           const Icon = config.icon;
           return (
-            <Card key={role} className="border">
+            <Card 
+              key={role} 
+              className={`border cursor-pointer transition-all ${roleFilter === role ? 'ring-2 ring-primary' : 'hover:border-primary/50'}`}
+              onClick={() => setRoleFilter(roleFilter === role ? 'all' : role)}
+            >
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Icon className="w-4 h-4" />
-                  {config.label}
+                <CardTitle className="text-sm flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <Icon className="w-4 h-4" />
+                    {config.label}
+                  </span>
+                  <Badge variant="secondary">{roleCounts[role]}</Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -145,10 +254,13 @@ export function UserRolesPage() {
               <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">
                 Changer le rôle
               </th>
+              <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border w-[80px]">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody>
-            {users.map((userWithRole) => {
+            {filteredUsers.map((userWithRole) => {
               const config = roleConfig[userWithRole.role];
               const Icon = config.icon;
               const isCurrentUser = userWithRole.user_id === currentUser?.id;
@@ -227,18 +339,72 @@ export function UserRolesPage() {
                       </Select>
                     )}
                   </td>
+                  <td className="px-6 py-4">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleOpenEditDialog(userWithRole)}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                  </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
 
-        {users.length === 0 && (
+        {filteredUsers.length === 0 && (
           <div className="p-12 text-center text-muted-foreground">
-            Aucun utilisateur trouvé
+            {roleFilter !== 'all' 
+              ? `Aucun utilisateur avec le rôle "${roleConfig[roleFilter].label}"`
+              : "Aucun utilisateur trouvé"
+            }
           </div>
         )}
       </div>
+
+      {/* Edit User Dialog */}
+      <Dialog open={!!editingUser} onOpenChange={(open) => !open && setEditingUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Modifier l'utilisateur</DialogTitle>
+            <DialogDescription>
+              {editingUser?.email}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="firstName">Prénom</Label>
+              <Input
+                id="firstName"
+                value={editFirstName}
+                onChange={(e) => setEditFirstName(e.target.value)}
+                placeholder="Prénom"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lastName">Nom</Label>
+              <Input
+                id="lastName"
+                value={editLastName}
+                onChange={(e) => setEditLastName(e.target.value)}
+                placeholder="Nom"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingUser(null)}>
+              Annuler
+            </Button>
+            <Button onClick={handleSaveUserInfo} disabled={updateUserInfo.isPending}>
+              {updateUserInfo.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Enregistrer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
