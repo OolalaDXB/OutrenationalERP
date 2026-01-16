@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { X, Package, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { useSuppliers } from "@/hooks/useSuppliers";
 import { useCreateProduct, useUpdateProduct, type Product, type ProductInsert } from "@/hooks/useProducts";
 import type { Enums } from "@/integrations/supabase/types";
 import { ProductImageGallery } from "./ProductImageGallery";
+import { CurrencyExchangeField } from "./CurrencyExchangeField";
 
 interface ProductFormProps {
   isOpen: boolean;
@@ -428,22 +429,15 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
                   </span>
                 </div>
               </div>
-
-              {formData.currency === "USD" && (
-                <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Taux de change (USD→EUR)</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.0001"
-                    value={formData.exchange_rate}
-                    onChange={(e) => setFormData({ ...formData, exchange_rate: Number(e.target.value) })}
-                    placeholder="0.92"
-                    className="mt-1.5"
-                  />
-                </div>
-              )}
             </div>
+
+            {/* Currency Exchange Field - Auto/Manual */}
+            <CurrencyExchangeField
+              currency={formData.currency}
+              exchangeRate={formData.exchange_rate}
+              onExchangeRateChange={useCallback((rate: number) => setFormData(prev => ({ ...prev, exchange_rate: rate })), [])}
+              purchasePrice={formData.purchase_price}
+            />
           </div>
 
           {/* Frais annexes */}
