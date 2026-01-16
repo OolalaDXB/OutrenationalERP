@@ -6,6 +6,8 @@ export interface UserWithRole {
   id: string;
   user_id: string;
   email: string;
+  first_name: string | null;
+  last_name: string | null;
   role: AppRole;
   created_at: string;
 }
@@ -22,23 +24,32 @@ export function useUsersWithRoles() {
 
       if (rolesError) throw rolesError;
 
-      // Get user emails from auth.users via the users table
+      // Get user info from the users table
       const { data: users, error: usersError } = await supabase
         .from('users')
-        .select('auth_user_id, email');
+        .select('auth_user_id, email, first_name, last_name');
 
       if (usersError) throw usersError;
 
-      // Map roles to include email
-      const usersMap = new Map(users?.map(u => [u.auth_user_id, u.email]) || []);
+      // Map roles to include user info
+      const usersMap = new Map(users?.map(u => [u.auth_user_id, {
+        email: u.email,
+        first_name: u.first_name,
+        last_name: u.last_name
+      }]) || []);
       
-      return (roles || []).map(role => ({
-        id: role.id,
-        user_id: role.user_id,
-        email: usersMap.get(role.user_id) || 'Email inconnu',
-        role: role.role as AppRole,
-        created_at: role.created_at
-      })) as UserWithRole[];
+      return (roles || []).map(role => {
+        const userInfo = usersMap.get(role.user_id);
+        return {
+          id: role.id,
+          user_id: role.user_id,
+          email: userInfo?.email || 'Email inconnu',
+          first_name: userInfo?.first_name || null,
+          last_name: userInfo?.last_name || null,
+          role: role.role as AppRole,
+          created_at: role.created_at
+        };
+      }) as UserWithRole[];
     }
   });
 }

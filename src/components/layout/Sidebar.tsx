@@ -86,7 +86,6 @@ const navigation: NavSection[] = [
     title: "Administration",
     items: [
       { icon: UserCog, label: "Gestion des rôles", href: "/admin/roles", adminOnly: true },
-      { icon: Database, label: "Cache TVA", href: "/admin/vat-cache", adminOnly: true },
       { icon: Settings, label: "Paramètres", href: "/admin/settings", adminOnly: true },
     ],
   },
