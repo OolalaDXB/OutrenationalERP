@@ -23,8 +23,8 @@ const typeStyles: Record<StockMovementType, { icon: typeof ArrowUpCircle; color:
   return: { icon: RefreshCw, color: "text-info", bg: "bg-info/10", label: "Retour" },
   adjustment: { icon: RefreshCw, color: "text-warning-foreground", bg: "bg-warning/10", label: "Ajustement" },
   loss: { icon: ArrowDownCircle, color: "text-destructive", bg: "bg-destructive/10", label: "Perte" },
-  consignment_in: { icon: ArrowUpCircle, color: "text-primary", bg: "bg-primary/10", label: "Entrée consignation" },
-  consignment_out: { icon: ArrowDownCircle, color: "text-primary", bg: "bg-primary/10", label: "Sortie consignation" },
+  consignment_in: { icon: ArrowUpCircle, color: "text-primary", bg: "bg-primary/10", label: "Entrée dépôt-vente" },
+  consignment_out: { icon: ArrowDownCircle, color: "text-primary", bg: "bg-primary/10", label: "Sortie dépôt-vente" },
 };
 
 const periodPresets = [
@@ -261,8 +261,8 @@ export function StockMovementsPage() {
             <option value="return">Retours</option>
             <option value="adjustment">Ajustements</option>
             <option value="loss">Pertes</option>
-            <option value="consignment_in">Entrées consignation</option>
-            <option value="consignment_out">Sorties consignation</option>
+            <option value="consignment_in">Entrées dépôt-vente</option>
+            <option value="consignment_out">Sorties dépôt-vente</option>
           </select>
 
           {/* Period filter */}

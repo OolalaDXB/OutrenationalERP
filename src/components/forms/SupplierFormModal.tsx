@@ -269,7 +269,6 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormPro
                 >
                   <option value="purchase">Achat ferme</option>
                   <option value="own">Production propre</option>
-                  <option value="consignment">Consignation</option>
                   <option value="depot_vente">Dépôt-vente</option>
                 </select>
               </div>

@@ -5,12 +5,14 @@ import { useProducts, Product } from "@/hooks/useProducts";
 import { useOrders } from "@/hooks/useOrders";
 import { useCustomers, Customer } from "@/hooks/useCustomers";
 import { useSuppliers, Supplier } from "@/hooks/useSuppliers";
+import { useSettings } from "@/hooks/useSettings";
 import { TopCustomersWidget } from "@/components/analytics/TopCustomersWidget";
 import { SupplierStatsWidget } from "@/components/analytics/SupplierStatsWidget";
 import { SupplierSalesEvolutionChart } from "@/components/analytics/SupplierSalesEvolutionChart";
 import { CustomerDrawer } from "@/components/drawers/CustomerDrawer";
 import { SupplierDrawer } from "@/components/drawers/SupplierDrawer";
 import { ProductDrawer } from "@/components/drawers/ProductDrawer";
+import { defaultWidgetVisibility } from "@/components/settings/WidgetVisibilitySection";
 import {
   BarChart,
   Bar,
@@ -41,6 +43,9 @@ export function AnalyticsPage() {
   const { data: orders = [] } = useOrders();
   const { data: customers = [] } = useCustomers();
   const { data: suppliers = [] } = useSuppliers();
+  const { data: settings } = useSettings();
+  
+  const widgetVisibility = settings?.visible_widgets || defaultWidgetVisibility;
   
   // Top customers period state
   const [topCustomersPeriod, setTopCustomersPeriod] = useState("30days");
@@ -273,268 +278,212 @@ export function AnalyticsPage() {
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
-        <KpiCard icon={Euro} value={formatCurrency(stats.totalRevenue)} label="CA Total" variant="primary" />
-        <KpiCard icon={ShoppingCart} value={stats.totalOrders.toString()} label="Commandes" variant="info" />
-        <KpiCard icon={TrendingUp} value={formatCurrency(stats.avgOrderValue)} label="Panier moyen" variant="success" />
-        <KpiCard icon={Users} value={stats.totalCustomers.toString()} label="Clients" variant="warning" />
-        <KpiCard icon={Package} value={stats.totalProducts.toString()} label="Produits" variant="primary" />
-        <KpiCard 
-          icon={DollarSign} 
-          value={formatCurrency(profitabilityStats.totalProfit)} 
-          label="Marge brute" 
-          variant={profitabilityStats.totalProfit >= 0 ? "success" : "warning"} 
-        />
-        <KpiCard 
-          icon={Percent} 
-          value={`${profitabilityStats.profitMargin.toFixed(1)}%`} 
-          label="Taux de marge" 
-          variant={profitabilityStats.profitMargin >= 20 ? "success" : "warning"} 
-        />
-      </div>
+      {widgetVisibility.kpi_cards && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+          <KpiCard icon={Euro} value={formatCurrency(stats.totalRevenue)} label="CA Total" variant="primary" />
+          <KpiCard icon={ShoppingCart} value={stats.totalOrders.toString()} label="Commandes" variant="info" />
+          <KpiCard icon={TrendingUp} value={formatCurrency(stats.avgOrderValue)} label="Panier moyen" variant="success" />
+          <KpiCard icon={Users} value={stats.totalCustomers.toString()} label="Clients" variant="warning" />
+          <KpiCard icon={Package} value={stats.totalProducts.toString()} label="Produits" variant="primary" />
+          <KpiCard 
+            icon={DollarSign} 
+            value={formatCurrency(profitabilityStats.totalProfit)} 
+            label="Marge brute" 
+            variant={profitabilityStats.totalProfit >= 0 ? "success" : "warning"} 
+          />
+          <KpiCard 
+            icon={Percent} 
+            value={`${profitabilityStats.profitMargin.toFixed(1)}%`} 
+            label="Taux de marge" 
+            variant={profitabilityStats.profitMargin >= 20 ? "success" : "warning"} 
+          />
+        </div>
+      )}
 
       {/* Profitability Summary */}
-      <div className="bg-card rounded-xl border border-border shadow-sm p-6">
-        <h3 className="text-lg font-semibold mb-4">Résumé de rentabilité (stock actuel)</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          <div className="p-4 bg-secondary/30 rounded-lg">
-            <div className="text-sm text-muted-foreground">Valeur stock (vente)</div>
-            <div className="text-xl font-bold mt-1">{formatCurrency(profitabilityStats.totalRevenue)}</div>
-          </div>
-          <div className="p-4 bg-secondary/30 rounded-lg">
-            <div className="text-sm text-muted-foreground">Coût total stock</div>
-            <div className="text-xl font-bold mt-1">{formatCurrency(profitabilityStats.totalCost)}</div>
-          </div>
-          <div className="p-4 bg-secondary/30 rounded-lg">
-            <div className="text-sm text-muted-foreground">Frais Marketplace</div>
-            <div className="text-xl font-bold mt-1">{formatCurrency(profitabilityStats.totalMarketplaceFees)}</div>
-          </div>
-          <div className="p-4 bg-secondary/30 rounded-lg">
-            <div className="text-sm text-muted-foreground">Frais Import</div>
-            <div className="text-xl font-bold mt-1">{formatCurrency(profitabilityStats.totalImportFees)}</div>
-          </div>
-          <div className="p-4 bg-secondary/30 rounded-lg">
-            <div className="text-sm text-muted-foreground">Frais de Port</div>
-            <div className="text-xl font-bold mt-1">{formatCurrency(profitabilityStats.totalShippingCosts)}</div>
-          </div>
-          <div className={`p-4 rounded-lg ${profitabilityStats.totalProfit >= 0 ? "bg-green-500/10" : "bg-red-500/10"}`}>
-            <div className="text-sm text-muted-foreground">Marge potentielle</div>
-            <div className={`text-xl font-bold mt-1 ${profitabilityStats.totalProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-              {formatCurrency(profitabilityStats.totalProfit)}
+      {widgetVisibility.profitability_summary && (
+        <div className="bg-card rounded-xl border border-border shadow-sm p-6">
+          <h3 className="text-lg font-semibold mb-4">Résumé de rentabilité (stock actuel)</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <div className="p-4 bg-secondary/30 rounded-lg">
+              <div className="text-sm text-muted-foreground">Valeur stock (vente)</div>
+              <div className="text-xl font-bold mt-1">{formatCurrency(profitabilityStats.totalRevenue)}</div>
+            </div>
+            <div className="p-4 bg-secondary/30 rounded-lg">
+              <div className="text-sm text-muted-foreground">Coût total stock</div>
+              <div className="text-xl font-bold mt-1">{formatCurrency(profitabilityStats.totalCost)}</div>
+            </div>
+            <div className="p-4 bg-secondary/30 rounded-lg">
+              <div className="text-sm text-muted-foreground">Frais Marketplace</div>
+              <div className="text-xl font-bold mt-1">{formatCurrency(profitabilityStats.totalMarketplaceFees)}</div>
+            </div>
+            <div className="p-4 bg-secondary/30 rounded-lg">
+              <div className="text-sm text-muted-foreground">Frais Import</div>
+              <div className="text-xl font-bold mt-1">{formatCurrency(profitabilityStats.totalImportFees)}</div>
+            </div>
+            <div className="p-4 bg-secondary/30 rounded-lg">
+              <div className="text-sm text-muted-foreground">Frais de Port</div>
+              <div className="text-xl font-bold mt-1">{formatCurrency(profitabilityStats.totalShippingCosts)}</div>
+            </div>
+            <div className={`p-4 rounded-lg ${profitabilityStats.totalProfit >= 0 ? "bg-green-500/10" : "bg-red-500/10"}`}>
+              <div className="text-sm text-muted-foreground">Marge potentielle</div>
+              <div className={`text-xl font-bold mt-1 ${profitabilityStats.totalProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
+                {formatCurrency(profitabilityStats.totalProfit)}
+              </div>
             </div>
           </div>
+          <p className="text-xs text-muted-foreground mt-4">
+            Basé sur {profitabilityStats.productsWithCost} produits avec un prix d'achat renseigné
+          </p>
         </div>
-        <p className="text-xs text-muted-foreground mt-4">
-          Basé sur {profitabilityStats.productsWithCost} produits avec un prix d'achat renseigné
-        </p>
-      </div>
+      )}
 
       {/* Charts Row 1 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Évolution des ventes */}
-        <div className="bg-card rounded-xl border border-border shadow-sm p-6">
-          <h3 className="text-lg font-semibold mb-4">Évolution des ventes</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={salesByMonth}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px",
-                }}
-                formatter={(value: number) => formatCurrency(value)}
-              />
-              <Line
-                type="monotone"
-                dataKey="revenue"
-                stroke="hsl(var(--primary))"
-                strokeWidth={2}
-                dot={{ fill: "hsl(var(--primary))" }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+      {(widgetVisibility.sales_evolution || widgetVisibility.cost_breakdown) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Évolution des ventes */}
+          {widgetVisibility.sales_evolution && (
+            <div className="bg-card rounded-xl border border-border shadow-sm p-6">
+              <h3 className="text-lg font-semibold mb-4">Évolution des ventes</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={salesByMonth}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                    }}
+                    formatter={(value: number) => formatCurrency(value)}
+                  />
+                  <Line type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ fill: "hsl(var(--primary))" }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
 
-        {/* Répartition des coûts */}
-        <div className="bg-card rounded-xl border border-border shadow-sm p-6">
-          <h3 className="text-lg font-semibold mb-4">Répartition des coûts</h3>
-          {costBreakdown.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={costBreakdown}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={2}
-                  dataKey="value"
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                >
-                  {costBreakdown.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px",
-                  }}
-                  formatter={(value: number) => formatCurrency(value)}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-              Aucune donnée de coût disponible
+          {/* Répartition des coûts */}
+          {widgetVisibility.cost_breakdown && (
+            <div className="bg-card rounded-xl border border-border shadow-sm p-6">
+              <h3 className="text-lg font-semibold mb-4">Répartition des coûts</h3>
+              {costBreakdown.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie data={costBreakdown} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={2} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                      {costBreakdown.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}
+                    </Pie>
+                    <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }} formatter={(value: number) => formatCurrency(value)} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[300px] flex items-center justify-center text-muted-foreground">Aucune donnée de coût disponible</div>
+              )}
             </div>
           )}
         </div>
-      </div>
+      )}
 
       {/* Top produits par marge */}
-      <div className="bg-card rounded-xl border border-border shadow-sm p-6">
-        <h3 className="text-lg font-semibold mb-4">Top 10 produits par marge</h3>
-        {topProfitProducts.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-3 px-2 font-medium text-muted-foreground">#</th>
-                  <th className="text-left py-3 px-2 font-medium text-muted-foreground">Produit</th>
-                  <th className="text-right py-3 px-2 font-medium text-muted-foreground">Prix vente</th>
-                  <th className="text-right py-3 px-2 font-medium text-muted-foreground">Coût total</th>
-                  <th className="text-right py-3 px-2 font-medium text-muted-foreground">Marge €</th>
-                  <th className="text-right py-3 px-2 font-medium text-muted-foreground">Marge %</th>
-                  <th className="text-right py-3 px-2 font-medium text-muted-foreground">Stock</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topProfitProducts.map((product, index) => (
-                  <tr key={product.id} className="border-b border-border/50 hover:bg-secondary/30 cursor-pointer" onClick={() => handleProductClick(product.id)}>
-                    <td className="py-3 px-2">{index + 1}</td>
-                    <td className="py-3 px-2">
-                      <div className="font-medium hover:underline">{product.title}</div>
-                      <div className="text-xs text-muted-foreground">{product.artist}</div>
-                    </td>
-                    <td className="py-3 px-2 text-right">{formatCurrency(product.sellingPrice)}</td>
-                    <td className="py-3 px-2 text-right">{formatCurrency(product.totalCost)}</td>
-                    <td className={`py-3 px-2 text-right font-medium ${product.profit >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      {formatCurrency(product.profit)}
-                    </td>
-                    <td className={`py-3 px-2 text-right ${product.profitMargin >= 20 ? "text-green-600" : product.profitMargin >= 0 ? "text-amber-600" : "text-red-600"}`}>
-                      {product.profitMargin.toFixed(1)}%
-                    </td>
-                    <td className="py-3 px-2 text-right">{product.stock}</td>
+      {widgetVisibility.top_profit_products && (
+        <div className="bg-card rounded-xl border border-border shadow-sm p-6">
+          <h3 className="text-lg font-semibold mb-4">Top 10 produits par marge</h3>
+          {topProfitProducts.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-3 px-2 font-medium text-muted-foreground">#</th>
+                    <th className="text-left py-3 px-2 font-medium text-muted-foreground">Produit</th>
+                    <th className="text-right py-3 px-2 font-medium text-muted-foreground">Prix vente</th>
+                    <th className="text-right py-3 px-2 font-medium text-muted-foreground">Coût total</th>
+                    <th className="text-right py-3 px-2 font-medium text-muted-foreground">Marge €</th>
+                    <th className="text-right py-3 px-2 font-medium text-muted-foreground">Marge %</th>
+                    <th className="text-right py-3 px-2 font-medium text-muted-foreground">Stock</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="py-8 text-center text-muted-foreground">
-            Aucun produit avec un coût renseigné
-          </div>
-        )}
-      </div>
+                </thead>
+                <tbody>
+                  {topProfitProducts.map((product, index) => (
+                    <tr key={product.id} className="border-b border-border/50 hover:bg-secondary/30 cursor-pointer" onClick={() => handleProductClick(product.id)}>
+                      <td className="py-3 px-2">{index + 1}</td>
+                      <td className="py-3 px-2">
+                        <div className="font-medium hover:underline">{product.title}</div>
+                        <div className="text-xs text-muted-foreground">{product.artist}</div>
+                      </td>
+                      <td className="py-3 px-2 text-right">{formatCurrency(product.sellingPrice)}</td>
+                      <td className="py-3 px-2 text-right">{formatCurrency(product.totalCost)}</td>
+                      <td className={`py-3 px-2 text-right font-medium ${product.profit >= 0 ? "text-green-600" : "text-red-600"}`}>{formatCurrency(product.profit)}</td>
+                      <td className={`py-3 px-2 text-right ${product.profitMargin >= 20 ? "text-green-600" : product.profitMargin >= 0 ? "text-amber-600" : "text-red-600"}`}>{product.profitMargin.toFixed(1)}%</td>
+                      <td className="py-3 px-2 text-right">{product.stock}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-muted-foreground">Aucun produit avec un coût renseigné</div>
+          )}
+        </div>
+      )}
 
       {/* Top Customers Widget */}
-      <TopCustomersWidget
-        orders={orders as any}
-        customers={customers}
-        selectedPeriod={topCustomersPeriod}
-        onPeriodChange={setTopCustomersPeriod}
-        customStartDate={customStartDate}
-        customEndDate={customEndDate}
-        onCustomDateChange={(start, end) => {
-          setCustomStartDate(start);
-          setCustomEndDate(end);
-        }}
-        onCustomerClick={handleCustomerClick}
-      />
+      {widgetVisibility.top_customers && (
+        <TopCustomersWidget orders={orders as any} customers={customers} selectedPeriod={topCustomersPeriod} onPeriodChange={setTopCustomersPeriod} customStartDate={customStartDate} customEndDate={customEndDate} onCustomDateChange={(start, end) => { setCustomStartDate(start); setCustomEndDate(end); }} onCustomerClick={handleCustomerClick} />
+      )}
 
       {/* Supplier Stats Widget */}
-      <SupplierStatsWidget
-        products={products}
-        suppliers={suppliers}
-        orders={orders}
-        onSupplierClick={handleSupplierClick}
-      />
+      {widgetVisibility.supplier_stats && (
+        <SupplierStatsWidget products={products} suppliers={suppliers} orders={orders} onSupplierClick={handleSupplierClick} />
+      )}
 
       {/* Supplier Sales Evolution Chart */}
-      <SupplierSalesEvolutionChart
-        orders={orders as any}
-        suppliers={suppliers}
-      />
+      {widgetVisibility.supplier_sales_evolution && (
+        <SupplierSalesEvolutionChart orders={orders as any} suppliers={suppliers} />
+      )}
 
       {/* Charts Row 2 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Commandes par mois */}
-        <div className="bg-card rounded-xl border border-border shadow-sm p-6 lg:col-span-2">
-          <h3 className="text-lg font-semibold mb-4">Commandes par mois</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={salesByMonth}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px",
-                }}
-              />
-              <Bar dataKey="orders" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+      {(widgetVisibility.orders_by_month || widgetVisibility.stock_by_format) && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {widgetVisibility.orders_by_month && (
+            <div className="bg-card rounded-xl border border-border shadow-sm p-6 lg:col-span-2">
+              <h3 className="text-lg font-semibold mb-4">Commandes par mois</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={salesByMonth}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }} />
+                  <Bar dataKey="orders" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+          {widgetVisibility.stock_by_format && (
+            <div className="bg-card rounded-xl border border-border shadow-sm p-6">
+              <h3 className="text-lg font-semibold mb-4">Stock par format</h3>
+              <ResponsiveContainer width="100%" height={250}>
+                <PieChart>
+                  <Pie data={salesByFormat} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2} dataKey="value">
+                    {salesByFormat.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}
+                  </Pie>
+                  <Legend />
+                  <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
-
-        {/* Répartition par format */}
-        <div className="bg-card rounded-xl border border-border shadow-sm p-6">
-          <h3 className="text-lg font-semibold mb-4">Stock par format</h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <PieChart>
-              <Pie
-                data={salesByFormat}
-                cx="50%"
-                cy="50%"
-                innerRadius={50}
-                outerRadius={80}
-                paddingAngle={2}
-                dataKey="value"
-              >
-                {salesByFormat.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Legend />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px",
-                }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+      )}
 
       {/* Devises */}
-      {productsByCurrency.length > 1 && (
+      {widgetVisibility.products_by_currency && productsByCurrency.length > 1 && (
         <div className="bg-card rounded-xl border border-border shadow-sm p-6">
           <h3 className="text-lg font-semibold mb-4">Produits par devise d'achat</h3>
           <div className="flex gap-4">
             {productsByCurrency.map((item, index) => (
               <div key={item.name} className="flex items-center gap-3 px-4 py-2 bg-secondary/30 rounded-lg">
-                <div 
-                  className="w-4 h-4 rounded-full" 
-                  style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                />
+                <div className="w-4 h-4 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
                 <span className="font-medium">{item.name}</span>
                 <span className="text-muted-foreground">{item.value} produits</span>
               </div>
