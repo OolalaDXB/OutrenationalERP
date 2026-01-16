@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Plus, MoreHorizontal, Loader2, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StockIndicator } from "@/components/ui/stock-indicator";
@@ -31,6 +32,7 @@ const formatLabels: Record<string, string> = {
 };
 
 export function ProductsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data: products = [], isLoading: productsLoading } = useProducts();
   const { data: suppliers = [], isLoading: suppliersLoading } = useSuppliers();
   const { data: labels = [], isLoading: labelsLoading } = useLabels();
@@ -43,6 +45,27 @@ export function ProductsPage() {
   const [labelFilter, setLabelFilter] = useState("all");
   const [formatFilter, setFormatFilter] = useState("all");
   const [stockFilter, setStockFilter] = useState("all");
+
+  // Initialize filters from URL params
+  useEffect(() => {
+    const labelParam = searchParams.get('label');
+    const supplierParam = searchParams.get('supplier');
+    if (labelParam) setLabelFilter(labelParam);
+    if (supplierParam) setSupplierFilter(supplierParam);
+  }, [searchParams]);
+
+  // Update URL when filters change
+  const updateFilter = (type: 'supplier' | 'label', value: string) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (value === 'all') {
+      newParams.delete(type);
+    } else {
+      newParams.set(type, value);
+    }
+    setSearchParams(newParams);
+    if (type === 'supplier') setSupplierFilter(value);
+    if (type === 'label') setLabelFilter(value);
+  };
   
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -152,7 +175,7 @@ export function ProductsPage() {
           <select
             className="px-3 py-2 rounded-md border border-border bg-card text-sm cursor-pointer"
             value={supplierFilter}
-            onChange={(e) => setSupplierFilter(e.target.value)}
+            onChange={(e) => updateFilter('supplier', e.target.value)}
           >
             <option value="all">Tous les fournisseurs</option>
             {suppliers.map((s) => (
@@ -162,7 +185,7 @@ export function ProductsPage() {
           <select
             className="px-3 py-2 rounded-md border border-border bg-card text-sm cursor-pointer"
             value={labelFilter}
-            onChange={(e) => setLabelFilter(e.target.value)}
+            onChange={(e) => updateFilter('label', e.target.value)}
           >
             <option value="all">Tous les labels</option>
             {labels.map((l) => (

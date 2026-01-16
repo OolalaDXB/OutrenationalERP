@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { X, Building2, Mail, Phone, MapPin, Package, Euro, TrendingUp, Pencil, Trash2, Disc, ChevronRight, Globe, FileText } from "lucide-react";
+import { X, Building2, Mail, Phone, MapPin, Package, Euro, TrendingUp, Pencil, Trash2, Disc, ChevronRight, Globe, FileText, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, supplierTypeVariant, supplierTypeLabel } from "@/components/ui/status-badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -12,6 +12,8 @@ import { toast } from "@/hooks/use-toast";
 import { SupplierFormModal } from "@/components/forms/SupplierFormModal";
 import { ProductDrawer } from "@/components/drawers/ProductDrawer";
 import { isValidVatNumberFormat } from "@/lib/vat-utils";
+import { useSupplierLabels } from "@/hooks/useSupplierLabels";
+import { useLabels } from "@/hooks/useLabels";
 
 interface SupplierDrawerProps {
   supplier: Supplier | null;
@@ -23,10 +25,20 @@ export function SupplierDrawer({ supplier, isOpen, onClose }: SupplierDrawerProp
   const { canWrite, canDelete } = useAuth();
   const deleteSupplier = useDeleteSupplier();
   const { data: allProducts = [] } = useProducts();
+  const { data: allLabels = [] } = useLabels();
+  const { data: supplierLabelAssocs = [] } = useSupplierLabels(supplier?.id ?? null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isProductDrawerOpen, setIsProductDrawerOpen] = useState(false);
+
+  // Labels associated with this supplier
+  const associatedLabels = useMemo(() => {
+    if (!supplierLabelAssocs.length) return [];
+    return supplierLabelAssocs.map(assoc => 
+      allLabels.find(l => l.id === assoc.label_id)
+    ).filter(Boolean);
+  }, [supplierLabelAssocs, allLabels]);
 
   // Products from this supplier
   const supplierProducts = useMemo(() => {
@@ -213,6 +225,30 @@ export function SupplierDrawer({ supplier, isOpen, onClose }: SupplierDrawerProp
                     <div className="text-xs text-info/70">Période en cours</div>
                   </div>
                   <div className="text-2xl font-bold text-info">{formatCurrency(supplier.pending_payout)}</div>
+                </div>
+              </div>
+            )}
+
+            {/* Associated Labels */}
+            {associatedLabels.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <Tag className="w-4 h-4" />
+                  Labels distribués ({associatedLabels.length})
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {associatedLabels.map((label) => label && (
+                    <span
+                      key={label.id}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-full text-sm"
+                    >
+                      <Tag className="w-3 h-3" />
+                      {label.name}
+                      {label.country && (
+                        <span className="text-primary/60">({label.country})</span>
+                      )}
+                    </span>
+                  ))}
                 </div>
               </div>
             )}
