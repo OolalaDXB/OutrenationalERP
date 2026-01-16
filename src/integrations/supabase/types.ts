@@ -1683,6 +1683,14 @@ export type Database = {
         }
         Returns: string
       }
+      get_auth_users_for_admin: {
+        Args: never
+        Returns: {
+          created_at: string
+          email: string
+          id: string
+        }[]
+      }
       has_any_role: {
         Args: {
           _roles: Database["public"]["Enums"]["app_role"][]
