@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Settings, Save, Loader2, Upload, Image, X, Building, FileText, CreditCard, Receipt, Palette, ToggleLeft, Database } from "lucide-react";
+import { Settings, Save, Loader2, Upload, Image, X, Building, FileText, CreditCard, Receipt, Palette, ToggleLeft, Database, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VatCacheSection } from "@/components/settings/VatCacheSection";
+import { WidgetVisibilitySection, defaultWidgetVisibility, type WidgetVisibility } from "@/components/settings/WidgetVisibilitySection";
 
 export function SettingsPage() {
   const { toast } = useToast();
@@ -46,6 +47,8 @@ export function SettingsPage() {
     cgv: "",
     // Feature toggles
     show_artists_section: false,
+    // Widget visibility
+    visible_widgets: defaultWidgetVisibility,
   });
 
   // Initialize form when settings load
@@ -77,6 +80,7 @@ export function SettingsPage() {
         eori: settings.eori || "",
         cgv: settings.cgv || "",
         show_artists_section: settings.show_artists_section || false,
+        visible_widgets: settings.visible_widgets || defaultWidgetVisibility,
       });
     }
   });
@@ -109,6 +113,7 @@ export function SettingsPage() {
       eori: settings.eori || "",
       cgv: settings.cgv || "",
       show_artists_section: settings.show_artists_section || false,
+      visible_widgets: settings.visible_widgets || defaultWidgetVisibility,
     });
   }
 
@@ -195,7 +200,7 @@ export function SettingsPage() {
       </div>
 
       <Tabs defaultValue="shop" className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="shop" className="gap-2">
             <Building className="w-4 h-4" />
             Boutique
@@ -211,6 +216,10 @@ export function SettingsPage() {
           <TabsTrigger value="banking" className="gap-2">
             <CreditCard className="w-4 h-4" />
             Bancaire
+          </TabsTrigger>
+          <TabsTrigger value="widgets" className="gap-2">
+            <BarChart3 className="w-4 h-4" />
+            Widgets
           </TabsTrigger>
           <TabsTrigger value="vat-cache" className="gap-2">
             <Database className="w-4 h-4" />
@@ -580,6 +589,14 @@ Les prix de nos produits sont indiqués en euros..."
               </div>
             )}
           </div>
+        </TabsContent>
+
+        {/* Widgets Tab */}
+        <TabsContent value="widgets" className="space-y-6">
+          <WidgetVisibilitySection
+            visibility={formData.visible_widgets}
+            onChange={(visibility) => setFormData({ ...formData, visible_widgets: visibility })}
+          />
         </TabsContent>
 
         {/* VAT Cache Tab */}

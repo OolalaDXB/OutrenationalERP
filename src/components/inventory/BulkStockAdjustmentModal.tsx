@@ -22,8 +22,8 @@ const ADJUSTMENT_TYPES = [
   { value: "adjustment", label: "Ajustement inventaire" },
   { value: "return", label: "Retour" },
   { value: "loss", label: "Perte / Casse" },
-  { value: "consignment_in", label: "Consignation entrée" },
-  { value: "consignment_out", label: "Consignation sortie" },
+  { value: "consignment_in", label: "Dépôt-vente entrée" },
+  { value: "consignment_out", label: "Dépôt-vente sortie" },
 ] as const;
 
 export function BulkStockAdjustmentModal({ 

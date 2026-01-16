@@ -1063,6 +1063,7 @@ export type Database = {
           updated_at: string | null
           vat_number: string | null
           vat_rate: number | null
+          visible_widgets: Json | null
         }
         Insert: {
           bank_name?: string | null
@@ -1094,6 +1095,7 @@ export type Database = {
           updated_at?: string | null
           vat_number?: string | null
           vat_rate?: number | null
+          visible_widgets?: Json | null
         }
         Update: {
           bank_name?: string | null
@@ -1125,6 +1127,7 @@ export type Database = {
           updated_at?: string | null
           vat_number?: string | null
           vat_rate?: number | null
+          visible_widgets?: Json | null
         }
         Relationships: []
       }
