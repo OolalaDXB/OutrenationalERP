@@ -1,9 +1,11 @@
 import { useState, useRef } from "react";
-import { Loader2, Upload, Download, FileSpreadsheet, CheckCircle2, XCircle, AlertTriangle, FileDown } from "lucide-react";
+import { Loader2, Upload, Download, FileSpreadsheet, CheckCircle2, XCircle, AlertTriangle, FileDown, RefreshCw, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -22,6 +24,7 @@ import {
 } from "@/lib/excel-utils";
 
 type EntityType = 'products' | 'customers' | 'suppliers';
+type ImportMode = 'insert' | 'update';
 
 interface ImportExportModalProps {
   isOpen: boolean;
@@ -33,7 +36,8 @@ interface ImportExportModalProps {
 
 interface ParsedRow {
   data: Record<string, unknown>;
-  status: "valid" | "duplicate" | "invalid";
+  status: "valid" | "duplicate" | "invalid" | "update";
+  existingId?: string;
   message?: string;
 }
 
@@ -45,6 +49,7 @@ const entityConfig = {
     headerMapping: productHeaderMapping,
     requiredFields: ['sku', 'title'],
     uniqueField: 'sku',
+    uniqueFieldLabel: 'SKU',
   },
   customers: {
     title: 'Clients',
@@ -53,6 +58,7 @@ const entityConfig = {
     headerMapping: customerHeaderMapping,
     requiredFields: ['email'],
     uniqueField: 'email',
+    uniqueFieldLabel: 'Email',
   },
   suppliers: {
     title: 'Fournisseurs',
@@ -61,6 +67,7 @@ const entityConfig = {
     headerMapping: supplierHeaderMapping,
     requiredFields: ['name'],
     uniqueField: 'name',
+    uniqueFieldLabel: 'Nom',
   },
 };
 
@@ -68,6 +75,7 @@ export function ImportExportModal({ isOpen, onClose, entityType, data, onImportS
   const fileInputRef = useRef<HTMLInputElement>(null);
   const config = entityConfig[entityType];
   const [activeTab, setActiveTab] = useState<'import' | 'export'>('import');
+  const [importMode, setImportMode] = useState<ImportMode>('insert');
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [fileName, setFileName] = useState("");
@@ -95,10 +103,14 @@ export function ImportExportModal({ isOpen, onClose, entityType, data, onImportS
     try {
       const parsed = await parseXLSFile<Record<string, unknown>>(file, config.headerMapping);
       
-      // Validate each row
-      const existingValues = new Set(
-        data.map(item => String(item[config.uniqueField] || '').toLowerCase())
-      );
+      // Build a map of existing records by unique field
+      const existingMap = new Map<string, string>();
+      data.forEach(item => {
+        const key = String(item[config.uniqueField] || '').toLowerCase();
+        if (key && item.id) {
+          existingMap.set(key, String(item.id));
+        }
+      });
 
       const validatedRows: ParsedRow[] = parsed.map(row => {
         // Check required fields
@@ -114,14 +126,26 @@ export function ImportExportModal({ isOpen, onClose, entityType, data, onImportS
           };
         }
 
-        // Check for duplicates
+        // Check for existing records
         const uniqueValue = String(row[config.uniqueField] || '').toLowerCase();
-        if (existingValues.has(uniqueValue)) {
-          return {
-            data: row,
-            status: 'duplicate' as const,
-            message: 'Existe déjà',
-          };
+        const existingId = existingMap.get(uniqueValue);
+        
+        if (existingId) {
+          if (importMode === 'update') {
+            return {
+              data: row,
+              status: 'update' as const,
+              existingId,
+              message: 'Sera mis à jour',
+            };
+          } else {
+            return {
+              data: row,
+              status: 'duplicate' as const,
+              existingId,
+              message: 'Existe déjà (ignoré)',
+            };
+          }
         }
 
         return { data: row, status: 'valid' as const };
@@ -133,23 +157,66 @@ export function ImportExportModal({ isOpen, onClose, entityType, data, onImportS
     }
   };
 
+  // Re-validate rows when import mode changes
+  const revalidateRows = () => {
+    if (parsedRows.length === 0) return;
+    
+    const existingMap = new Map<string, string>();
+    data.forEach(item => {
+      const key = String(item[config.uniqueField] || '').toLowerCase();
+      if (key && item.id) {
+        existingMap.set(key, String(item.id));
+      }
+    });
+
+    const revalidated = parsedRows.map(row => {
+      // Keep invalid rows as-is
+      if (row.status === 'invalid') return row;
+      
+      const uniqueValue = String(row.data[config.uniqueField] || '').toLowerCase();
+      const existingId = existingMap.get(uniqueValue);
+      
+      if (existingId) {
+        if (importMode === 'update') {
+          return {
+            ...row,
+            status: 'update' as const,
+            existingId,
+            message: 'Sera mis à jour',
+          };
+        } else {
+          return {
+            ...row,
+            status: 'duplicate' as const,
+            existingId,
+            message: 'Existe déjà (ignoré)',
+          };
+        }
+      }
+      
+      return { ...row, status: 'valid' as const, existingId: undefined, message: undefined };
+    });
+    
+    setParsedRows(revalidated);
+  };
+
   const handleImport = async () => {
-    const validRows = parsedRows.filter(r => r.status === 'valid');
-    if (validRows.length === 0) {
-      toast({ title: "Erreur", description: "Aucune ligne valide à importer", variant: "destructive" });
+    const rowsToProcess = importMode === 'update' 
+      ? parsedRows.filter(r => r.status === 'valid' || r.status === 'update')
+      : parsedRows.filter(r => r.status === 'valid');
+      
+    if (rowsToProcess.length === 0) {
+      toast({ title: "Erreur", description: "Aucune ligne à traiter", variant: "destructive" });
       return;
     }
 
     setIsImporting(true);
     try {
-      const dataToInsert = validRows.map(r => {
-        const row = { ...r.data };
-        
-        // Helper to convert to string safely
-        const str = (val: unknown): string | null => val ? String(val) : null;
-        const num = (val: unknown): number | null => val ? Number(val) : null;
-        
-        // Type-specific transformations
+      // Helper to convert to string safely
+      const str = (val: unknown): string | null => val ? String(val) : null;
+      const num = (val: unknown): number | null => val ? Number(val) : null;
+      
+      const transformRow = (row: Record<string, unknown>) => {
         if (entityType === 'products') {
           return {
             sku: str(row.sku) || '',
@@ -168,7 +235,7 @@ export function ImportExportModal({ isOpen, onClose, entityType, data, onImportS
             country_of_origin: str(row.country_of_origin),
             condition_media: str(row.condition_media) as 'M' | 'NM' | 'VG+' | 'VG' | 'G+' | 'G' | 'F' | 'P' | null,
             condition_sleeve: str(row.condition_sleeve) as 'M' | 'NM' | 'VG+' | 'VG' | 'G+' | 'G' | 'F' | 'P' | null,
-            supplier_id: '00000000-0000-0000-0000-000000000000', // Default supplier needed
+            supplier_id: '00000000-0000-0000-0000-000000000000',
           };
         } else if (entityType === 'customers') {
           return {
@@ -189,7 +256,6 @@ export function ImportExportModal({ isOpen, onClose, entityType, data, onImportS
             notes: str(row.notes),
           };
         } else {
-          // suppliers
           return {
             name: str(row.name) || '',
             type: (str(row.type) || 'purchase') as 'consignment' | 'purchase' | 'own' | 'depot_vente',
@@ -209,15 +275,45 @@ export function ImportExportModal({ isOpen, onClose, entityType, data, onImportS
             notes: str(row.notes),
           };
         }
-      });
+      };
 
-      const { error } = await supabase.from(entityType).insert(dataToInsert);
+      let insertedCount = 0;
+      let updatedCount = 0;
+
+      // Process inserts (new records)
+      const rowsToInsert = rowsToProcess.filter(r => r.status === 'valid');
+      if (rowsToInsert.length > 0) {
+        const dataToInsert = rowsToInsert.map(r => transformRow(r.data));
+        const { error } = await supabase.from(entityType).insert(dataToInsert);
+        if (error) throw error;
+        insertedCount = rowsToInsert.length;
+      }
+
+      // Process updates (existing records)
+      if (importMode === 'update') {
+        const rowsToUpdate = rowsToProcess.filter(r => r.status === 'update' && r.existingId);
+        for (const row of rowsToUpdate) {
+          const updateData = transformRow(row.data);
+          // Remove fields that shouldn't be updated
+          if (entityType === 'products') {
+            delete (updateData as Record<string, unknown>).supplier_id;
+          }
+          const { error } = await supabase
+            .from(entityType)
+            .update(updateData)
+            .eq('id', row.existingId!);
+          if (error) throw error;
+          updatedCount++;
+        }
+      }
+
+      const messages: string[] = [];
+      if (insertedCount > 0) messages.push(`${insertedCount} ajouté(s)`);
+      if (updatedCount > 0) messages.push(`${updatedCount} mis à jour`);
       
-      if (error) throw error;
-
       toast({ 
         title: "Import réussi", 
-        description: `${validRows.length} ${config.title.toLowerCase()} importé(s)` 
+        description: messages.join(', ') || 'Aucune modification'
       });
       
       handleClose();
@@ -235,13 +331,22 @@ export function ImportExportModal({ isOpen, onClose, entityType, data, onImportS
     setParsedRows([]);
     setFileName("");
     setActiveTab('import');
+    setImportMode('insert');
     if (fileInputRef.current) fileInputRef.current.value = "";
     onClose();
   };
 
+  const handleModeChange = (mode: ImportMode) => {
+    setImportMode(mode);
+    // Revalidate after state update
+    setTimeout(revalidateRows, 0);
+  };
+
   const validCount = parsedRows.filter(r => r.status === 'valid').length;
+  const updateCount = parsedRows.filter(r => r.status === 'update').length;
   const duplicateCount = parsedRows.filter(r => r.status === 'duplicate').length;
   const invalidCount = parsedRows.filter(r => r.status === 'invalid').length;
+  const actionableCount = importMode === 'update' ? validCount + updateCount : validCount;
 
   const getDisplayValue = (row: ParsedRow): string => {
     if (entityType === 'products') return String(row.data.title || row.data.sku || '—');
@@ -279,6 +384,40 @@ export function ImportExportModal({ isOpen, onClose, entityType, data, onImportS
           </TabsList>
 
           <TabsContent value="import" className="space-y-4 py-4">
+            {/* Import mode selection */}
+            <div className="p-4 bg-secondary/50 rounded-lg space-y-3">
+              <p className="text-sm font-medium">Mode d'import</p>
+              <RadioGroup 
+                value={importMode} 
+                onValueChange={(v) => handleModeChange(v as ImportMode)}
+                className="flex gap-6"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="insert" id="mode-insert" />
+                  <Label htmlFor="mode-insert" className="flex items-center gap-2 cursor-pointer">
+                    <Plus className="w-4 h-4" />
+                    <div>
+                      <span className="font-medium">Insérer nouveaux</span>
+                      <p className="text-xs text-muted-foreground">Ajoute uniquement les nouvelles entrées</p>
+                    </div>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="update" id="mode-update" />
+                  <Label htmlFor="mode-update" className="flex items-center gap-2 cursor-pointer">
+                    <RefreshCw className="w-4 h-4" />
+                    <div>
+                      <span className="font-medium">Mettre à jour</span>
+                      <p className="text-xs text-muted-foreground">Met à jour les existants + ajoute les nouveaux</p>
+                    </div>
+                  </Label>
+                </div>
+              </RadioGroup>
+              <p className="text-xs text-muted-foreground mt-2">
+                Clé de correspondance : <strong>{config.uniqueFieldLabel}</strong>
+              </p>
+            </div>
+
             {/* Template download */}
             <div className="flex items-center justify-between p-3 bg-secondary rounded-lg">
               <div>
@@ -319,15 +458,23 @@ export function ImportExportModal({ isOpen, onClose, entityType, data, onImportS
             {parsedRows.length > 0 && (
               <div className="space-y-3">
                 {/* Summary */}
-                <div className="flex gap-4 text-sm">
-                  <span className="flex items-center gap-1 text-success">
-                    <CheckCircle2 className="w-4 h-4" />
-                    {validCount} valide(s)
-                  </span>
+                <div className="flex flex-wrap gap-4 text-sm">
+                  {validCount > 0 && (
+                    <span className="flex items-center gap-1 text-success">
+                      <Plus className="w-4 h-4" />
+                      {validCount} nouveau(x)
+                    </span>
+                  )}
+                  {updateCount > 0 && (
+                    <span className="flex items-center gap-1 text-blue-500">
+                      <RefreshCw className="w-4 h-4" />
+                      {updateCount} mise(s) à jour
+                    </span>
+                  )}
                   {duplicateCount > 0 && (
                     <span className="flex items-center gap-1 text-warning">
                       <AlertTriangle className="w-4 h-4" />
-                      {duplicateCount} doublon(s)
+                      {duplicateCount} ignoré(s)
                     </span>
                   )}
                   {invalidCount > 0 && (
@@ -345,7 +492,7 @@ export function ImportExportModal({ isOpen, onClose, entityType, data, onImportS
                       <tr>
                         <th className="text-left px-3 py-2">Identifiant</th>
                         <th className="text-left px-3 py-2">Libellé</th>
-                        <th className="text-center px-3 py-2">Statut</th>
+                        <th className="text-center px-3 py-2">Action</th>
                         <th className="text-left px-3 py-2">Message</th>
                       </tr>
                     </thead>
@@ -355,7 +502,8 @@ export function ImportExportModal({ isOpen, onClose, entityType, data, onImportS
                           <td className="px-3 py-2 font-mono text-xs">{getIdentifier(row)}</td>
                           <td className="px-3 py-2 truncate max-w-[200px]">{getDisplayValue(row)}</td>
                           <td className="px-3 py-2 text-center">
-                            {row.status === 'valid' && <CheckCircle2 className="w-4 h-4 text-success mx-auto" />}
+                            {row.status === 'valid' && <Plus className="w-4 h-4 text-success mx-auto" />}
+                            {row.status === 'update' && <RefreshCw className="w-4 h-4 text-blue-500 mx-auto" />}
                             {row.status === 'duplicate' && <AlertTriangle className="w-4 h-4 text-warning mx-auto" />}
                             {row.status === 'invalid' && <XCircle className="w-4 h-4 text-destructive mx-auto" />}
                           </td>
@@ -398,10 +546,13 @@ export function ImportExportModal({ isOpen, onClose, entityType, data, onImportS
           {activeTab === 'import' && (
             <Button 
               onClick={handleImport} 
-              disabled={isImporting || validCount === 0}
+              disabled={isImporting || actionableCount === 0}
             >
               {isImporting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Importer {validCount} {config.title.toLowerCase()}
+              {importMode === 'update' 
+                ? `Traiter ${actionableCount} ${config.title.toLowerCase()}`
+                : `Importer ${validCount} ${config.title.toLowerCase()}`
+              }
             </Button>
           )}
         </DialogFooter>
