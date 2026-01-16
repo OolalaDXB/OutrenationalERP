@@ -1,10 +1,11 @@
-import { FileText, Mail, MapPin, Calendar, Euro, User, Building } from "lucide-react";
+import { FileText, Mail, MapPin, Calendar, User, Pencil, Copy, Download, Check } from "lucide-react";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { Tables } from "@/integrations/supabase/types";
@@ -20,6 +21,10 @@ interface InvoiceDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   invoice: InvoiceWithItems | null;
+  onEdit?: (invoice: InvoiceWithItems) => void;
+  onDuplicate?: (invoice: InvoiceWithItems) => void;
+  onDownloadPDF?: (invoice: InvoiceWithItems) => void;
+  onMarkAsPaid?: (invoice: InvoiceWithItems) => void;
 }
 
 const statusVariant: Record<string, "success" | "warning" | "danger" | "info" | "primary"> = {
@@ -38,8 +43,35 @@ const statusLabel: Record<string, string> = {
   cancelled: "Annulée",
 };
 
-export function InvoiceDrawer({ open, onOpenChange, invoice }: InvoiceDrawerProps) {
+export function InvoiceDrawer({ 
+  open, 
+  onOpenChange, 
+  invoice,
+  onEdit,
+  onDuplicate,
+  onDownloadPDF,
+  onMarkAsPaid,
+}: InvoiceDrawerProps) {
   if (!invoice) return null;
+
+  const handleEdit = () => {
+    onEdit?.(invoice);
+    onOpenChange(false);
+  };
+
+  const handleDuplicate = () => {
+    onDuplicate?.(invoice);
+    onOpenChange(false);
+  };
+
+  const handleDownloadPDF = () => {
+    onDownloadPDF?.(invoice);
+  };
+
+  const handleMarkAsPaid = () => {
+    onMarkAsPaid?.(invoice);
+    onOpenChange(false);
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -49,7 +81,7 @@ export function InvoiceDrawer({ open, onOpenChange, invoice }: InvoiceDrawerProp
             <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
               <FileText className="w-6 h-6 text-primary" />
             </div>
-            <div>
+            <div className="flex-1">
               <SheetTitle className="text-xl">{invoice.invoice_number}</SheetTitle>
               <div className="flex items-center gap-2 mt-1">
                 <StatusBadge variant={statusVariant[invoice.status || "draft"]}>
@@ -60,6 +92,39 @@ export function InvoiceDrawer({ open, onOpenChange, invoice }: InvoiceDrawerProp
                 </span>
               </div>
             </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="flex flex-wrap gap-2 mt-4">
+            {invoice.status !== "paid" && onMarkAsPaid && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-2 text-success border-success/30 hover:bg-success/10"
+                onClick={handleMarkAsPaid}
+              >
+                <Check className="w-4 h-4" />
+                Marquer payée
+              </Button>
+            )}
+            {onEdit && (
+              <Button variant="outline" size="sm" className="gap-2" onClick={handleEdit}>
+                <Pencil className="w-4 h-4" />
+                Modifier
+              </Button>
+            )}
+            {onDuplicate && (
+              <Button variant="outline" size="sm" className="gap-2" onClick={handleDuplicate}>
+                <Copy className="w-4 h-4" />
+                Dupliquer
+              </Button>
+            )}
+            {onDownloadPDF && (
+              <Button variant="outline" size="sm" className="gap-2" onClick={handleDownloadPDF}>
+                <Download className="w-4 h-4" />
+                PDF
+              </Button>
+            )}
           </div>
         </SheetHeader>
 
