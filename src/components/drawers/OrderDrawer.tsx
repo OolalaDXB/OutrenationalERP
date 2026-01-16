@@ -11,10 +11,12 @@ import type { Order, OrderItem } from "@/hooks/useOrders";
 import { useCancelOrder, useUpdateOrder } from "@/hooks/useOrders";
 import { useRestoreStock } from "@/hooks/useRestoreStock";
 import { useAuth } from "@/hooks/useAuth";
+import { useProducts, Product } from "@/hooks/useProducts";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
 import { OrderEditModal } from "@/components/forms/OrderEditModal";
 import { OrderFormModal } from "@/components/forms/OrderFormModal";
+import { ProductDrawer } from "@/components/drawers/ProductDrawer";
 
 type OrderWithItems = Order & { order_items?: OrderItem[] };
 
@@ -47,6 +49,7 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   const cancelOrder = useCancelOrder();
   const updateOrder = useUpdateOrder();
   const restoreStock = useRestoreStock();
+  const { data: products = [] } = useProducts();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
@@ -54,6 +57,22 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   const [showShippedDialog, setShowShippedDialog] = useState(false);
   const [trackingNumber, setTrackingNumber] = useState("");
   const [trackingUrl, setTrackingUrl] = useState("");
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isProductDrawerOpen, setIsProductDrawerOpen] = useState(false);
+
+  const handleProductClick = (productId: string | null) => {
+    if (!productId) return;
+    const product = products.find(p => p.id === productId);
+    if (product) {
+      setSelectedProduct(product);
+      setIsProductDrawerOpen(true);
+    }
+  };
+
+  const handleCloseProductDrawer = () => {
+    setIsProductDrawerOpen(false);
+    setSelectedProduct(null);
+  };
 
   const handleCancel = async () => {
     if (!order) return;
@@ -347,7 +366,13 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
               </h3>
               <div className="space-y-3">
                 {order.order_items?.map((item) => (
-                  <div key={item.id} className="flex items-center gap-3 p-3 bg-secondary rounded-lg">
+                  <div 
+                    key={item.id} 
+                    className={`flex items-center gap-3 p-3 bg-secondary rounded-lg transition-colors ${
+                      item.product_id ? 'cursor-pointer hover:bg-secondary/80' : ''
+                    }`}
+                    onClick={() => handleProductClick(item.product_id)}
+                  >
                     {item.image_url ? (
                       <img src={item.image_url} alt={item.title} className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
                     ) : (
@@ -356,7 +381,9 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate">{item.title}</div>
+                      <div className={`font-medium text-sm truncate ${item.product_id ? 'text-primary hover:underline' : ''}`}>
+                        {item.title}
+                      </div>
                       <div className="text-xs text-muted-foreground">{item.artist_name || '—'}</div>
                     </div>
                     <div className="text-right">
@@ -510,6 +537,13 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
           duplicateFrom={order}
         />
       )}
+
+      {/* Product Drawer */}
+      <ProductDrawer
+        product={selectedProduct}
+        isOpen={isProductDrawerOpen}
+        onClose={handleCloseProductDrawer}
+      />
     </>
   );
 }
