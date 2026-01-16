@@ -1,12 +1,14 @@
 import { useMemo, useState } from "react";
-import { Euro, Package, ArrowUpRight, ArrowDownRight, Download, Loader2, TrendingUp, Percent, DollarSign } from "lucide-react";
+import { Euro, Package, ArrowUpRight, ArrowDownRight, Download, Loader2, TrendingUp, Percent, DollarSign, FileSpreadsheet, FileText, Calendar } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, supplierTypeVariant, supplierTypeLabel } from "@/components/ui/status-badge";
 import { useSupplierSalesView } from "@/hooks/useDashboard";
 import { useSuppliers } from "@/hooks/useSuppliers";
 import { useProducts } from "@/hooks/useProducts";
+import { useAllOrderItems } from "@/hooks/useOrders";
 import { formatCurrency } from "@/lib/format";
+import { SupplierSalesReport } from "@/components/reports/SupplierSalesReport";
 import {
   BarChart,
   Bar,
@@ -27,8 +29,10 @@ export function SupplierSalesPage() {
   const { data: supplierSales = [], isLoading: salesLoading, isError: salesError, error: salesErr, refetch: refetchSales } = useSupplierSalesView();
   const { data: suppliers = [], isLoading: suppliersLoading, isError: suppliersError, error: suppliersErr, refetch: refetchSuppliers } = useSuppliers();
   const { data: products = [] } = useProducts();
+  const { data: orderItems = [] } = useAllOrderItems();
   const [selectedPeriod, setSelectedPeriod] = useState("all");
   const [viewMode, setViewMode] = useState<"sales" | "profitability">("profitability");
+  const [isReportOpen, setIsReportOpen] = useState(false);
 
   const isLoading = salesLoading || suppliersLoading;
   const isError = salesError || suppliersError;
@@ -439,10 +443,12 @@ export function SupplierSalesPage() {
                 <option value="year">Cette année</option>
               </select>
             </div>
-            <Button variant="secondary" className="gap-2">
-              <Download className="w-4 h-4" />
-              Exporter
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="secondary" className="gap-2" onClick={() => setIsReportOpen(true)}>
+                <Calendar className="w-4 h-4" />
+                Relevé de ventes
+              </Button>
+            </div>
           </div>
 
           {/* Rapports par fournisseur */}
@@ -476,7 +482,7 @@ export function SupplierSalesPage() {
                         <div className="text-xs text-muted-foreground">Articles</div>
                         <div className="font-semibold">{report.items_sold ?? 0}</div>
                       </div>
-                      {report.supplier_type === "consignment" && (
+                      {(report.supplier_type === "consignment" || report.supplier_type === "depot_vente") && (
                         <div>
                           <div className="text-xs text-muted-foreground">À reverser</div>
                           <div className="font-semibold text-info">{formatCurrency(report.supplier_due)}</div>
@@ -490,7 +496,7 @@ export function SupplierSalesPage() {
                   </div>
 
                   {/* Footer avec action */}
-                  {report.supplier_type === "consignment" && (report.supplier_due ?? 0) > 0 && (
+                  {(report.supplier_type === "consignment" || report.supplier_type === "depot_vente") && (report.supplier_due ?? 0) > 0 && (
                     <div className="flex items-center justify-between p-4 border-t border-border bg-info/5">
                       <div className="text-sm">
                         <span className="text-muted-foreground">Commission ON : </span>
@@ -498,13 +504,21 @@ export function SupplierSalesPage() {
                         <span className="text-muted-foreground"> • Montant à reverser : </span>
                         <span className="font-semibold text-info">{formatCurrency(report.supplier_due)}</span>
                       </div>
-                      <Button size="sm" variant="secondary">Générer relevé</Button>
+                      <Button size="sm" variant="secondary" onClick={() => setIsReportOpen(true)}>Générer relevé</Button>
                     </div>
                   )}
                 </div>
               );
             })}
           </div>
+
+          {/* Supplier Sales Report Modal */}
+          <SupplierSalesReport
+            isOpen={isReportOpen}
+            onClose={() => setIsReportOpen(false)}
+            suppliers={suppliers.map(s => ({ id: s.id, name: s.name, type: s.type, commission_rate: s.commission_rate || 0 }))}
+            orderItems={orderItems as any}
+          />
         </>
       )}
     </div>

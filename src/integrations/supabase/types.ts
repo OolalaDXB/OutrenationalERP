@@ -1590,7 +1590,7 @@ export type Database = {
         | "loss"
         | "consignment_in"
         | "consignment_out"
-      supplier_type: "consignment" | "purchase" | "own"
+      supplier_type: "consignment" | "purchase" | "own" | "depot_vente"
       vinyl_condition: "M" | "NM" | "VG+" | "VG" | "G+" | "G" | "F" | "P"
     }
     CompositeTypes: {
@@ -1754,7 +1754,7 @@ export const Constants = {
         "consignment_in",
         "consignment_out",
       ],
-      supplier_type: ["consignment", "purchase", "own"],
+      supplier_type: ["consignment", "purchase", "own", "depot_vente"],
       vinyl_condition: ["M", "NM", "VG+", "VG", "G+", "G", "F", "P"],
     },
   },

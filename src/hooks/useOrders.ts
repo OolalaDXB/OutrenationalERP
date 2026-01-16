@@ -73,6 +73,26 @@ export function useOrderItems(orderId: string) {
   });
 }
 
+export function useAllOrderItems() {
+  return useQuery({
+    queryKey: ['order_items', 'all'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('order_items')
+        .select(`
+          *,
+          orders!inner (created_at, status)
+        `)
+        .not('orders.status', 'in', '("cancelled","refunded")');
+      if (error) throw error;
+      return data.map(item => ({
+        ...item,
+        created_at: item.orders?.created_at
+      }));
+    }
+  });
+}
+
 export function useCreateOrder() {
   const queryClient = useQueryClient();
   return useMutation({

@@ -44,13 +44,15 @@ export const orderStatusLabel: Record<string, string> = {
 };
 
 export const supplierTypeVariant: Record<string, BadgeVariant> = {
-  consignment: "info",
   purchase: "success",
   own: "primary",
+  consignment: "info",
+  depot_vente: "warning",
 };
 
 export const supplierTypeLabel: Record<string, string> = {
-  consignment: "Dépôt-vente",
   purchase: "Achat ferme",
   own: "Propre",
+  consignment: "Consignation",
+  depot_vente: "Dépôt-vente",
 };
