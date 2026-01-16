@@ -20,6 +20,7 @@ import { InvoicesPage } from "@/pages/Invoices";
 import { AnalyticsPage } from "@/pages/Analytics";
 import { StockMovementsPage } from "@/pages/StockMovements";
 import { UserRolesPage } from "@/pages/UserRoles";
+import { VatCachePage } from "@/pages/VatCache";
 import { LoginPage } from "@/pages/Login";
 import { ResetPasswordPage } from "@/pages/ResetPassword";
 import { ProLayout } from "@/components/pro/ProLayout";
@@ -52,6 +53,7 @@ const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   "/analytics": { title: "Analytics", subtitle: "Statistiques" },
   "/supplier-sales": { title: "Ventes par fournisseur", subtitle: "Rapports" },
   "/admin/roles": { title: "Gestion des rôles", subtitle: "Administration" },
+  "/admin/vat-cache": { title: "Cache TVA", subtitle: "Administration" },
 };
 
 const BackofficeContent = forwardRef<HTMLDivElement>(function BackofficeContent(_props, ref) {
@@ -85,6 +87,7 @@ const BackofficeContent = forwardRef<HTMLDivElement>(function BackofficeContent(
       case "/analytics": return <AnalyticsPage />;
       case "/supplier-sales": return <SupplierSalesPage />;
       case "/admin/roles": return <UserRolesPage />;
+      case "/admin/vat-cache": return <VatCachePage />;
       default: return <Dashboard />;
     }
   };
