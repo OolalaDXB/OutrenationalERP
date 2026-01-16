@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Euro, Package, ArrowUpRight, ArrowDownRight, Download, Loader2, TrendingUp, Percent, DollarSign, FileSpreadsheet, FileText, Calendar } from "lucide-react";
+import { Euro, Package, ArrowUpRight, ArrowDownRight, Download, Loader2, TrendingUp, Percent, DollarSign, FileSpreadsheet, FileText, Calendar, CreditCard } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, supplierTypeVariant, supplierTypeLabel } from "@/components/ui/status-badge";
@@ -7,8 +7,10 @@ import { useSupplierSalesView } from "@/hooks/useDashboard";
 import { useSuppliers } from "@/hooks/useSuppliers";
 import { useProducts } from "@/hooks/useProducts";
 import { useAllOrderItems } from "@/hooks/useOrders";
+import { useSupplierPayouts } from "@/hooks/useSupplierPayouts";
 import { formatCurrency } from "@/lib/format";
 import { SupplierSalesReport } from "@/components/reports/SupplierSalesReport";
+import { SupplierPayoutManager } from "@/components/suppliers/SupplierPayoutManager";
 import {
   BarChart,
   Bar,
@@ -30,9 +32,16 @@ export function SupplierSalesPage() {
   const { data: suppliers = [], isLoading: suppliersLoading, isError: suppliersError, error: suppliersErr, refetch: refetchSuppliers } = useSuppliers();
   const { data: products = [] } = useProducts();
   const { data: orderItems = [] } = useAllOrderItems();
+  const { data: payouts = [] } = useSupplierPayouts();
   const [selectedPeriod, setSelectedPeriod] = useState("all");
   const [viewMode, setViewMode] = useState<"sales" | "profitability">("profitability");
   const [isReportOpen, setIsReportOpen] = useState(false);
+  const [isPayoutManagerOpen, setIsPayoutManagerOpen] = useState(false);
+
+  // Calculate pending payouts
+  const pendingPayoutsTotal = useMemo(() => {
+    return payouts.filter(p => p.status === "pending").reduce((sum, p) => sum + p.payout_amount, 0);
+  }, [payouts]);
 
   const isLoading = salesLoading || suppliersLoading;
   const isError = salesError || suppliersError;
@@ -444,6 +453,15 @@ export function SupplierSalesPage() {
               </select>
             </div>
             <div className="flex gap-2">
+              <Button variant="outline" className="gap-2" onClick={() => setIsPayoutManagerOpen(true)}>
+                <CreditCard className="w-4 h-4" />
+                Reversements
+                {pendingPayoutsTotal > 0 && (
+                  <span className="ml-1 px-2 py-0.5 text-xs bg-warning/20 text-warning-foreground rounded-full">
+                    {formatCurrency(pendingPayoutsTotal)}
+                  </span>
+                )}
+              </Button>
               <Button variant="secondary" className="gap-2" onClick={() => setIsReportOpen(true)}>
                 <Calendar className="w-4 h-4" />
                 Relevé de ventes
@@ -518,6 +536,13 @@ export function SupplierSalesPage() {
             onClose={() => setIsReportOpen(false)}
             suppliers={suppliers.map(s => ({ id: s.id, name: s.name, type: s.type, commission_rate: s.commission_rate || 0 }))}
             orderItems={orderItems as any}
+          />
+
+          {/* Supplier Payout Manager Modal */}
+          <SupplierPayoutManager
+            isOpen={isPayoutManagerOpen}
+            onClose={() => setIsPayoutManagerOpen(false)}
+            suppliers={suppliers.map(s => ({ id: s.id, name: s.name, type: s.type, commission_rate: s.commission_rate || 0, email: s.email || undefined }))}
           />
         </>
       )}
