@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, forwardRef } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -54,7 +54,7 @@ const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   "/admin/roles": { title: "Gestion des rôles", subtitle: "Administration" },
 };
 
-function BackofficeContent() {
+const BackofficeContent = forwardRef<HTMLDivElement>(function BackofficeContent(_props, ref) {
   const { user, loading } = useAuth();
   const [currentPath, setCurrentPath] = useState("/");
 
@@ -93,7 +93,7 @@ function BackofficeContent() {
 
   return (
     <NotificationProvider>
-      <div className="min-h-screen bg-background">
+      <div ref={ref} className="min-h-screen bg-background">
         <Sidebar currentPath={currentPath} onNavigate={setCurrentPath} />
         <PageLayout title={pageInfo.title} subtitle={pageInfo.subtitle} onNavigate={setCurrentPath}>
           {renderPage()}
@@ -101,7 +101,7 @@ function BackofficeContent() {
       </div>
     </NotificationProvider>
   );
-}
+});
 
 function AppRouter() {
   const location = useLocation();
