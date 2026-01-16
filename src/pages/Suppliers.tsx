@@ -1,13 +1,15 @@
 import { useState, useMemo } from "react";
-import { Plus, MoreHorizontal, Loader2, Pencil, Trash2 } from "lucide-react";
+import { Plus, MoreHorizontal, Loader2, Pencil, Trash2, FileSpreadsheet } from "lucide-react";
 import { StatusBadge, supplierTypeVariant, supplierTypeLabel } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { SupplierDrawer } from "@/components/drawers/SupplierDrawer";
 import { SupplierFormModal } from "@/components/forms/SupplierFormModal";
+import { ImportExportModal } from "@/components/import-export/ImportExportModal";
 import { useSuppliers, useDeleteSupplier, type Supplier } from "@/hooks/useSuppliers";
 import { formatCurrency } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export function SuppliersPage() {
+  const queryClient = useQueryClient();
   const { data: suppliers = [], isLoading, error } = useSuppliers();
   const deleteSupplier = useDeleteSupplier();
   const { toast } = useToast();
@@ -30,6 +33,7 @@ export function SuppliersPage() {
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [showImportExport, setShowImportExport] = useState(false);
 
   // Pays uniques
   const countries = useMemo(() => {
@@ -112,12 +116,20 @@ export function SuppliersPage() {
           <h2 className="text-lg font-semibold">Tous les fournisseurs</h2>
           <p className="text-sm text-muted-foreground">{filteredSuppliers.length} fournisseurs</p>
         </div>
-        {canWrite() && (
-          <Button className="gap-2" onClick={handleCreateNew}>
-            <Plus className="w-4 h-4" />
-            Nouveau fournisseur
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {canWrite() && (
+            <Button variant="outline" className="gap-2" onClick={() => setShowImportExport(true)}>
+              <FileSpreadsheet className="w-4 h-4" />
+              Import / Export
+            </Button>
+          )}
+          {canWrite() && (
+            <Button className="gap-2" onClick={handleCreateNew}>
+              <Plus className="w-4 h-4" />
+              Nouveau fournisseur
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
@@ -257,6 +269,15 @@ export function SuppliersPage() {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         supplier={editingSupplier}
+      />
+
+      {/* Import/Export Modal */}
+      <ImportExportModal
+        isOpen={showImportExport}
+        onClose={() => setShowImportExport(false)}
+        entityType="suppliers"
+        data={suppliers as unknown as Record<string, unknown>[]}
+        onImportSuccess={() => queryClient.invalidateQueries({ queryKey: ['suppliers'] })}
       />
     </div>
   );
