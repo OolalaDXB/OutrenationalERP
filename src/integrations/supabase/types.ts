@@ -1212,6 +1212,49 @@ export type Database = {
           },
         ]
       }
+      supplier_labels: {
+        Row: {
+          created_at: string
+          id: string
+          label_id: string
+          supplier_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label_id: string
+          supplier_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label_id?: string
+          supplier_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_labels_label_id_fkey"
+            columns: ["label_id"]
+            isOneToOne: false
+            referencedRelation: "labels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_labels_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_labels_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "v_supplier_sales"
+            referencedColumns: ["supplier_id"]
+          },
+        ]
+      }
       supplier_payouts: {
         Row: {
           commission_amount: number

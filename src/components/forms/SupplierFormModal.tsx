@@ -3,8 +3,11 @@ import { X, Building2, Loader2, Info, CheckCircle2, AlertCircle, RefreshCw } fro
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useCreateSupplier, useUpdateSupplier, type Supplier, type SupplierInsert } from "@/hooks/useSuppliers";
+import { useLabels } from "@/hooks/useLabels";
+import { useSupplierLabels, useSaveSupplierLabels } from "@/hooks/useSupplierLabels";
 import { useViesValidation, type ViesValidationResult } from "@/hooks/useViesValidation";
 import type { Enums } from "@/integrations/supabase/types";
 import {
@@ -32,9 +35,14 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormPro
   const { toast } = useToast();
   const createSupplier = useCreateSupplier();
   const updateSupplier = useUpdateSupplier();
+  const { data: labels = [] } = useLabels();
+  const { data: supplierLabels = [] } = useSupplierLabels(supplier?.id ?? null);
+  const saveSupplierLabels = useSaveSupplierLabels();
   const { validateVat, isValidating, result: viesResult, error: viesError, reset: resetVies } = useViesValidation();
   
   const isEditMode = !!supplier;
+  
+  const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
 
   const [formData, setFormData] = useState<{
     name: string;
@@ -128,8 +136,16 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormPro
         vat_number: "",
         website: "",
       });
+      setSelectedLabelIds([]);
     }
   }, [supplier, isOpen]);
+
+  // Load existing supplier labels when editing
+  useEffect(() => {
+    if (supplierLabels.length > 0) {
+      setSelectedLabelIds(supplierLabels.map(sl => sl.label_id));
+    }
+  }, [supplierLabels]);
 
   // Reset state when country changes
   useEffect(() => {
@@ -172,13 +188,24 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormPro
         vat_number: formData.vat_number || null,
       } as SupplierInsert;
 
+      let supplierId: string;
+
       if (isEditMode && supplier) {
         await updateSupplier.mutateAsync({ id: supplier.id, ...extendedData });
+        supplierId = supplier.id;
         toast({ title: "Succès", description: "Fournisseur mis à jour avec succès" });
       } else {
-        await createSupplier.mutateAsync(extendedData);
+        const newSupplier = await createSupplier.mutateAsync(extendedData);
+        supplierId = newSupplier.id;
         toast({ title: "Succès", description: "Fournisseur créé avec succès" });
       }
+
+      // Save supplier labels
+      await saveSupplierLabels.mutateAsync({ 
+        supplierId, 
+        labelIds: selectedLabelIds 
+      });
+
       onClose();
     } catch (error) {
       toast({ 
@@ -187,6 +214,14 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormPro
         variant: "destructive" 
       });
     }
+  };
+
+  const handleLabelToggle = (labelId: string) => {
+    setSelectedLabelIds(prev => 
+      prev.includes(labelId) 
+        ? prev.filter(id => id !== labelId)
+        : [...prev, labelId]
+    );
   };
 
   return (
@@ -475,6 +510,38 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormPro
               )}
             </div>
           </div>
+
+          {/* Labels */}
+          {labels.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="font-medium text-sm">Labels distribués</h3>
+              <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 border border-border rounded-lg">
+                {labels.map((label) => (
+                  <div key={label.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`label-${label.id}`}
+                      checked={selectedLabelIds.includes(label.id)}
+                      onCheckedChange={() => handleLabelToggle(label.id)}
+                    />
+                    <label
+                      htmlFor={`label-${label.id}`}
+                      className="text-sm cursor-pointer flex-1"
+                    >
+                      {label.name}
+                      {label.country && (
+                        <span className="text-muted-foreground ml-1">({label.country})</span>
+                      )}
+                    </label>
+                  </div>
+                ))}
+              </div>
+              {selectedLabelIds.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {selectedLabelIds.length} label(s) sélectionné(s)
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-4 border-t border-border">
             <Button type="button" variant="secondary" onClick={onClose} disabled={isLoading}>
