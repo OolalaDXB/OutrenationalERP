@@ -21,6 +21,13 @@ export interface Settings {
   payout_invoice_next_number: number | null;
   primary_color: string | null;
   shop_logo_url: string | null;
+  // New invoice customization fields
+  payment_terms_text: string | null;
+  legal_mentions: string | null;
+  bank_name: string | null;
+  iban: string | null;
+  bic: string | null;
+  eori: string | null;
 }
 
 export function useSettings() {
