@@ -470,6 +470,7 @@ export type Database = {
       order_items: {
         Row: {
           artist_name: string | null
+          cancelled_at: string | null
           consignment_rate: number | null
           created_at: string | null
           format: Database["public"]["Enums"]["product_format"] | null
@@ -478,7 +479,12 @@ export type Database = {
           order_id: string
           product_id: string | null
           quantity: number
+          return_reason: string | null
+          returned_at: string | null
+          reversed_stock_movement_id: string | null
           sku: string | null
+          status: string
+          stock_movement_id: string | null
           supplier_id: string | null
           supplier_name: string | null
           supplier_type: Database["public"]["Enums"]["supplier_type"] | null
@@ -489,6 +495,7 @@ export type Database = {
         }
         Insert: {
           artist_name?: string | null
+          cancelled_at?: string | null
           consignment_rate?: number | null
           created_at?: string | null
           format?: Database["public"]["Enums"]["product_format"] | null
@@ -497,7 +504,12 @@ export type Database = {
           order_id: string
           product_id?: string | null
           quantity?: number
+          return_reason?: string | null
+          returned_at?: string | null
+          reversed_stock_movement_id?: string | null
           sku?: string | null
+          status?: string
+          stock_movement_id?: string | null
           supplier_id?: string | null
           supplier_name?: string | null
           supplier_type?: Database["public"]["Enums"]["supplier_type"] | null
@@ -508,6 +520,7 @@ export type Database = {
         }
         Update: {
           artist_name?: string | null
+          cancelled_at?: string | null
           consignment_rate?: number | null
           created_at?: string | null
           format?: Database["public"]["Enums"]["product_format"] | null
@@ -516,7 +529,12 @@ export type Database = {
           order_id?: string
           product_id?: string | null
           quantity?: number
+          return_reason?: string | null
+          returned_at?: string | null
+          reversed_stock_movement_id?: string | null
           sku?: string | null
+          status?: string
+          stock_movement_id?: string | null
           supplier_id?: string | null
           supplier_name?: string | null
           supplier_type?: Database["public"]["Enums"]["supplier_type"] | null
@@ -1616,6 +1634,34 @@ export type Database = {
       }
     }
     Functions: {
+      apply_stock_movement: {
+        Args: {
+          p_created_by?: string
+          p_delta: number
+          p_order_id?: string
+          p_product_id: string
+          p_reason?: string
+          p_reference?: string
+          p_supplier_id?: string
+          p_type: string
+          p_unit_cost?: number
+        }
+        Returns: string
+      }
+      apply_stock_movement_v2: {
+        Args: {
+          p_created_by?: string
+          p_delta: number
+          p_order_id?: string
+          p_product_id: string
+          p_reason?: string
+          p_reference?: string
+          p_supplier_id?: string
+          p_type: Database["public"]["Enums"]["stock_movement_type"]
+          p_unit_cost?: number
+        }
+        Returns: string
+      }
       has_any_role: {
         Args: {
           _roles: Database["public"]["Enums"]["app_role"][]
@@ -1666,6 +1712,8 @@ export type Database = {
         | "loss"
         | "consignment_in"
         | "consignment_out"
+        | "sale_reversal"
+        | "sale_adjustment"
       supplier_type: "consignment" | "purchase" | "own" | "depot_vente"
       vinyl_condition: "M" | "NM" | "VG+" | "VG" | "G+" | "G" | "F" | "P"
     }
@@ -1829,6 +1877,8 @@ export const Constants = {
         "loss",
         "consignment_in",
         "consignment_out",
+        "sale_reversal",
+        "sale_adjustment",
       ],
       supplier_type: ["consignment", "purchase", "own", "depot_vente"],
       vinyl_condition: ["M", "NM", "VG+", "VG", "G+", "G", "F", "P"],
