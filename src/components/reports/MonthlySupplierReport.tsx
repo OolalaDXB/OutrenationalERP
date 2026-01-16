@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback } from "react";
-import { format, startOfMonth, endOfMonth, subMonths, eachMonthOfInterval, subYears, startOfYear, endOfYear, parseISO } from "date-fns";
+import { format, startOfMonth, endOfMonth, subMonths, eachMonthOfInterval, subYears, startOfYear, endOfYear, parseISO, differenceInDays, subDays } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
+import { ArrowUp, ArrowDown, Minus } from "lucide-react";
 import { FileText, X, Building2, Loader2, TrendingUp, TrendingDown, Package, Euro, Percent, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -67,6 +68,29 @@ interface SupplierMonthlyData {
   commission_rate: number;
 }
 
+// Evolution badge component
+function EvolutionBadge({ value, inverted = false, suffix = "%" }: { value: number; inverted?: boolean; suffix?: string }) {
+  const isPositive = inverted ? value < 0 : value > 0;
+  const isNegative = inverted ? value > 0 : value < 0;
+  const isNeutral = value === 0;
+
+  if (isNeutral) {
+    return (
+      <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+        <Minus className="w-3 h-3" />
+        <span>0{suffix}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`flex items-center gap-1 text-xs mt-1 ${isPositive ? "text-green-600" : "text-red-600"}`}>
+      {value > 0 ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
+      <span>{value > 0 ? "+" : ""}{value.toFixed(1)}{suffix}</span>
+    </div>
+  );
+}
+
 type PeriodPreset = "this_month" | "last_month" | "this_quarter" | "this_year" | "last_year" | "custom";
 
 export function MonthlySupplierReport({ isOpen, onClose, suppliers, orderItems }: MonthlySupplierReportProps) {
@@ -128,6 +152,15 @@ export function MonthlySupplierReport({ isOpen, onClose, suppliers, orderItems }
     return { periodStart: start, periodEnd: end, periodLabel: label };
   }, [periodPreset, customStartDate, customEndDate]);
 
+  // Calculate previous period for comparison
+  const { prevPeriodStart, prevPeriodEnd, prevPeriodLabel } = useMemo(() => {
+    const periodDuration = differenceInDays(periodEnd, periodStart) + 1;
+    const prevEnd = subDays(periodStart, 1);
+    const prevStart = subDays(prevEnd, periodDuration - 1);
+    const label = `${format(prevStart, "d MMM", { locale: fr })} - ${format(prevEnd, "d MMM yyyy", { locale: fr })}`;
+    return { prevPeriodStart: prevStart, prevPeriodEnd: prevEnd, prevPeriodLabel: label };
+  }, [periodStart, periodEnd]);
+
   // Filter order items for the selected period
   const filteredItems = useMemo(() => {
     return orderItems.filter(item => {
@@ -136,6 +169,15 @@ export function MonthlySupplierReport({ isOpen, onClose, suppliers, orderItems }
       return itemDate >= periodStart && itemDate <= periodEnd;
     });
   }, [orderItems, periodStart, periodEnd]);
+
+  // Filter order items for the previous period
+  const prevFilteredItems = useMemo(() => {
+    return orderItems.filter(item => {
+      if (!item.created_at) return false;
+      const itemDate = new Date(item.created_at);
+      return itemDate >= prevPeriodStart && itemDate <= prevPeriodEnd;
+    });
+  }, [orderItems, prevPeriodStart, prevPeriodEnd]);
 
   // Calculate sales by supplier for the period
   const supplierSalesData = useMemo(() => {
@@ -178,7 +220,7 @@ export function MonthlySupplierReport({ isOpen, onClose, suppliers, orderItems }
     return Object.values(salesBySupplier).sort((a, b) => b.gross_sales - a.gross_sales);
   }, [filteredItems, suppliers]);
 
-  // Monthly totals
+  // Current period totals
   const totals = useMemo(() => ({
     gross_sales: supplierSalesData.reduce((sum, s) => sum + s.gross_sales, 0),
     items_sold: supplierSalesData.reduce((sum, s) => sum + s.items_sold, 0),
@@ -187,9 +229,62 @@ export function MonthlySupplierReport({ isOpen, onClose, suppliers, orderItems }
     supplier_count: supplierSalesData.length,
   }), [supplierSalesData]);
 
+  // Previous period totals for comparison
+  const prevTotals = useMemo(() => {
+    let gross_sales = 0;
+    let items_sold = 0;
+    let supplier_due = 0;
+    let our_margin = 0;
+
+    prevFilteredItems.forEach(item => {
+      const supplierId = item.supplier_id;
+      if (!supplierId) return;
+
+      const supplier = suppliers.find(s => s.id === supplierId);
+      if (!supplier) return;
+
+      const saleAmount = item.total_price;
+      gross_sales += saleAmount;
+      items_sold += item.quantity;
+
+      if (supplier.type === "consignment" || supplier.type === "depot_vente") {
+        const rate = supplier.commission_rate || item.consignment_rate || 0;
+        const ourCut = saleAmount * rate;
+        our_margin += ourCut;
+        supplier_due += saleAmount - ourCut;
+      } else {
+        our_margin += saleAmount;
+      }
+    });
+
+    return { gross_sales, items_sold, supplier_due, our_margin };
+  }, [prevFilteredItems, suppliers]);
+
+  // Calculate evolution percentages
+  const evolution = useMemo(() => {
+    const calcEvolution = (current: number, previous: number) => {
+      if (previous === 0) return current > 0 ? 100 : 0;
+      return ((current - previous) / previous) * 100;
+    };
+
+    return {
+      gross_sales: calcEvolution(totals.gross_sales, prevTotals.gross_sales),
+      items_sold: calcEvolution(totals.items_sold, prevTotals.items_sold),
+      supplier_due: calcEvolution(totals.supplier_due, prevTotals.supplier_due),
+      our_margin: calcEvolution(totals.our_margin, prevTotals.our_margin),
+    };
+  }, [totals, prevTotals]);
+
+  // Margin percentage calculations
   const marginPercentage = totals.gross_sales > 0 
     ? ((totals.our_margin / totals.gross_sales) * 100).toFixed(1) 
     : "0";
+
+  const prevMarginPercentage = prevTotals.gross_sales > 0 
+    ? ((prevTotals.our_margin / prevTotals.gross_sales) * 100)
+    : 0;
+
+  const marginEvolution = parseFloat(marginPercentage) - prevMarginPercentage;
 
   // Chart data - Top suppliers by sales
   const topSuppliersChart = useMemo(() => {
@@ -441,7 +536,7 @@ export function MonthlySupplierReport({ isOpen, onClose, suppliers, orderItems }
 
         {/* Content */}
         <div className="flex-1 overflow-auto p-6 space-y-6">
-          {/* KPI Cards */}
+          {/* KPI Cards with Evolution */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl p-4 border border-primary/20">
               <div className="flex items-center gap-2 text-primary mb-2">
@@ -449,6 +544,7 @@ export function MonthlySupplierReport({ isOpen, onClose, suppliers, orderItems }
                 <span className="text-sm font-medium">CA Brut</span>
               </div>
               <div className="text-2xl font-bold">{formatCurrency(totals.gross_sales)}</div>
+              <EvolutionBadge value={evolution.gross_sales} />
             </div>
             
             <div className="bg-gradient-to-br from-success/10 to-success/5 rounded-xl p-4 border border-success/20">
@@ -457,6 +553,7 @@ export function MonthlySupplierReport({ isOpen, onClose, suppliers, orderItems }
                 <span className="text-sm font-medium">Marge ON</span>
               </div>
               <div className="text-2xl font-bold text-success">{formatCurrency(totals.our_margin)}</div>
+              <EvolutionBadge value={evolution.our_margin} />
             </div>
             
             <div className="bg-gradient-to-br from-info/10 to-info/5 rounded-xl p-4 border border-info/20">
@@ -465,6 +562,7 @@ export function MonthlySupplierReport({ isOpen, onClose, suppliers, orderItems }
                 <span className="text-sm font-medium">À reverser</span>
               </div>
               <div className="text-2xl font-bold text-info">{formatCurrency(totals.supplier_due)}</div>
+              <EvolutionBadge value={evolution.supplier_due} inverted />
             </div>
             
             <div className="bg-gradient-to-br from-warning/10 to-warning/5 rounded-xl p-4 border border-warning/20">
@@ -473,6 +571,7 @@ export function MonthlySupplierReport({ isOpen, onClose, suppliers, orderItems }
                 <span className="text-sm font-medium">Articles vendus</span>
               </div>
               <div className="text-2xl font-bold">{totals.items_sold}</div>
+              <EvolutionBadge value={evolution.items_sold} />
             </div>
             
             <div className="bg-gradient-to-br from-secondary to-secondary/50 rounded-xl p-4 border border-border">
@@ -481,7 +580,13 @@ export function MonthlySupplierReport({ isOpen, onClose, suppliers, orderItems }
                 <span className="text-sm font-medium">Taux de marge</span>
               </div>
               <div className="text-2xl font-bold">{marginPercentage}%</div>
+              <EvolutionBadge value={marginEvolution} suffix="pts" />
             </div>
+          </div>
+
+          {/* Previous period info */}
+          <div className="text-xs text-muted-foreground text-center">
+            Comparaison avec la période précédente : {prevPeriodLabel}
           </div>
 
           {/* Charts */}
