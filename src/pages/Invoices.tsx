@@ -415,6 +415,10 @@ export function InvoicesPage() {
         open={!!viewingInvoice}
         onOpenChange={(open) => !open && setViewingInvoice(null)}
         invoice={viewingInvoice}
+        onEdit={(inv) => setEditingInvoice(inv)}
+        onDuplicate={handleDuplicateInvoice}
+        onDownloadPDF={generatePDF}
+        onMarkAsPaid={handleMarkAsPaid}
       />
 
       {/* Table */}
