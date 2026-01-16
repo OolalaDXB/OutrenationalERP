@@ -128,10 +128,12 @@ export type Database = {
           payment_terms: number | null
           phone: string | null
           postal_code: string | null
+          state: string | null
           tags: string[] | null
           total_spent: number | null
           updated_at: string | null
           vat_number: string | null
+          website: string | null
         }
         Insert: {
           accepts_marketing?: boolean | null
@@ -157,10 +159,12 @@ export type Database = {
           payment_terms?: number | null
           phone?: string | null
           postal_code?: string | null
+          state?: string | null
           tags?: string[] | null
           total_spent?: number | null
           updated_at?: string | null
           vat_number?: string | null
+          website?: string | null
         }
         Update: {
           accepts_marketing?: boolean | null
@@ -186,10 +190,12 @@ export type Database = {
           payment_terms?: number | null
           phone?: string | null
           postal_code?: string | null
+          state?: string | null
           tags?: string[] | null
           total_spent?: number | null
           updated_at?: string | null
           vat_number?: string | null
+          website?: string | null
         }
         Relationships: []
       }
@@ -1254,9 +1260,11 @@ export type Database = {
           postal_code: string | null
           products_count: number | null
           slug: string | null
+          state: string | null
           total_revenue: number | null
           type: Database["public"]["Enums"]["supplier_type"]
           updated_at: string | null
+          vat_number: string | null
           website: string | null
         }
         Insert: {
@@ -1281,9 +1289,11 @@ export type Database = {
           postal_code?: string | null
           products_count?: number | null
           slug?: string | null
+          state?: string | null
           total_revenue?: number | null
           type?: Database["public"]["Enums"]["supplier_type"]
           updated_at?: string | null
+          vat_number?: string | null
           website?: string | null
         }
         Update: {
@@ -1308,9 +1318,11 @@ export type Database = {
           postal_code?: string | null
           products_count?: number | null
           slug?: string | null
+          state?: string | null
           total_revenue?: number | null
           type?: Database["public"]["Enums"]["supplier_type"]
           updated_at?: string | null
+          vat_number?: string | null
           website?: string | null
         }
         Relationships: []
