@@ -10,6 +10,7 @@ export interface ViesValidationResult {
   requestDate: string;
   error?: string;
   serviceUnavailable?: boolean;
+  cached?: boolean;
 }
 
 export function useViesValidation() {
@@ -48,8 +49,15 @@ export function useViesValidation() {
         return null;
       }
 
-      setResult(data as ViesValidationResult);
-      return data as ViesValidationResult;
+      const validationResult = data as ViesValidationResult;
+      setResult(validationResult);
+      
+      // Log cache status
+      if (validationResult.cached) {
+        console.log('VAT validation retrieved from cache');
+      }
+      
+      return validationResult;
     } catch (err) {
       setError('Erreur de connexion au service VIES');
       setResult(null);

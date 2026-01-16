@@ -1384,6 +1384,42 @@ export type Database = {
         }
         Relationships: []
       }
+      vat_validations_cache: {
+        Row: {
+          company_address: string | null
+          company_name: string | null
+          country_code: string
+          created_at: string
+          expires_at: string
+          id: string
+          is_valid: boolean
+          validated_at: string
+          vat_number: string
+        }
+        Insert: {
+          company_address?: string | null
+          company_name?: string | null
+          country_code: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          is_valid: boolean
+          validated_at?: string
+          vat_number: string
+        }
+        Update: {
+          company_address?: string | null
+          company_name?: string | null
+          country_code?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          is_valid?: boolean
+          validated_at?: string
+          vat_number?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       v_dashboard_kpis: {

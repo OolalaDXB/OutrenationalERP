@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,6 +13,18 @@ interface ViesResponse {
   name?: string;
   address?: string;
   requestDate: string;
+  cached?: boolean;
+}
+
+interface CacheEntry {
+  id: string;
+  vat_number: string;
+  country_code: string;
+  is_valid: boolean;
+  company_name: string | null;
+  company_address: string | null;
+  validated_at: string;
+  expires_at: string;
 }
 
 serve(async (req) => {
@@ -63,6 +76,39 @@ serve(async (req) => {
       );
     }
 
+    // Initialize Supabase client for cache operations
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Check cache first
+    const { data: cachedResult, error: cacheError } = await supabase
+      .from('vat_validations_cache')
+      .select('*')
+      .eq('vat_number', cleanVat)
+      .gt('expires_at', new Date().toISOString())
+      .single();
+
+    if (cachedResult && !cacheError) {
+      console.log(`Cache hit for VAT: ${cleanVat}`);
+      const result: ViesResponse = {
+        valid: cachedResult.is_valid,
+        countryCode: cachedResult.country_code,
+        vatNumber: number,
+        name: cachedResult.company_name || undefined,
+        address: cachedResult.company_address || undefined,
+        requestDate: cachedResult.validated_at,
+        cached: true,
+      };
+
+      return new Response(
+        JSON.stringify(result),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`Cache miss for VAT: ${cleanVat}, calling VIES API`);
+
     // Call the VIES SOAP API
     const soapEnvelope = `<?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" 
@@ -97,6 +143,30 @@ serve(async (req) => {
     const companyAddress = addressMatch ? addressMatch[1].trim() : undefined;
     const requestDate = requestDateMatch ? requestDateMatch[1] : new Date().toISOString();
 
+    // Store result in cache
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30); // Cache for 30 days
+
+    const { error: upsertError } = await supabase
+      .from('vat_validations_cache')
+      .upsert({
+        vat_number: cleanVat,
+        country_code: countryCode,
+        is_valid: isValid,
+        company_name: companyName && companyName !== '---' ? companyName : null,
+        company_address: companyAddress && companyAddress !== '---' ? companyAddress : null,
+        validated_at: requestDate,
+        expires_at: expiresAt.toISOString(),
+      }, {
+        onConflict: 'vat_number',
+      });
+
+    if (upsertError) {
+      console.error('Failed to cache VAT validation:', upsertError);
+    } else {
+      console.log(`Cached VAT validation for: ${cleanVat}`);
+    }
+
     const result: ViesResponse = {
       valid: isValid,
       countryCode,
@@ -104,6 +174,7 @@ serve(async (req) => {
       name: companyName && companyName !== '---' ? companyName : undefined,
       address: companyAddress && companyAddress !== '---' ? companyAddress : undefined,
       requestDate,
+      cached: false,
     };
 
     return new Response(
