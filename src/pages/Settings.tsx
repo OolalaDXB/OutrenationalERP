@@ -41,6 +41,7 @@ export function SettingsPage() {
     iban: "",
     bic: "",
     eori: "",
+    cgv: "",
   });
 
   // Initialize form when settings load
@@ -70,6 +71,7 @@ export function SettingsPage() {
         iban: settings.iban || "",
         bic: settings.bic || "",
         eori: settings.eori || "",
+        cgv: settings.cgv || "",
       });
     }
   });
@@ -100,6 +102,7 @@ export function SettingsPage() {
       iban: settings.iban || "",
       bic: settings.bic || "",
       eori: settings.eori || "",
+      cgv: settings.cgv || "",
     });
   }
 
@@ -483,6 +486,34 @@ export function SettingsPage() {
                   rows={3}
                 />
               </div>
+            </div>
+          </div>
+
+          {/* CGV Section */}
+          <div className="bg-card rounded-xl border border-border p-6">
+            <h2 className="text-lg font-semibold mb-2">Conditions Générales de Vente (CGV)</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Les CGV seront ajoutées en dernière page de vos factures si renseignées.
+            </p>
+            <div>
+              <Textarea
+                value={formData.cgv}
+                onChange={(e) => setFormData({ ...formData, cgv: e.target.value })}
+                className="mt-1 font-mono text-xs"
+                placeholder="Saisissez vos conditions générales de vente ici...
+
+Article 1 - Objet
+Les présentes conditions générales de vente régissent les ventes de produits...
+
+Article 2 - Prix
+Les prix de nos produits sont indiqués en euros..."
+                rows={12}
+              />
+              {formData.cgv && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  {formData.cgv.length} caractères • ~{Math.ceil(formData.cgv.length / 2500)} page(s) sur la facture
+                </p>
+              )}
             </div>
           </div>
         </TabsContent>

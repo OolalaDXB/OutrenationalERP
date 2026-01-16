@@ -28,6 +28,7 @@ export interface Settings {
   iban: string | null;
   bic: string | null;
   eori: string | null;
+  cgv: string | null;
 }
 
 export function useSettings() {

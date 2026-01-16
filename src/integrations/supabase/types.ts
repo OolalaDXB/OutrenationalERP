@@ -1036,6 +1036,7 @@ export type Database = {
         Row: {
           bank_name: string | null
           bic: string | null
+          cgv: string | null
           created_at: string | null
           default_currency: string | null
           eori: string | null
@@ -1065,6 +1066,7 @@ export type Database = {
         Insert: {
           bank_name?: string | null
           bic?: string | null
+          cgv?: string | null
           created_at?: string | null
           default_currency?: string | null
           eori?: string | null
@@ -1094,6 +1096,7 @@ export type Database = {
         Update: {
           bank_name?: string | null
           bic?: string | null
+          cgv?: string | null
           created_at?: string | null
           default_currency?: string | null
           eori?: string | null

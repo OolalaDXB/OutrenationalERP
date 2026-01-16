@@ -227,19 +227,63 @@ export async function generateOrderInvoicePDF({ order, settings, invoiceNumber }
     doc.text(splitLegal, 14, yPos);
   }
 
-  // Footer
-  const footerY = doc.internal.pageSize.getHeight() - 15;
-  doc.setFontSize(8);
-  doc.setTextColor(120);
-  doc.setFont("helvetica", "normal");
-  
-  const footerText = [
-    settings.legal_name || settings.shop_name,
-    settings.siret ? `SIRET : ${settings.siret}` : null,
-    settings.vat_number ? `TVA : ${settings.vat_number}` : null,
-  ].filter(Boolean).join(' - ');
-  
-  doc.text(footerText, pageWidth / 2, footerY, { align: 'center' });
+  // Footer for first page
+  const addFooter = () => {
+    const footerY = doc.internal.pageSize.getHeight() - 15;
+    doc.setFontSize(8);
+    doc.setTextColor(120);
+    doc.setFont("helvetica", "normal");
+    
+    const footerText = [
+      settings.legal_name || settings.shop_name,
+      settings.siret ? `SIRET : ${settings.siret}` : null,
+      settings.vat_number ? `TVA : ${settings.vat_number}` : null,
+    ].filter(Boolean).join(' - ');
+    
+    doc.text(footerText, pageWidth / 2, footerY, { align: 'center' });
+  };
+
+  addFooter();
+
+  // CGV - Add on separate page(s) if present
+  if (settings.cgv && settings.cgv.trim()) {
+    doc.addPage();
+    
+    let cgvYPos = 20;
+    
+    // CGV Title
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(0);
+    doc.text("CONDITIONS GÉNÉRALES DE VENTE", pageWidth / 2, cgvYPos, { align: 'center' });
+    
+    cgvYPos += 15;
+    
+    // CGV Content
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(60);
+    
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const marginBottom = 25;
+    const lineHeight = 4;
+    
+    const cgvLines = doc.splitTextToSize(settings.cgv, pageWidth - 28);
+    
+    cgvLines.forEach((line: string) => {
+      // Check if we need a new page
+      if (cgvYPos + lineHeight > pageHeight - marginBottom) {
+        addFooter();
+        doc.addPage();
+        cgvYPos = 20;
+      }
+      
+      doc.text(line, 14, cgvYPos);
+      cgvYPos += lineHeight;
+    });
+    
+    addFooter();
+  }
 
   return doc;
 }
