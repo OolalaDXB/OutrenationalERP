@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import type { WidgetVisibility } from '@/components/settings/WidgetVisibilitySection';
+import type { WidgetVisibility, WidgetOrder } from '@/components/settings/WidgetVisibilitySection';
 
 export interface Settings {
   id: string;
@@ -32,8 +32,9 @@ export interface Settings {
   cgv: string | null;
   // Feature toggles
   show_artists_section: boolean | null;
-  // Widget visibility
+  // Widget visibility and order
   visible_widgets: WidgetVisibility | null;
+  widget_order: WidgetOrder | null;
 }
 
 export function useSettings() {
@@ -50,6 +51,7 @@ export function useSettings() {
       return {
         ...data,
         visible_widgets: data.visible_widgets as unknown as WidgetVisibility | null,
+        widget_order: data.widget_order as unknown as WidgetOrder | null,
       } as Settings;
     }
   });
@@ -69,10 +71,11 @@ export function useUpdateSettings() {
       
       if (fetchError) throw fetchError;
       
-      // Convert visible_widgets to JSON-compatible format
+      // Convert visible_widgets and widget_order to JSON-compatible format
       const updatePayload = {
         ...updates,
         visible_widgets: updates.visible_widgets ? updates.visible_widgets as unknown as Record<string, boolean> : undefined,
+        widget_order: updates.widget_order ? updates.widget_order as unknown as Record<string, string[]> : undefined,
       };
       
       const { data, error } = await supabase
