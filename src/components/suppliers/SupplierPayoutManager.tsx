@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { 
   X, Building2, Check, Clock, Euro, Calendar, CreditCard, 
-  FileText, Loader2, AlertCircle, CheckCircle2, Trash2, Eye
+  FileText, Loader2, AlertCircle, CheckCircle2, Trash2, Eye, Download
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ import {
   useDeleteSupplierPayout,
   type SupplierPayoutInsert 
 } from "@/hooks/useSupplierPayouts";
+import { generateSupplierPayoutInvoicePDF } from "./SupplierPayoutInvoicePDF";
 
 interface SupplierPayoutManagerProps {
   isOpen: boolean;
@@ -119,13 +120,62 @@ export function SupplierPayoutManager({ isOpen, onClose, suppliers, prefillData 
         id: selectedPayout.id,
         payment_reference: paymentReference,
       });
-      toast({ title: "Succès", description: "Reversement marqué comme payé" });
+      
+      // Generate invoice PDF automatically
+      const supplier = selectedPayout.suppliers;
+      if (supplier) {
+        const invoiceNumber = `REV-${format(new Date(), "yyyyMMdd")}-${selectedPayout.id.slice(0, 8).toUpperCase()}`;
+        generateSupplierPayoutInvoicePDF(
+          {
+            ...selectedPayout,
+            paid_at: new Date().toISOString(),
+            payment_reference: paymentReference,
+          },
+          {
+            name: supplier.name,
+            type: supplier.type,
+            email: supplier.email,
+            iban: supplier.iban,
+            bic: supplier.bic,
+            bank_name: supplier.bank_name,
+          },
+          invoiceNumber
+        );
+        toast({ title: "Succès", description: "Reversement validé et facture PDF générée" });
+      } else {
+        toast({ title: "Succès", description: "Reversement marqué comme payé" });
+      }
+      
       setViewMode("list");
       setSelectedPayout(null);
       setPaymentReference("");
     } catch (error) {
       toast({ title: "Erreur", description: "Impossible de valider le paiement", variant: "destructive" });
     }
+  };
+
+  // Function to regenerate PDF for any payout
+  const handleDownloadPDF = (payout: any) => {
+    const supplier = payout.suppliers;
+    if (!supplier) {
+      toast({ title: "Erreur", description: "Informations fournisseur manquantes", variant: "destructive" });
+      return;
+    }
+    
+    const invoiceNumber = `REV-${format(new Date(payout.created_at), "yyyyMMdd")}-${payout.id.slice(0, 8).toUpperCase()}`;
+    generateSupplierPayoutInvoicePDF(
+      payout,
+      {
+        name: supplier.name,
+        type: supplier.type,
+        email: supplier.email,
+        iban: supplier.iban,
+        bic: supplier.bic,
+        bank_name: supplier.bank_name,
+      },
+      invoiceNumber
+    );
+    toast({ title: "PDF téléchargé", description: `Facture ${invoiceNumber}` });
   };
 
   const handleDelete = async (id: string) => {
@@ -304,10 +354,19 @@ export function SupplierPayoutManager({ isOpen, onClose, suppliers, prefillData 
                                   size="sm"
                                   onClick={() => { setSelectedPayout(payout); setViewMode("validate"); }}
                                   className="text-success hover:text-success"
+                                  title="Valider le paiement"
                                 >
                                   <Check className="w-4 h-4" />
                                 </Button>
                               )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDownloadPDF(payout)}
+                                title="Télécharger la facture PDF"
+                              >
+                                <Download className="w-4 h-4" />
+                              </Button>
                               {payout.status === "paid" && payout.payment_reference && (
                                 <span className="text-xs text-muted-foreground mr-2" title="Référence paiement">
                                   {payout.payment_reference}
@@ -318,6 +377,7 @@ export function SupplierPayoutManager({ isOpen, onClose, suppliers, prefillData 
                                 size="sm"
                                 onClick={() => handleDelete(payout.id)}
                                 className="text-destructive hover:text-destructive"
+                                title="Supprimer"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
