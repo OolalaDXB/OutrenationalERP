@@ -14,6 +14,8 @@ import { ProductDrawer } from "@/components/drawers/ProductDrawer";
 import { isValidVatNumberFormat } from "@/lib/vat-utils";
 import { useSupplierLabels } from "@/hooks/useSupplierLabels";
 import { useLabels } from "@/hooks/useLabels";
+import { useAllOrderItems } from "@/hooks/useOrders";
+import { MonthlySupplierReport } from "@/components/reports/MonthlySupplierReport";
 
 interface SupplierDrawerProps {
   supplier: Supplier | null;
@@ -27,10 +29,12 @@ export function SupplierDrawer({ supplier, isOpen, onClose }: SupplierDrawerProp
   const { data: allProducts = [] } = useProducts();
   const { data: allLabels = [] } = useLabels();
   const { data: supplierLabelAssocs = [] } = useSupplierLabels(supplier?.id ?? null);
+  const { data: allOrderItems = [] } = useAllOrderItems();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isProductDrawerOpen, setIsProductDrawerOpen] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   // Labels associated with this supplier
   const associatedLabels = useMemo(() => {
@@ -297,7 +301,10 @@ export function SupplierDrawer({ supplier, isOpen, onClose }: SupplierDrawerProp
 
             {/* Actions */}
             <div className="flex gap-3">
-              <Button variant="secondary" className="flex-1">Générer relevé</Button>
+              <Button variant="secondary" className="flex-1" onClick={() => setShowReportModal(true)}>
+                <FileText className="w-4 h-4 mr-2" />
+                Générer relevé
+              </Button>
             </div>
 
             {/* Edit/Delete Actions */}
@@ -351,6 +358,14 @@ export function SupplierDrawer({ supplier, isOpen, onClose }: SupplierDrawerProp
         product={selectedProduct}
         isOpen={isProductDrawerOpen}
         onClose={() => setIsProductDrawerOpen(false)}
+      />
+
+      {/* Supplier Report Modal */}
+      <MonthlySupplierReport
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        suppliers={[supplier]}
+        orderItems={allOrderItems.filter(item => item.supplier_id === supplier.id) as any}
       />
     </>
   );
