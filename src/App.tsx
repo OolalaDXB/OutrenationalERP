@@ -21,6 +21,7 @@ import { AnalyticsPage } from "@/pages/Analytics";
 import { StockMovementsPage } from "@/pages/StockMovements";
 import { UserRolesPage } from "@/pages/UserRoles";
 import { LoginPage } from "@/pages/Login";
+import { ResetPasswordPage } from "@/pages/ResetPassword";
 import { ProLayout } from "@/components/pro/ProLayout";
 import { ProLogin } from "@/pages/pro/ProLogin";
 import { ProRegister } from "@/pages/pro/ProRegister";
@@ -105,6 +106,12 @@ function BackofficeContent() {
 function AppRouter() {
   const location = useLocation();
   const isProRoute = location.pathname.startsWith('/pro');
+  const isResetPasswordRoute = location.pathname === '/reset-password';
+
+  // Handle reset password route separately (no auth required)
+  if (isResetPasswordRoute) {
+    return <ResetPasswordPage />;
+  }
 
   if (isProRoute) {
     return (
