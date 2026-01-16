@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { FileText, Euro, Clock, CheckCircle, XCircle, Download, Plus, Pencil } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { FileText, Euro, Clock, CheckCircle, XCircle, Download, Plus, Pencil, Copy, Trash2, Check } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -9,6 +9,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { InvoiceFormModal } from "@/components/forms/InvoiceFormModal";
 import { InvoiceEditModal } from "@/components/forms/InvoiceEditModal";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { Tables } from "@/integrations/supabase/types";
@@ -37,6 +48,7 @@ const statusLabel: Record<string, string> = {
 };
 
 export function InvoicesPage() {
+  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const initialSearch = searchParams.get("search") || "";
   
@@ -45,6 +57,8 @@ export function InvoicesPage() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<InvoiceWithItems | null>(null);
+  const [deletingInvoice, setDeletingInvoice] = useState<InvoiceWithItems | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Sync search term with URL params
   useEffect(() => {
@@ -208,6 +222,112 @@ export function InvoicesPage() {
     doc.save(`${invoice.invoice_number}.pdf`);
   };
 
+  // Delete invoice
+  const handleDeleteInvoice = async () => {
+    if (!deletingInvoice) return;
+    
+    setIsDeleting(true);
+    try {
+      // Delete invoice items first
+      const { error: itemsError } = await supabase
+        .from("invoice_items")
+        .delete()
+        .eq("invoice_id", deletingInvoice.id);
+
+      if (itemsError) throw itemsError;
+
+      // Then delete the invoice
+      const { error: invoiceError } = await supabase
+        .from("invoices")
+        .delete()
+        .eq("id", deletingInvoice.id);
+
+      if (invoiceError) throw invoiceError;
+
+      toast.success("Facture supprimée avec succès");
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      setDeletingInvoice(null);
+    } catch (error) {
+      console.error("Error deleting invoice:", error);
+      toast.error("Erreur lors de la suppression de la facture");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Duplicate invoice
+  const handleDuplicateInvoice = async (invoice: InvoiceWithItems) => {
+    try {
+      // Generate new invoice number
+      const newNumber = `${invoice.invoice_number}-COPIE`;
+      
+      // Create new invoice
+      const { data: newInvoice, error: invoiceError } = await supabase
+        .from("invoices")
+        .insert({
+          invoice_number: newNumber,
+          type: invoice.type,
+          recipient_name: invoice.recipient_name,
+          recipient_email: invoice.recipient_email,
+          recipient_address: invoice.recipient_address,
+          issue_date: new Date().toISOString().split("T")[0],
+          due_date: invoice.due_date,
+          notes: invoice.notes,
+          subtotal: invoice.subtotal,
+          tax_amount: invoice.tax_amount,
+          total: invoice.total,
+          status: "draft",
+        })
+        .select()
+        .single();
+
+      if (invoiceError) throw invoiceError;
+
+      // Duplicate invoice items
+      const newItems = invoice.invoice_items.map((item) => ({
+        invoice_id: newInvoice.id,
+        description: item.description,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        total_price: item.total_price,
+      }));
+
+      const { error: itemsError } = await supabase
+        .from("invoice_items")
+        .insert(newItems);
+
+      if (itemsError) throw itemsError;
+
+      toast.success("Facture dupliquée avec succès");
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    } catch (error) {
+      console.error("Error duplicating invoice:", error);
+      toast.error("Erreur lors de la duplication de la facture");
+    }
+  };
+
+  // Mark invoice as paid
+  const handleMarkAsPaid = async (invoice: InvoiceWithItems) => {
+    try {
+      const { error } = await supabase
+        .from("invoices")
+        .update({
+          status: "paid",
+          paid_date: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", invoice.id);
+
+      if (error) throw error;
+
+      toast.success("Facture marquée comme payée");
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    } catch (error) {
+      console.error("Error marking invoice as paid:", error);
+      toast.error("Erreur lors de la mise à jour de la facture");
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
@@ -265,6 +385,29 @@ export function InvoicesPage() {
         invoice={editingInvoice} 
       />
 
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingInvoice} onOpenChange={(open) => !open && setDeletingInvoice(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer la facture ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir supprimer la facture <strong>{deletingInvoice?.invoice_number}</strong> ? 
+              Cette action est irréversible et supprimera également toutes les lignes associées.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Annuler</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteInvoice} 
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Suppression..." : "Supprimer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Table */}
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <table className="w-full border-collapse">
@@ -309,7 +452,16 @@ export function InvoicesPage() {
                 <td className="px-6 py-4 font-semibold tabular-nums">{formatCurrency(invoice.total)}</td>
                 <td className="px-6 py-4 text-sm text-muted-foreground">{formatDate(invoice.issue_date)}</td>
                 <td className="px-6 py-4">
-                  <div className="flex gap-2">
+                  <div className="flex gap-1">
+                    {invoice.status !== "paid" && (
+                      <button
+                        onClick={() => handleMarkAsPaid(invoice)}
+                        className="p-2 rounded-md hover:bg-success/10 transition-colors text-success"
+                        title="Marquer comme payée"
+                      >
+                        <Check className="w-4 h-4" />
+                      </button>
+                    )}
                     <button
                       onClick={() => setEditingInvoice(invoice)}
                       className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground"
@@ -318,11 +470,25 @@ export function InvoicesPage() {
                       <Pencil className="w-4 h-4" />
                     </button>
                     <button
+                      onClick={() => handleDuplicateInvoice(invoice)}
+                      className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground"
+                      title="Dupliquer"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+                    <button
                       onClick={() => generatePDF(invoice)}
                       className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground"
                       title="Télécharger PDF"
                     >
                       <Download className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setDeletingInvoice(invoice)}
+                      className="p-2 rounded-md hover:bg-destructive/10 transition-colors text-destructive"
+                      title="Supprimer"
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </td>
