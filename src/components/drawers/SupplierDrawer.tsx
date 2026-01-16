@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { X, Building2, Mail, Phone, MapPin, Package, Euro, TrendingUp, Pencil, Trash2, Disc, ChevronRight } from "lucide-react";
+import { X, Building2, Mail, Phone, MapPin, Package, Euro, TrendingUp, Pencil, Trash2, Disc, ChevronRight, Globe, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, supplierTypeVariant, supplierTypeLabel } from "@/components/ui/status-badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -11,6 +11,7 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
 import { SupplierFormModal } from "@/components/forms/SupplierFormModal";
 import { ProductDrawer } from "@/components/drawers/ProductDrawer";
+import { isValidVatNumberFormat } from "@/lib/vat-utils";
 
 interface SupplierDrawerProps {
   supplier: Supplier | null;
@@ -52,6 +53,8 @@ export function SupplierDrawer({ supplier, isOpen, onClose }: SupplierDrawerProp
 
   if (!isOpen || !supplier) return null;
 
+  const hasValidVat = isValidVatNumberFormat((supplier as any).vat_number);
+
   return (
     <>
       <div className="fixed inset-0 z-50 flex">
@@ -90,10 +93,33 @@ export function SupplierDrawer({ supplier, isOpen, onClose }: SupplierDrawerProp
                   <span>{supplier.phone}</span>
                 </div>
               )}
-              {supplier.address && (
+              {(supplier.address || supplier.city || supplier.country) && (
+                <div className="flex items-start gap-3 text-sm">
+                  <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
+                  <div>
+                    {supplier.address && <div>{supplier.address}</div>}
+                    <div>
+                      {[
+                        supplier.postal_code,
+                        supplier.city,
+                        (supplier as any).state,
+                        supplier.country
+                      ].filter(Boolean).join(', ')}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {supplier.website && (
                 <div className="flex items-center gap-3 text-sm">
-                  <MapPin className="w-4 h-4 text-muted-foreground" />
-                  <span>{supplier.address}{supplier.city ? `, ${supplier.city}` : ''}{supplier.country ? `, ${supplier.country}` : ''}</span>
+                  <Globe className="w-4 h-4 text-muted-foreground" />
+                  <a 
+                    href={supplier.website} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="text-primary hover:underline"
+                  >
+                    {supplier.website}
+                  </a>
                 </div>
               )}
               {supplier.contact_name && (
@@ -103,6 +129,29 @@ export function SupplierDrawer({ supplier, isOpen, onClose }: SupplierDrawerProp
                 </div>
               )}
             </div>
+
+            {/* TVA Info */}
+            {(supplier as any).vat_number && (
+              <div className="bg-muted rounded-lg p-4">
+                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  Informations fiscales
+                </h3>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-1">TVA Intracommunautaire</div>
+                    <div className="font-medium flex items-center gap-2">
+                      {(supplier as any).vat_number}
+                      {hasValidVat ? (
+                        <span className="text-xs text-green-600">✓ Format valide</span>
+                      ) : (
+                        <span className="text-xs text-amber-600">⚠ Format invalide</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Contrat */}
             <div>

@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { X, Mail, Phone, MapPin, ShoppingCart, Euro, Calendar, Pencil, Trash2 } from "lucide-react";
+import { X, Mail, Phone, MapPin, ShoppingCart, Euro, Calendar, Pencil, Trash2, Building2, Globe, FileText, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, orderStatusVariant, orderStatusLabel } from "@/components/ui/status-badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
 import { CustomerFormModal } from "@/components/forms/CustomerFormModal";
+import { getVatStatusLabel, isValidVatNumberFormat, type CustomerType } from "@/lib/vat-utils";
 
 interface CustomerDrawerProps {
   customer: Customer | null;
@@ -47,6 +48,13 @@ export function CustomerDrawer({ customer, isOpen, onClose }: CustomerDrawerProp
   if (!isOpen || !customer) return null;
 
   const initials = `${customer.first_name?.[0] || '?'}${customer.last_name?.[0] || ''}`;
+  const isProfessional = customer.customer_type === 'professionnel';
+  const hasValidVat = isValidVatNumberFormat(customer.vat_number);
+  const vatStatus = getVatStatusLabel(
+    customer.country, 
+    (customer.customer_type as CustomerType) || 'particulier', 
+    hasValidVat
+  );
 
   return (
     <>
@@ -56,20 +64,61 @@ export function CustomerDrawer({ customer, isOpen, onClose }: CustomerDrawerProp
           {/* Header */}
           <div className="sticky top-0 bg-card flex items-center justify-between p-6 border-b border-border z-10">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-primary-light flex items-center justify-center text-lg font-semibold text-primary">
-                {initials}
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-semibold ${
+                isProfessional 
+                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' 
+                  : 'bg-primary/10 text-primary'
+              }`}>
+                {isProfessional ? <Building2 className="w-6 h-6" /> : initials}
               </div>
               <div>
-                <h2 className="text-lg font-semibold">{customer.first_name} {customer.last_name}</h2>
-                <p className="text-sm text-muted-foreground">Client depuis {formatDate(customer.created_at)}</p>
+                {isProfessional && customer.company_name ? (
+                  <>
+                    <h2 className="text-lg font-semibold">{customer.company_name}</h2>
+                    <p className="text-sm text-muted-foreground">{customer.first_name} {customer.last_name}</p>
+                  </>
+                ) : (
+                  <>
+                    <h2 className="text-lg font-semibold">{customer.first_name} {customer.last_name}</h2>
+                    <p className="text-sm text-muted-foreground">Client depuis {formatDate(customer.created_at)}</p>
+                  </>
+                )}
               </div>
             </div>
-            <button onClick={onClose} className="p-2 rounded-lg hover:bg-secondary transition-colors">
-              <X className="w-5 h-5 text-muted-foreground" />
-            </button>
+            <div className="flex items-center gap-2">
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                isProfessional 
+                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' 
+                  : 'bg-primary/10 text-primary'
+              }`}>
+                {isProfessional ? 'Professionnel' : 'Particulier'}
+              </span>
+              <button onClick={onClose} className="p-2 rounded-lg hover:bg-secondary transition-colors">
+                <X className="w-5 h-5 text-muted-foreground" />
+              </button>
+            </div>
           </div>
 
           <div className="p-6 space-y-6">
+            {/* TVA Status Banner */}
+            <div className={`rounded-lg p-3 flex items-center justify-between ${
+              vatStatus.includes('0%') 
+                ? 'bg-green-50 dark:bg-green-900/20' 
+                : 'bg-muted'
+            }`}>
+              <div className="flex items-center gap-2">
+                <FileText className={`w-4 h-4 ${
+                  vatStatus.includes('0%') ? 'text-green-600' : 'text-muted-foreground'
+                }`} />
+                <span className="text-sm font-medium">Statut TVA</span>
+              </div>
+              <span className={`text-sm font-semibold ${
+                vatStatus.includes('0%') ? 'text-green-600' : 'text-foreground'
+              }`}>
+                {vatStatus}
+              </span>
+            </div>
+
             {/* Contact Info */}
             <div className="bg-secondary rounded-lg p-4 space-y-3">
               <div className="flex items-center gap-3 text-sm">
@@ -84,13 +133,86 @@ export function CustomerDrawer({ customer, isOpen, onClose }: CustomerDrawerProp
                   <span>{customer.phone}</span>
                 </div>
               )}
-              {(customer.city || customer.country) && (
+              {(customer.address || customer.city || customer.country) && (
+                <div className="flex items-start gap-3 text-sm">
+                  <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
+                  <div>
+                    {customer.address && <div>{customer.address}</div>}
+                    {customer.address_line_2 && <div>{customer.address_line_2}</div>}
+                    <div>
+                      {[
+                        customer.postal_code,
+                        customer.city,
+                        (customer as any).state,
+                        customer.country
+                      ].filter(Boolean).join(', ')}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {(customer as any).website && (
                 <div className="flex items-center gap-3 text-sm">
-                  <MapPin className="w-4 h-4 text-muted-foreground" />
-                  <span>{customer.city}{customer.city && customer.country ? ', ' : ''}{customer.country}</span>
+                  <Globe className="w-4 h-4 text-muted-foreground" />
+                  <a 
+                    href={(customer as any).website} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="text-primary hover:underline"
+                  >
+                    {(customer as any).website}
+                  </a>
                 </div>
               )}
             </div>
+
+            {/* Professional Info */}
+            {isProfessional && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <Building2 className="w-4 h-4" />
+                  Informations entreprise
+                </h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  {customer.company_name && (
+                    <div className="col-span-2">
+                      <div className="text-xs text-muted-foreground mb-1">Raison sociale</div>
+                      <div className="font-medium">{customer.company_name}</div>
+                    </div>
+                  )}
+                  {customer.vat_number && (
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">TVA Intracommunautaire</div>
+                      <div className="font-medium flex items-center gap-2">
+                        {customer.vat_number}
+                        {hasValidVat ? (
+                          <span className="text-xs text-green-600">✓</span>
+                        ) : (
+                          <span className="text-xs text-amber-600">⚠</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {customer.discount_rate != null && customer.discount_rate > 0 && (
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">Remise accordée</div>
+                      <div className="font-medium">{(customer.discount_rate * 100).toFixed(0)}%</div>
+                    </div>
+                  )}
+                  {customer.payment_terms != null && (
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">Délai de paiement</div>
+                      <div className="font-medium">{customer.payment_terms} jours</div>
+                    </div>
+                  )}
+                  {customer.credit_limit != null && (
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">Encours autorisé</div>
+                      <div className="font-medium">{formatCurrency(customer.credit_limit)}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Stats */}
             <div className="grid grid-cols-3 gap-4">
