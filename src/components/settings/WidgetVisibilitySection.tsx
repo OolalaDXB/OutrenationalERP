@@ -406,9 +406,23 @@ export function WidgetVisibilitySection({ visibility, order, onChange }: WidgetV
             variant="ghost"
             size="sm"
             onClick={() => {
-              const allFalse = Object.fromEntries(
-                allWidgetKeys.map(k => [k, false])
-              ) as WidgetVisibility;
+              const allFalse: WidgetVisibility = {
+                dashboard_kpi_cards: false,
+                dashboard_payment_deadlines: false,
+                dashboard_supplier_performance: false,
+                dashboard_monthly_sales: false,
+                kpi_cards: false,
+                profitability_summary: false,
+                sales_evolution: false,
+                cost_breakdown: false,
+                top_profit_products: false,
+                top_customers: false,
+                supplier_stats: false,
+                supplier_sales_evolution: false,
+                orders_by_month: false,
+                stock_by_format: false,
+                products_by_currency: false,
+              };
               onChange(allFalse, order);
               setActivePreset("custom");
             }}

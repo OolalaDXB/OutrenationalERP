@@ -1,15 +1,16 @@
-import { useState } from "react";
+import { useState, useMemo, ReactNode } from "react";
 import { Euro, ShoppingCart, AlertTriangle, Loader2, Users } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { StatusBadge, supplierTypeVariant, supplierTypeLabel } from "@/components/ui/status-badge";
 import { useDashboardKpis, useSupplierSalesView } from "@/hooks/useDashboard";
 import { formatCurrency } from "@/lib/format";
 import { PaymentDeadlinesWidget } from "@/components/dashboard/PaymentDeadlinesWidget";
+import { MonthlySalesChart } from "@/components/dashboard/MonthlySalesChart";
 import { SupplierPayoutManager } from "@/components/suppliers/SupplierPayoutManager";
 import { SupplierDrawer } from "@/components/drawers/SupplierDrawer";
 import { useSuppliers, Supplier } from "@/hooks/useSuppliers";
 import { useSettings } from "@/hooks/useSettings";
-import { defaultWidgetVisibility } from "@/components/settings/WidgetVisibilitySection";
+import { defaultWidgetVisibility, defaultWidgetOrder, type DashboardWidgetVisibility } from "@/components/settings/WidgetVisibilitySection";
 import type { Tables } from "@/integrations/supabase/types";
 
 type SupplierSalesRow = Tables<'v_supplier_sales'>;
@@ -20,6 +21,7 @@ export function Dashboard() {
   const { data: suppliers = [] } = useSuppliers();
   const { data: settings } = useSettings();
   const widgetVisibility = settings?.visible_widgets || defaultWidgetVisibility;
+  const widgetOrder = settings?.widget_order?.dashboard || defaultWidgetOrder.dashboard;
   const [isPayoutManagerOpen, setIsPayoutManagerOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
 
@@ -32,6 +34,114 @@ export function Dashboard() {
   const isLoading = kpisLoading || salesLoading;
   const isError = kpisError || salesError;
   const errorMessage = kpisErr instanceof Error ? kpisErr.message : salesErr instanceof Error ? salesErr.message : "Erreur inconnue";
+
+  // Widget components map
+  const widgetComponents: Record<keyof DashboardWidgetVisibility, ReactNode> = useMemo(() => ({
+    dashboard_kpi_cards: (
+      <div key="dashboard_kpi_cards" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <KpiCard
+          icon={Euro}
+          value={formatCurrency(kpis?.revenue_30d ?? 0)}
+          label="Chiffre d'affaires (30j)"
+          variant="primary"
+        />
+        <KpiCard
+          icon={ShoppingCart}
+          value={(kpis?.orders_30d ?? 0).toString()}
+          label="Commandes (30j)"
+          variant="success"
+        />
+        <KpiCard
+          icon={Users}
+          value={(kpis?.new_customers_30d ?? 0).toString()}
+          label="Nouveaux clients (30j)"
+          variant="info"
+        />
+        <KpiCard
+          icon={AlertTriangle}
+          value={(kpis?.low_stock_alerts ?? 0).toString()}
+          label="Alertes stock"
+          variant="danger"
+        />
+      </div>
+    ),
+    dashboard_monthly_sales: (
+      <MonthlySalesChart key="dashboard_monthly_sales" />
+    ),
+    dashboard_payment_deadlines: (
+      <PaymentDeadlinesWidget key="dashboard_payment_deadlines" onOpenPayoutManager={() => setIsPayoutManagerOpen(true)} />
+    ),
+    dashboard_supplier_performance: (
+      <div key="dashboard_supplier_performance">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-semibold">Performance par fournisseur</h2>
+            <p className="text-sm text-muted-foreground">Toutes périodes confondues</p>
+          </div>
+        </div>
+
+        <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr>
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Fournisseur</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Type</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Commission</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">CA Brut</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Marge ON</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">À reverser</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(supplierSales as SupplierSalesRow[]).map((item) => (
+                <tr key={item.supplier_id} className="border-b border-border last:border-b-0 hover:bg-secondary/50 transition-colors">
+                  <td className="px-6 py-4">
+                    <button 
+                      onClick={() => item.supplier_id && handleSupplierClick(item.supplier_id)}
+                      className="text-left hover:underline"
+                    >
+                      <div className="font-semibold text-primary">{item.supplier_name}</div>
+                      <div className="text-xs text-muted-foreground">{item.items_sold ?? 0} articles vendus</div>
+                    </button>
+                  </td>
+                  <td className="px-6 py-4">
+                    {item.supplier_type && (
+                      <StatusBadge variant={supplierTypeVariant[item.supplier_type]}>
+                        {supplierTypeLabel[item.supplier_type]}
+                      </StatusBadge>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-sm tabular-nums">
+                      {item.supplier_type === "depot_vente" && item.commission_rate
+                        ? `${((item.commission_rate || 0) * 100).toFixed(0)}%`
+                        : "—"}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="font-semibold tabular-nums">{formatCurrency(item.gross_sales)}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="font-semibold tabular-nums text-success">{formatCurrency(item.our_margin)}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`tabular-nums ${(item.supplier_due ?? 0) > 0 ? "text-info font-medium" : "text-muted-foreground"}`}>
+                      {(item.supplier_due ?? 0) > 0 ? formatCurrency(item.supplier_due) : "—"}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {supplierSales.length === 0 && (
+            <div className="p-12 text-center text-muted-foreground">
+              Aucune donnée de vente
+            </div>
+          )}
+        </div>
+      </div>
+    ),
+  }), [kpis, supplierSales, handleSupplierClick]);
 
   if (isLoading) {
     return (
@@ -58,40 +168,11 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* KPI Cards */}
-      {widgetVisibility.dashboard_kpi_cards && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <KpiCard
-            icon={Euro}
-            value={formatCurrency(kpis?.revenue_30d ?? 0)}
-            label="Chiffre d'affaires (30j)"
-            variant="primary"
-          />
-          <KpiCard
-            icon={ShoppingCart}
-            value={(kpis?.orders_30d ?? 0).toString()}
-            label="Commandes (30j)"
-            variant="success"
-          />
-          <KpiCard
-            icon={Users}
-            value={(kpis?.new_customers_30d ?? 0).toString()}
-            label="Nouveaux clients (30j)"
-            variant="info"
-          />
-          <KpiCard
-            icon={AlertTriangle}
-            value={(kpis?.low_stock_alerts ?? 0).toString()}
-            label="Alertes stock"
-            variant="danger"
-          />
-        </div>
-      )}
-
-      {/* Payment Deadlines Widget */}
-      {widgetVisibility.dashboard_payment_deadlines && (
-        <PaymentDeadlinesWidget onOpenPayoutManager={() => setIsPayoutManagerOpen(true)} />
-      )}
+      {/* Render widgets in configured order */}
+      {widgetOrder.map((widgetKey) => {
+        if (!widgetVisibility[widgetKey]) return null;
+        return widgetComponents[widgetKey];
+      })}
 
       {/* Payout Manager Modal */}
       <SupplierPayoutManager
@@ -105,78 +186,6 @@ export function Dashboard() {
           email: s.email || undefined
         }))}
       />
-
-      {/* Supplier Performance Table */}
-      {widgetVisibility.dashboard_supplier_performance && (
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-lg font-semibold">Performance par fournisseur</h2>
-              <p className="text-sm text-muted-foreground">Toutes périodes confondues</p>
-            </div>
-          </div>
-
-          <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr>
-                  <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Fournisseur</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Type</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Commission</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">CA Brut</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Marge ON</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">À reverser</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(supplierSales as SupplierSalesRow[]).map((item) => (
-                  <tr key={item.supplier_id} className="border-b border-border last:border-b-0 hover:bg-secondary/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <button 
-                        onClick={() => item.supplier_id && handleSupplierClick(item.supplier_id)}
-                        className="text-left hover:underline"
-                      >
-                        <div className="font-semibold text-primary">{item.supplier_name}</div>
-                        <div className="text-xs text-muted-foreground">{item.items_sold ?? 0} articles vendus</div>
-                      </button>
-                    </td>
-                    <td className="px-6 py-4">
-                      {item.supplier_type && (
-                        <StatusBadge variant={supplierTypeVariant[item.supplier_type]}>
-                          {supplierTypeLabel[item.supplier_type]}
-                        </StatusBadge>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm tabular-nums">
-                        {item.supplier_type === "depot_vente" && item.commission_rate
-                          ? `${((item.commission_rate || 0) * 100).toFixed(0)}%`
-                          : "—"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-semibold tabular-nums">{formatCurrency(item.gross_sales)}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-semibold tabular-nums text-success">{formatCurrency(item.our_margin)}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`tabular-nums ${(item.supplier_due ?? 0) > 0 ? "text-info font-medium" : "text-muted-foreground"}`}>
-                        {(item.supplier_due ?? 0) > 0 ? formatCurrency(item.supplier_due) : "—"}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {supplierSales.length === 0 && (
-              <div className="p-12 text-center text-muted-foreground">
-                Aucune donnée de vente
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Supplier Drawer */}
       <SupplierDrawer

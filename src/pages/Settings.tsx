@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VatCacheSection } from "@/components/settings/VatCacheSection";
-import { WidgetVisibilitySection, defaultWidgetVisibility, type WidgetVisibility } from "@/components/settings/WidgetVisibilitySection";
+import { WidgetVisibilitySection, defaultWidgetVisibility, defaultWidgetOrder, type WidgetVisibility, type WidgetOrder } from "@/components/settings/WidgetVisibilitySection";
 
 export function SettingsPage() {
   const { toast } = useToast();
@@ -47,8 +47,9 @@ export function SettingsPage() {
     cgv: "",
     // Feature toggles
     show_artists_section: false,
-    // Widget visibility
+    // Widget visibility and order
     visible_widgets: defaultWidgetVisibility,
+    widget_order: defaultWidgetOrder,
   });
 
   // Initialize form when settings load
@@ -81,6 +82,7 @@ export function SettingsPage() {
         cgv: settings.cgv || "",
         show_artists_section: settings.show_artists_section || false,
         visible_widgets: settings.visible_widgets || defaultWidgetVisibility,
+        widget_order: settings.widget_order || defaultWidgetOrder,
       });
     }
   });
@@ -114,6 +116,7 @@ export function SettingsPage() {
       cgv: settings.cgv || "",
       show_artists_section: settings.show_artists_section || false,
       visible_widgets: settings.visible_widgets || defaultWidgetVisibility,
+      widget_order: settings.widget_order || defaultWidgetOrder,
     });
   }
 
@@ -595,7 +598,8 @@ Les prix de nos produits sont indiqués en euros..."
         <TabsContent value="widgets" className="space-y-6">
           <WidgetVisibilitySection
             visibility={formData.visible_widgets}
-            onChange={(visibility) => setFormData({ ...formData, visible_widgets: visibility })}
+            order={formData.widget_order}
+            onChange={(visibility, order) => setFormData({ ...formData, visible_widgets: visibility, widget_order: order })}
           />
         </TabsContent>
 
