@@ -7,6 +7,7 @@ import { useCustomers } from "@/hooks/useCustomers";
 import { useSuppliers } from "@/hooks/useSuppliers";
 import { TopCustomersWidget } from "@/components/analytics/TopCustomersWidget";
 import { SupplierStatsWidget } from "@/components/analytics/SupplierStatsWidget";
+import { SupplierSalesEvolutionChart } from "@/components/analytics/SupplierSalesEvolutionChart";
 import {
   BarChart,
   Bar,
@@ -437,6 +438,12 @@ export function AnalyticsPage() {
         products={products}
         suppliers={suppliers}
         orders={orders}
+      />
+
+      {/* Supplier Sales Evolution Chart */}
+      <SupplierSalesEvolutionChart
+        orders={orders as any}
+        suppliers={suppliers}
       />
 
       {/* Charts Row 2 */}
