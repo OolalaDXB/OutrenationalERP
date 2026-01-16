@@ -246,7 +246,10 @@ export function UserRolesPage() {
           <thead>
             <tr>
               <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">
-                Utilisateur
+                Email
+              </th>
+              <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">
+                Nom / Prénom
               </th>
               <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">
                 Rôle actuel
@@ -280,12 +283,7 @@ export function UserRolesPage() {
                         }
                       </div>
                       <div>
-                        {(userWithRole.first_name || userWithRole.last_name) && (
-                          <div className="font-medium">
-                            {[userWithRole.first_name, userWithRole.last_name].filter(Boolean).join(' ')}
-                          </div>
-                        )}
-                        <div className={userWithRole.first_name || userWithRole.last_name ? "text-sm text-muted-foreground" : "font-medium"}>
+                        <div className="font-medium">
                           {userWithRole.email}
                         </div>
                         {isCurrentUser && (
@@ -293,6 +291,15 @@ export function UserRolesPage() {
                         )}
                       </div>
                     </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    {(userWithRole.first_name || userWithRole.last_name) ? (
+                      <span className="font-medium">
+                        {[userWithRole.first_name, userWithRole.last_name].filter(Boolean).join(' ')}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-muted-foreground italic">Non renseigné</span>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <Badge variant="outline" className={config.color}>
