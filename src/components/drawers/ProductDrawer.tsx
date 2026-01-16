@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Disc3, MapPin, Tag, Package, Euro, TrendingUp, Pencil, Trash2, ExternalLink, Plus, Minus, History, Loader2, Building2, ChevronRight, Music } from "lucide-react";
+import { X, Disc3, MapPin, Tag, Package, Euro, TrendingUp, Pencil, Trash2, ExternalLink, History, Loader2, Building2, ChevronRight, Music, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { StockIndicator } from "@/components/ui/stock-indicator";
@@ -7,7 +7,7 @@ import { ProductImageGalleryViewer } from "@/components/ui/product-image-gallery
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import type { Product } from "@/hooks/useProducts";
 import { useDeleteProduct } from "@/hooks/useProducts";
-import { useStockMovements, useAdjustStock } from "@/hooks/useStockMovements";
+import { useStockMovements } from "@/hooks/useStockMovements";
 import { useSupplier } from "@/hooks/useSuppliers";
 import { useArtist } from "@/hooks/useArtists";
 import { useAuth } from "@/hooks/useAuth";
@@ -82,7 +82,6 @@ const movementTypeColors: Record<string, string> = {
 export function ProductDrawer({ product, isOpen, onClose }: ProductDrawerProps) {
   const { canWrite, canDelete } = useAuth();
   const deleteProduct = useDeleteProduct();
-  const adjustStock = useAdjustStock();
   const { data: stockMovements = [], isLoading: movementsLoading } = useStockMovements(product?.id);
   const { data: supplier } = useSupplier(product?.supplier_id || '');
   const { data: artist } = useArtist(product?.artist_id || '');
@@ -103,22 +102,12 @@ export function ProductDrawer({ product, isOpen, onClose }: ProductDrawerProps) 
     }
   };
 
-  const handleStockAdjust = async (delta: number) => {
-    if (!product) return;
-    try {
-      await adjustStock.mutateAsync({
-        productId: product.id,
-        quantity: delta,
-        type: "adjustment",
-        reason: delta > 0 ? "Ajustement manuel (+)" : "Ajustement manuel (-)"
-      });
-      toast({ 
-        title: "Stock mis à jour", 
-        description: `Stock ${delta > 0 ? 'augmenté' : 'diminué'} de ${Math.abs(delta)} unité(s)` 
-      });
-    } catch (error) {
-      toast({ title: "Erreur", description: "Impossible de mettre à jour le stock.", variant: "destructive" });
-    }
+  // Stock adjustments are now handled automatically via order_items triggers
+  const handleStockInfo = () => {
+    toast({ 
+      title: "Stock automatique", 
+      description: "Le stock est géré automatiquement via les commandes. Créez ou modifiez une commande pour ajuster le stock." 
+    });
   };
 
   if (!isOpen || !product) return null;
@@ -290,49 +279,9 @@ export function ProductDrawer({ product, isOpen, onClose }: ProductDrawerProps) 
                 {/* Quick Stock Adjustment */}
                 {canWrite() && (
                   <div className="mt-4 pt-4 border-t border-border">
-                    <div className="text-xs text-muted-foreground mb-2">Ajustement rapide</div>
-                    <div className="flex items-center gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleStockAdjust(-1)}
-                        disabled={adjustStock.isPending || (product.stock ?? 0) <= 0}
-                        className="gap-1"
-                      >
-                        <Minus className="w-3 h-3" />
-                        1
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleStockAdjust(1)}
-                        disabled={adjustStock.isPending}
-                        className="gap-1"
-                      >
-                        <Plus className="w-3 h-3" />
-                        1
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleStockAdjust(-5)}
-                        disabled={adjustStock.isPending || (product.stock ?? 0) < 5}
-                        className="gap-1"
-                      >
-                        <Minus className="w-3 h-3" />
-                        5
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleStockAdjust(5)}
-                        disabled={adjustStock.isPending}
-                        className="gap-1"
-                      >
-                        <Plus className="w-3 h-3" />
-                        5
-                      </Button>
-                      {adjustStock.isPending && <Loader2 className="w-4 h-4 animate-spin ml-2" />}
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground bg-secondary/50 rounded-lg p-3">
+                      <Info className="w-4 h-4 flex-shrink-0" />
+                      <span>Le stock est géré automatiquement via les commandes.</span>
                     </div>
                   </div>
                 )}

@@ -1,19 +1,22 @@
 import { useState } from "react";
-import { X, ShoppingCart, MapPin, Truck, Clock, Package, Pencil, Trash2, Loader2, CreditCard, Copy, FileText, ExternalLink, Printer } from "lucide-react";
+import { X, ShoppingCart, MapPin, Truck, Clock, Package, Pencil, Trash2, Loader2, CreditCard, Copy, FileText, ExternalLink, Printer, RotateCcw, Ban, Edit3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge, orderStatusVariant, orderStatusLabel } from "@/components/ui/status-badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { Order, OrderItem } from "@/hooks/useOrders";
 import { useCancelOrder, useUpdateOrder } from "@/hooks/useOrders";
-import { useRestoreStock } from "@/hooks/useRestoreStock";
+import { useCancelOrderItem, useReturnOrderItem, useUpdateOrderItemQuantity } from "@/hooks/useOrderItemMutations";
 import { useAuth } from "@/hooks/useAuth";
 import { useProducts, Product } from "@/hooks/useProducts";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
+import { getErrorToast } from "@/lib/supabase-errors";
 import { OrderEditModal } from "@/components/forms/OrderEditModal";
 import { OrderFormModal } from "@/components/forms/OrderFormModal";
 import { ProductDrawer } from "@/components/drawers/ProductDrawer";
@@ -51,7 +54,9 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   const navigate = useNavigate();
   const cancelOrder = useCancelOrder();
   const updateOrder = useUpdateOrder();
-  const restoreStock = useRestoreStock();
+  const cancelOrderItem = useCancelOrderItem();
+  const returnOrderItem = useReturnOrderItem();
+  const updateItemQuantity = useUpdateOrderItemQuantity();
   const { data: products = [] } = useProducts();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
@@ -63,6 +68,13 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   const [trackingUrl, setTrackingUrl] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isProductDrawerOpen, setIsProductDrawerOpen] = useState(false);
+  
+  // Item action dialogs
+  const [itemToCancel, setItemToCancel] = useState<OrderItem | null>(null);
+  const [itemToReturn, setItemToReturn] = useState<OrderItem | null>(null);
+  const [returnReason, setReturnReason] = useState("");
+  const [itemToEdit, setItemToEdit] = useState<OrderItem | null>(null);
+  const [editQuantity, setEditQuantity] = useState(1);
 
   const handleViewInvoice = () => {
     onClose();
@@ -86,32 +98,53 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   const handleCancel = async () => {
     if (!order) return;
     try {
-      // Restore stock for all items if order was in a status where stock was decremented
-      if (order.order_items && order.order_items.length > 0) {
-        const result = await restoreStock.mutateAsync({
-          items: order.order_items.map(item => ({
-            product_id: item.product_id,
-            quantity: item.quantity,
-            title: item.title
-          })),
-          orderId: order.id,
-          orderStatus: order.status,
-          reason: 'Annulation commande'
-        });
-        
-        if (result.restoredCount > 0) {
-          toast({ 
-            title: "Stock restauré", 
-            description: `Stock restauré pour ${result.restoredCount} produit(s)` 
-          });
-        }
-      }
-
+      // Stock restoration is now handled automatically by the database trigger
+      // when we cancel the order - the trigger will create sale_reversal movements
       await cancelOrder.mutateAsync({ id: order.id, reason: "Annulation par l'utilisateur" });
-      toast({ title: "Commande annulée", description: `La commande ${order.order_number} a été annulée.` });
+      toast({ title: "Commande annulée", description: `La commande ${order.order_number} a été annulée. Le stock a été restauré automatiquement.` });
       setShowCancelDialog(false);
     } catch (error) {
-      toast({ title: "Erreur", description: "Impossible d'annuler la commande.", variant: "destructive" });
+      toast(getErrorToast(error));
+    }
+  };
+
+  // Item-level actions
+  const handleCancelItem = async () => {
+    if (!itemToCancel || !order) return;
+    try {
+      await cancelOrderItem.mutateAsync({ itemId: itemToCancel.id, orderId: order.id });
+      toast({ title: "Article annulé", description: `${itemToCancel.title} a été annulé. Le stock a été restauré.` });
+      setItemToCancel(null);
+    } catch (error) {
+      toast(getErrorToast(error));
+    }
+  };
+
+  const handleReturnItem = async () => {
+    if (!itemToReturn || !order || !returnReason.trim()) return;
+    try {
+      await returnOrderItem.mutateAsync({ itemId: itemToReturn.id, orderId: order.id, returnReason });
+      toast({ title: "Retour enregistré", description: `${itemToReturn.title} a été marqué comme retourné. Le stock a été restauré.` });
+      setItemToReturn(null);
+      setReturnReason("");
+    } catch (error) {
+      toast(getErrorToast(error));
+    }
+  };
+
+  const handleUpdateQuantity = async () => {
+    if (!itemToEdit || !order || editQuantity <= 0) return;
+    try {
+      await updateItemQuantity.mutateAsync({ 
+        itemId: itemToEdit.id, 
+        orderId: order.id, 
+        newQuantity: editQuantity,
+        unitPrice: itemToEdit.unit_price
+      });
+      toast({ title: "Quantité mise à jour", description: `Quantité modifiée pour ${itemToEdit.title}.` });
+      setItemToEdit(null);
+    } catch (error) {
+      toast(getErrorToast(error));
     }
   };
 
