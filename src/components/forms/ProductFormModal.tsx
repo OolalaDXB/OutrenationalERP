@@ -41,6 +41,7 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
     artist_name: string;
     supplier_id: string;
     label_id: string;
+    catalog_number: string;
     format: Enums<'product_format'>;
     selling_price: number;
     purchase_price: number | null;
@@ -65,6 +66,7 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
     artist_name: "",
     supplier_id: "",
     label_id: "",
+    catalog_number: "",
     format: "lp",
     selling_price: 0,
     purchase_price: null,
@@ -95,6 +97,7 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
         artist_name: product.artist_name || "",
         supplier_id: product.supplier_id || "",
         label_id: product.label_id || "",
+        catalog_number: product.catalog_number || "",
         format: product.format || "lp",
         selling_price: product.selling_price || 0,
         purchase_price: product.purchase_price || null,
@@ -128,6 +131,7 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
         artist_name: "",
         supplier_id: "",
         label_id: "",
+        catalog_number: "",
         format: "lp",
         selling_price: 0,
         purchase_price: null,
@@ -170,6 +174,7 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
       artist_name: data.artist || prev.artist_name,
       year_released: data.year || prev.year_released,
       format: (data.format as Enums<'product_format'>) || prev.format,
+      catalog_number: data.catalogNumber || prev.catalog_number,
     }));
 
     // Try to find or create label if provided
@@ -241,6 +246,7 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
         supplier_id: formData.supplier_id,
         label_id: formData.label_id || null,
         label_name: selectedLabel?.name || null,
+        catalog_number: formData.catalog_number || null,
         format: formData.format,
         selling_price: formData.selling_price,
         purchase_price: formData.purchase_price,
@@ -391,6 +397,16 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
                     <option key={l.id} value={l.id}>{l.name}</option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Numéro de catalogue</Label>
+                <Input
+                  value={formData.catalog_number}
+                  onChange={(e) => setFormData({ ...formData, catalog_number: e.target.value })}
+                  placeholder="CAT001"
+                  className="mt-1.5"
+                />
               </div>
 
               <div>

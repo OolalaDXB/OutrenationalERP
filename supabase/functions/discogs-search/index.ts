@@ -14,6 +14,7 @@ interface DiscogsSearchResult {
   country?: string;
   label?: string[];
   format?: string[];
+  catno?: string;
   resource_url: string;
 }
 
@@ -106,6 +107,7 @@ serve(async (req) => {
               country: result.country,
               label: result.label,
               format: result.format,
+              catno: releaseData.labels?.[0]?.catno || result.catno,
               thumb: result.thumb,
               cover_image: result.cover_image,
               images: releaseData.images?.map((img: any) => ({
@@ -124,6 +126,7 @@ serve(async (req) => {
             country: result.country,
             label: result.label,
             format: result.format,
+            catno: result.catno,
             thumb: result.thumb,
             cover_image: result.cover_image,
             images: result.cover_image ? [{ uri: result.cover_image, type: 'primary' }] : [],
@@ -137,6 +140,7 @@ serve(async (req) => {
             country: result.country,
             label: result.label,
             format: result.format,
+            catno: result.catno,
             thumb: result.thumb,
             cover_image: result.cover_image,
             images: result.cover_image ? [{ uri: result.cover_image, type: 'primary' }] : [],
