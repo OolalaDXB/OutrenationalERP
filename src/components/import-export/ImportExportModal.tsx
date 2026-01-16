@@ -1,5 +1,5 @@
-import { useState, useRef } from "react";
-import { Loader2, Upload, Download, FileSpreadsheet, CheckCircle2, XCircle, AlertTriangle, FileDown, RefreshCw, Plus } from "lucide-react";
+import { useState, useRef, useMemo } from "react";
+import { Loader2, Upload, Download, FileSpreadsheet, XCircle, AlertTriangle, FileDown, RefreshCw, Plus, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -22,6 +22,7 @@ import {
   customerHeaderMapping,
   supplierHeaderMapping,
 } from "@/lib/excel-utils";
+import { ChangesPreviewModal, fieldLabels } from "./ChangesPreviewModal";
 
 type EntityType = 'products' | 'customers' | 'suppliers';
 type ImportMode = 'insert' | 'update';
@@ -79,6 +80,7 @@ export function ImportExportModal({ isOpen, onClose, entityType, data, onImportS
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [fileName, setFileName] = useState("");
+  const [showChangesPreview, setShowChangesPreview] = useState(false);
 
   const handleDownloadTemplate = () => {
     generateTemplateXLS(config.templateColumns, `${entityType}_import`);
@@ -332,6 +334,7 @@ export function ImportExportModal({ isOpen, onClose, entityType, data, onImportS
     setFileName("");
     setActiveTab('import');
     setImportMode('insert');
+    setShowChangesPreview(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
     onClose();
   };
@@ -340,6 +343,63 @@ export function ImportExportModal({ isOpen, onClose, entityType, data, onImportS
     setImportMode(mode);
     // Revalidate after state update
     setTimeout(revalidateRows, 0);
+  };
+
+  // Calculate changes for preview
+  const recordChanges = useMemo(() => {
+    const rowsToUpdate = parsedRows.filter(r => r.status === 'update' && r.existingId);
+    const labels = fieldLabels[entityType] || {};
+    
+    return rowsToUpdate.map(row => {
+      const existingRecord = data.find(d => d.id === row.existingId);
+      if (!existingRecord) return null;
+      
+      const changes: { field: string; label: string; oldValue: string | number | null; newValue: string | number | null }[] = [];
+      
+      // Compare fields
+      const fieldsToCompare = Object.keys(labels);
+      for (const field of fieldsToCompare) {
+        const oldVal = existingRecord[field];
+        const newVal = row.data[field];
+        
+        // Normalize for comparison
+        const normalizeVal = (v: unknown): string => {
+          if (v === null || v === undefined || v === '') return '';
+          return String(v).trim();
+        };
+        
+        if (normalizeVal(oldVal) !== normalizeVal(newVal) && newVal !== undefined) {
+          changes.push({
+            field,
+            label: labels[field] || field,
+            oldValue: oldVal as string | number | null,
+            newValue: newVal as string | number | null,
+          });
+        }
+      }
+      
+      if (changes.length === 0) return null;
+      
+      return {
+        identifier: String(row.data[config.uniqueField] || ''),
+        displayName: entityType === 'products' 
+          ? String(row.data.title || row.data.sku || '—')
+          : entityType === 'customers'
+            ? String(row.data.email || '—')
+            : String(row.data.name || '—'),
+        existingId: row.existingId!,
+        changes,
+      };
+    }).filter(Boolean) as { identifier: string; displayName: string; existingId: string; changes: { field: string; label: string; oldValue: string | number | null; newValue: string | number | null }[] }[];
+  }, [parsedRows, data, entityType, config.uniqueField]);
+
+  const handlePreviewChanges = () => {
+    if (recordChanges.length > 0) {
+      setShowChangesPreview(true);
+    } else {
+      // No actual changes, just proceed
+      handleImport();
+    }
   };
 
   const validCount = parsedRows.filter(r => r.status === 'valid').length;
@@ -539,24 +599,49 @@ export function ImportExportModal({ isOpen, onClose, entityType, data, onImportS
           </TabsContent>
         </Tabs>
 
-        <DialogFooter>
+        <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={handleClose}>
             Fermer
           </Button>
           {activeTab === 'import' && (
-            <Button 
-              onClick={handleImport} 
-              disabled={isImporting || actionableCount === 0}
-            >
-              {isImporting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              {importMode === 'update' 
-                ? `Traiter ${actionableCount} ${config.title.toLowerCase()}`
-                : `Importer ${validCount} ${config.title.toLowerCase()}`
-              }
-            </Button>
+            <>
+              {importMode === 'update' && updateCount > 0 && (
+                <Button 
+                  variant="secondary"
+                  onClick={handlePreviewChanges} 
+                  disabled={isImporting || updateCount === 0}
+                >
+                  <Eye className="w-4 h-4 mr-2" />
+                  Aperçu des modifications
+                </Button>
+              )}
+              <Button 
+                onClick={handleImport} 
+                disabled={isImporting || actionableCount === 0}
+              >
+                {isImporting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                {importMode === 'update' 
+                  ? `Traiter ${actionableCount} ${config.title.toLowerCase()}`
+                  : `Importer ${validCount} ${config.title.toLowerCase()}`
+                }
+              </Button>
+            </>
           )}
         </DialogFooter>
       </DialogContent>
+
+      {/* Changes preview modal */}
+      <ChangesPreviewModal
+        isOpen={showChangesPreview}
+        onClose={() => setShowChangesPreview(false)}
+        onConfirm={() => {
+          setShowChangesPreview(false);
+          handleImport();
+        }}
+        isLoading={isImporting}
+        recordChanges={recordChanges}
+        entityTitle={config.title}
+      />
     </Dialog>
   );
 }
