@@ -51,21 +51,74 @@ export function InvoicesPage() {
   }, [searchParams]);
 
   // Fetch invoices from Supabase
-  const { data: invoices = [], isLoading } = useQuery({
+  const {
+    data: invoices = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["invoices"],
+    retry: false,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("invoices")
-        .select(`
-          *,
-          invoice_items (*)
-        `)
-        .order("created_at", { ascending: false });
-      
-      if (error) throw error;
-      return data as InvoiceWithItems[];
+      // Guard: surface misconfiguration early (prevents endless spinners)
+      const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+      const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
+      if (!url || !key) {
+        throw new Error(
+          "Configuration Supabase manquante: VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY."
+        );
+      }
+
+      // Timeout guard to avoid a fetch that never resolves
+      const timeoutMs = 15000;
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout lors du chargement des factures.")), timeoutMs)
+      );
+
+      const request = (async () => {
+        const { data, error } = await supabase
+          .from("invoices")
+          .select(`
+            *,
+            invoice_items (*)
+          `)
+          .order("created_at", { ascending: false });
+
+        if (error) throw error;
+        return data as InvoiceWithItems[];
+      })();
+
+      return await Promise.race([request, timeout]);
     },
   });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    const message = error instanceof Error ? error.message : "Erreur inconnue";
+    console.error("InvoicesPage query error:", error);
+
+    return (
+      <div className="space-y-3">
+        <div className="rounded-lg border border-border bg-card p-4">
+          <div className="text-sm font-semibold">Impossible de charger les factures</div>
+          <div className="mt-1 text-sm text-muted-foreground">{message}</div>
+          <div className="mt-3 flex gap-2">
+            <Button variant="outline" onClick={() => refetch()}>
+              Réessayer
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Filtrage
   const filteredInvoices = useMemo(() => {
@@ -85,8 +138,12 @@ export function InvoicesPage() {
   // Stats
   const stats = useMemo(() => {
     const totalAmount = invoices.reduce((sum, i) => sum + i.total, 0);
-    const paidAmount = invoices.filter((i) => i.status === "paid").reduce((sum, i) => sum + i.total, 0);
-    const pendingAmount = invoices.filter((i) => i.status === "sent" || i.status === "draft").reduce((sum, i) => sum + i.total, 0);
+    const paidAmount = invoices
+      .filter((i) => i.status === "paid")
+      .reduce((sum, i) => sum + i.total, 0);
+    const pendingAmount = invoices
+      .filter((i) => i.status === "sent" || i.status === "draft")
+      .reduce((sum, i) => sum + i.total, 0);
     const overdueCount = invoices.filter((i) => i.status === "overdue").length;
 
     return { totalAmount, paidAmount, pendingAmount, overdueCount };
@@ -147,7 +204,11 @@ export function InvoicesPage() {
       ],
       theme: "striped",
       headStyles: { fillColor: [113, 75, 103] },
-      footStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: "bold" },
+      footStyles: {
+        fillColor: [240, 240, 240],
+        textColor: [0, 0, 0],
+        fontStyle: "bold",
+      },
     });
 
     // Notes
@@ -169,14 +230,6 @@ export function InvoicesPage() {
     // Save
     doc.save(`${invoice.invoice_number}.pdf`);
   };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
