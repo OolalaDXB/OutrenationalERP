@@ -48,6 +48,20 @@ export function useSuppliersByLabel(labelId: string | null) {
   });
 }
 
+export function useAllSupplierLabels() {
+  return useQuery({
+    queryKey: ['supplier_labels', 'all'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('supplier_labels')
+        .select('*');
+      
+      if (error) throw error;
+      return data as SupplierLabel[];
+    },
+  });
+}
+
 export function useSaveSupplierLabels() {
   const queryClient = useQueryClient();
   
