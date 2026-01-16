@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { X, Package, Loader2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { X, Package, Loader2, Upload, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useSuppliers } from "@/hooks/useSuppliers";
 import { useCreateProduct, useUpdateProduct, type Product, type ProductInsert } from "@/hooks/useProducts";
 import type { Enums } from "@/integrations/supabase/types";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ProductFormProps {
   isOpen: boolean;
@@ -23,6 +24,10 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
   
   const isEditMode = !!product;
   
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  
   const [formData, setFormData] = useState<{
     sku: string;
     title: string;
@@ -36,6 +41,10 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
     stock_threshold: number;
     location: string;
     status: Enums<'product_status'>;
+    condition_media: Enums<'vinyl_condition'>;
+    condition_sleeve: Enums<'vinyl_condition'>;
+    year_released: number | null;
+    image_url: string | null;
   }>({
     sku: "",
     title: "",
@@ -49,6 +58,10 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
     stock_threshold: 10,
     location: "",
     status: "draft",
+    condition_media: "M",
+    condition_sleeve: "M",
+    year_released: null,
+    image_url: null,
   });
 
   // Populate form when editing
@@ -67,7 +80,12 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
         stock_threshold: product.stock_threshold || 10,
         location: product.location || "",
         status: product.status || "draft",
+        condition_media: product.condition_media || "M",
+        condition_sleeve: product.condition_sleeve || "M",
+        year_released: product.year_released || null,
+        image_url: product.image_url || null,
       });
+      setImagePreview(product.image_url || null);
     } else {
       // Reset form for create mode
       setFormData({
@@ -83,9 +101,47 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
         stock_threshold: 10,
         location: "",
         status: "draft",
+        condition_media: "M",
+        condition_sleeve: "M",
+        year_released: null,
+        image_url: null,
       });
+      setImagePreview(null);
     }
   }, [product, isOpen]);
+
+  const handleImageUpload = async (file: File) => {
+    if (!file) return;
+    
+    setIsUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `products/${fileName}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(filePath, file);
+      
+      if (uploadError) throw uploadError;
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(filePath);
+      
+      setFormData(prev => ({ ...prev, image_url: publicUrl }));
+      setImagePreview(publicUrl);
+      toast({ title: "Image téléchargée", description: "L'image a été ajoutée au produit" });
+    } catch (error) {
+      toast({ 
+        title: "Erreur", 
+        description: "Impossible de télécharger l'image", 
+        variant: "destructive" 
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -113,6 +169,10 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
         stock_threshold: formData.stock_threshold,
         location: formData.location || null,
         status: formData.status,
+        condition_media: formData.condition_media,
+        condition_sleeve: formData.condition_sleeve,
+        year_released: formData.year_released,
+        image_url: formData.image_url,
       };
 
       if (isEditMode && product) {
@@ -154,6 +214,50 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Image */}
+          <div>
+            <h3 className="text-sm font-semibold mb-4">Photo du produit</h3>
+            <div className="flex items-start gap-4">
+              <div 
+                onClick={() => fileInputRef.current?.click()}
+                className="w-24 h-24 rounded-lg border-2 border-dashed border-border hover:border-primary/50 flex items-center justify-center cursor-pointer transition-colors overflow-hidden bg-secondary/30"
+              >
+                {imagePreview ? (
+                  <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                ) : isUploading ? (
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                ) : (
+                  <ImageIcon className="w-6 h-6 text-muted-foreground" />
+                )}
+              </div>
+              <div className="flex-1">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleImageUpload(file);
+                  }}
+                />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  {isUploading ? "Téléchargement..." : "Ajouter une image"}
+                </Button>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Utilisez cette option si l'image n'a pas été trouvée automatiquement via le code-barres ou SKU
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Info produit */}
           <div>
             <h3 className="text-sm font-semibold mb-4">Informations produit</h3>
@@ -221,6 +325,19 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
                 </select>
               </div>
 
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Année de sortie</Label>
+                <Input
+                  type="number"
+                  min="1900"
+                  max={new Date().getFullYear()}
+                  value={formData.year_released || ""}
+                  onChange={(e) => setFormData({ ...formData, year_released: e.target.value ? Number(e.target.value) : null })}
+                  placeholder="2024"
+                  className="mt-1.5"
+                />
+              </div>
+
               <div className="col-span-2">
                 <Label className="text-sm font-medium text-muted-foreground">Description</Label>
                 <Textarea
@@ -231,6 +348,51 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
                 />
               </div>
             </div>
+          </div>
+
+          {/* État du vinyle */}
+          <div>
+            <h3 className="text-sm font-semibold mb-4">État du vinyle</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">État média</Label>
+                <select
+                  value={formData.condition_media}
+                  onChange={(e) => setFormData({ ...formData, condition_media: e.target.value as Enums<'vinyl_condition'> })}
+                  className="w-full mt-1.5 px-3 py-2 rounded-lg border border-border bg-card text-sm"
+                >
+                  <option value="M">Mint (M) - Neuf</option>
+                  <option value="NM">Near Mint (NM)</option>
+                  <option value="VG+">Very Good+ (VG+)</option>
+                  <option value="VG">Very Good (VG)</option>
+                  <option value="G+">Good+ (G+)</option>
+                  <option value="G">Good (G)</option>
+                  <option value="F">Fair (F)</option>
+                  <option value="P">Poor (P)</option>
+                </select>
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">État pochette</Label>
+                <select
+                  value={formData.condition_sleeve}
+                  onChange={(e) => setFormData({ ...formData, condition_sleeve: e.target.value as Enums<'vinyl_condition'> })}
+                  className="w-full mt-1.5 px-3 py-2 rounded-lg border border-border bg-card text-sm"
+                >
+                  <option value="M">Mint (M) - Neuf</option>
+                  <option value="NM">Near Mint (NM)</option>
+                  <option value="VG+">Very Good+ (VG+)</option>
+                  <option value="VG">Very Good (VG)</option>
+                  <option value="G+">Good+ (G+)</option>
+                  <option value="G">Good (G)</option>
+                  <option value="F">Fair (F)</option>
+                  <option value="P">Poor (P)</option>
+                </select>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Par défaut à "Mint" pour les produits neufs. Ajustez si nécessaire pour les produits d'occasion.
+            </p>
           </div>
 
           {/* Prix */}
