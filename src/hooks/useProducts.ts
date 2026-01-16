@@ -79,7 +79,11 @@ export function useLowStockProducts() {
 }
 
 
-export function useCreateProduct() {
+interface CreateProductOptions {
+  onIncompleteProduct?: (product: any, missingFields: string[]) => void;
+}
+
+export function useCreateProduct(options?: CreateProductOptions) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (product: ProductInsert) => {
@@ -91,8 +95,19 @@ export function useCreateProduct() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      
+      // Check for missing fields and trigger notification
+      const missingFields: string[] = [];
+      if (!data.label_id) missingFields.push('label');
+      if (!data.supplier_id) missingFields.push('fournisseur');
+      if (!data.barcode) missingFields.push('code-barres');
+      if (!data.sku) missingFields.push('SKU');
+      
+      if (missingFields.length > 0 && options?.onIncompleteProduct) {
+        options.onIncompleteProduct(data, missingFields);
+      }
     }
   });
 }

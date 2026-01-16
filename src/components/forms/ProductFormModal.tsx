@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useSuppliers } from "@/hooks/useSuppliers";
 import { useLabels } from "@/hooks/useLabels";
 import { useCreateProduct, useUpdateProduct, type Product, type ProductInsert } from "@/hooks/useProducts";
+import { useProductNotifications } from "@/hooks/useProductNotifications";
 import type { Enums } from "@/integrations/supabase/types";
 import { ProductImageGallery } from "./ProductImageGallery";
 import { CurrencyExchangeField } from "./CurrencyExchangeField";
@@ -22,7 +23,10 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
   const { toast } = useToast();
   const { data: suppliers = [] } = useSuppliers();
   const { data: labels = [] } = useLabels();
-  const createProduct = useCreateProduct();
+  const { notifyIncompleteProduct } = useProductNotifications();
+  const createProduct = useCreateProduct({
+    onIncompleteProduct: notifyIncompleteProduct
+  });
   const updateProduct = useUpdateProduct();
   
   const isEditMode = !!product;

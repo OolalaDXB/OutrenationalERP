@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from "react";
 import { products, orders } from "@/data/demo-data";
 
-export type NotificationType = "stock_alert" | "new_order" | "order_shipped" | "payment" | "supplier" | "info";
+export type NotificationType = "stock_alert" | "new_order" | "order_shipped" | "payment" | "supplier" | "info" | "incomplete_product";
 
 export interface Notification {
   id: string;

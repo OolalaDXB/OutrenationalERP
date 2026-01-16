@@ -7,6 +7,7 @@ interface SupplierStatsWidgetProps {
   products: Product[];
   suppliers: Supplier[];
   orders: any[];
+  onSupplierClick?: (supplierId: string) => void;
 }
 
 function formatCurrency(value: number) {
@@ -16,7 +17,7 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
-export function SupplierStatsWidget({ products, suppliers, orders }: SupplierStatsWidgetProps) {
+export function SupplierStatsWidget({ products, suppliers, orders, onSupplierClick }: SupplierStatsWidgetProps) {
   const supplierStats = useMemo(() => {
     const stats = new Map<string, {
       supplierId: string;
@@ -170,7 +171,12 @@ export function SupplierStatsWidget({ products, suppliers, orders }: SupplierSta
               <tr key={stat.supplierId} className="border-b border-border/50 hover:bg-secondary/30">
                 <td className="py-3 px-2 text-muted-foreground">{index + 1}</td>
                 <td className="py-3 px-2">
-                  <div className="font-medium">{stat.supplierName}</div>
+                  <button 
+                    onClick={() => onSupplierClick?.(stat.supplierId)}
+                    className="text-left hover:underline"
+                  >
+                    <div className="font-medium">{stat.supplierName}</div>
+                  </button>
                 </td>
                 <td className="py-3 px-2 text-center">
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-secondary">
