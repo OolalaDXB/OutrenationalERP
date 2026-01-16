@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+import { withTimeout } from '@/lib/withTimeout';
 
 export type Supplier = Tables<'suppliers'>;
 export type SupplierInsert = TablesInsert<'suppliers'>;
@@ -9,13 +10,18 @@ export type SupplierUpdate = TablesUpdate<'suppliers'>;
 export function useSuppliers() {
   return useQuery({
     queryKey: ['suppliers'],
+    retry: false,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('suppliers')
-        .select('*')
-        .order('name');
-      if (error) throw error;
-      return data;
+      const request = (async () => {
+        const { data, error } = await supabase
+          .from('suppliers')
+          .select('*')
+          .order('name');
+        if (error) throw error;
+        return data;
+      })();
+
+      return withTimeout(request, 15000, 'Timeout lors du chargement des fournisseurs.');
     }
   });
 }
@@ -23,14 +29,19 @@ export function useSuppliers() {
 export function useSupplier(id: string) {
   return useQuery({
     queryKey: ['suppliers', id],
+    retry: false,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('suppliers')
-        .select('*')
-        .eq('id', id)
-        .single();
-      if (error) throw error;
-      return data;
+      const request = (async () => {
+        const { data, error } = await supabase
+          .from('suppliers')
+          .select('*')
+          .eq('id', id)
+          .single();
+        if (error) throw error;
+        return data;
+      })();
+
+      return withTimeout(request, 15000, 'Timeout lors du chargement du fournisseur.');
     },
     enabled: !!id
   });
@@ -39,17 +50,23 @@ export function useSupplier(id: string) {
 export function useActiveSuppliers() {
   return useQuery({
     queryKey: ['suppliers', 'active'],
+    retry: false,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('suppliers')
-        .select('*')
-        .eq('active', true)
-        .order('name');
-      if (error) throw error;
-      return data;
+      const request = (async () => {
+        const { data, error } = await supabase
+          .from('suppliers')
+          .select('*')
+          .eq('active', true)
+          .order('name');
+        if (error) throw error;
+        return data;
+      })();
+
+      return withTimeout(request, 15000, 'Timeout lors du chargement des fournisseurs actifs.');
     }
   });
 }
+
 
 export function useCreateSupplier() {
   const queryClient = useQueryClient();
