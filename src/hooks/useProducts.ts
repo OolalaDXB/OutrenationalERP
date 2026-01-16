@@ -3,7 +3,10 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { withTimeout } from '@/lib/withTimeout';
 
-export type Product = Tables<'products'>;
+export type Product = Tables<'products'> & {
+  label_country?: string | null;
+  label_website?: string | null;
+};
 export type ProductInsert = TablesInsert<'products'>;
 export type ProductUpdate = TablesUpdate<'products'>;
 
@@ -15,10 +18,22 @@ export function useProducts() {
       const request = (async () => {
         const { data, error } = await supabase
           .from('products')
-          .select('*')
+          .select(`
+            *,
+            labels:label_id (
+              country,
+              website
+            )
+          `)
           .order('title');
         if (error) throw error;
-        return data;
+        
+        // Map label data to flat structure for easier access
+        return data.map(product => ({
+          ...product,
+          label_country: (product.labels as any)?.country ?? null,
+          label_website: (product.labels as any)?.website ?? null,
+        }));
       })();
       return withTimeout(request, 15000, 'Timeout lors du chargement des produits.');
     }

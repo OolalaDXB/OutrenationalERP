@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useSuppliers } from "@/hooks/useSuppliers";
+import { useLabels } from "@/hooks/useLabels";
 import { useCreateProduct, useUpdateProduct, type Product, type ProductInsert } from "@/hooks/useProducts";
 import type { Enums } from "@/integrations/supabase/types";
 import { ProductImageGallery } from "./ProductImageGallery";
@@ -20,6 +21,7 @@ interface ProductFormProps {
 export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps) {
   const { toast } = useToast();
   const { data: suppliers = [] } = useSuppliers();
+  const { data: labels = [] } = useLabels();
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
   
@@ -32,6 +34,7 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
     title: string;
     artist_name: string;
     supplier_id: string;
+    label_id: string;
     format: Enums<'product_format'>;
     selling_price: number;
     purchase_price: number | null;
@@ -55,6 +58,7 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
     title: "",
     artist_name: "",
     supplier_id: "",
+    label_id: "",
     format: "lp",
     selling_price: 0,
     purchase_price: null,
@@ -84,6 +88,7 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
         title: product.title || "",
         artist_name: product.artist_name || "",
         supplier_id: product.supplier_id || "",
+        label_id: product.label_id || "",
         format: product.format || "lp",
         selling_price: product.selling_price || 0,
         purchase_price: product.purchase_price || null,
@@ -116,6 +121,7 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
         title: "",
         artist_name: "",
         supplier_id: "",
+        label_id: "",
         format: "lp",
         selling_price: 0,
         purchase_price: null,
@@ -164,6 +170,9 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
     }
 
     try {
+      // Find label to populate label_name
+      const selectedLabel = labels.find(l => l.id === formData.label_id);
+      
       const productData: ProductInsert & {
         marketplace_fees?: number;
         import_fees?: number;
@@ -175,6 +184,8 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
         title: formData.title,
         artist_name: formData.artist_name || null,
         supplier_id: formData.supplier_id,
+        label_id: formData.label_id || null,
+        label_name: selectedLabel?.name || null,
         format: formData.format,
         selling_price: formData.selling_price,
         purchase_price: formData.purchase_price,
@@ -309,6 +320,20 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
                   <option value="10inch">10"</option>
                   <option value="12inch">12"</option>
                   <option value="cassette">Cassette</option>
+                </select>
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Label</Label>
+                <select
+                  value={formData.label_id}
+                  onChange={(e) => setFormData({ ...formData, label_id: e.target.value })}
+                  className="w-full mt-1.5 px-3 py-2 rounded-lg border border-border bg-card text-sm"
+                >
+                  <option value="">Aucun label</option>
+                  {labels.map(l => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
                 </select>
               </div>
 
