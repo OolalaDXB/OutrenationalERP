@@ -39,7 +39,41 @@ import "@fontsource/inter/500.css";
 import "@fontsource/inter/600.css";
 import "@fontsource/inter/700.css";
 
-const queryClient = new QueryClient();
+// Configure QueryClient with proper defaults to avoid cache/retry issues
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Cache data for 5 minutes before considering it stale
+      staleTime: 1000 * 60 * 5,
+      // Keep unused data in cache for 10 minutes
+      gcTime: 1000 * 60 * 10,
+      // Custom retry logic
+      retry: (failureCount, error) => {
+        // Don't retry on authentication errors
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (
+          errorMessage.includes('JWT') ||
+          errorMessage.includes('401') ||
+          errorMessage.includes('403') ||
+          errorMessage.includes('not authenticated') ||
+          errorMessage.includes('Invalid token')
+        ) {
+          return false;
+        }
+        // Retry other errors up to 2 times
+        return failureCount < 2;
+      },
+      // Don't refetch on window focus to avoid unnecessary requests
+      refetchOnWindowFocus: false,
+      // Don't refetch on reconnect automatically
+      refetchOnReconnect: 'always',
+    },
+    mutations: {
+      // Don't retry mutations by default
+      retry: false,
+    },
+  },
+});
 
 const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   "/": { title: "Dashboard", subtitle: "Vue d'ensemble" },
@@ -56,13 +90,17 @@ const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   "/analytics": { title: "Analytics", subtitle: "Statistiques" },
   "/supplier-sales": { title: "Ventes par fournisseur", subtitle: "Rapports" },
   "/admin/roles": { title: "Gestion des rôles", subtitle: "Administration" },
-  
   "/admin/settings": { title: "Paramètres", subtitle: "Configuration" },
 };
 
-const BackofficeContent = forwardRef<HTMLDivElement>(function BackofficeContent(_props, ref) {
+function BackofficeContentInner({ onNavigate }: { onNavigate: (path: string) => void }) {
   const { user, loading } = useAuth();
   const [currentPath, setCurrentPath] = useState("/");
+
+  const handleNavigate = (path: string) => {
+    setCurrentPath(path);
+    onNavigate(path);
+  };
 
   if (loading) {
     return (
@@ -92,7 +130,6 @@ const BackofficeContent = forwardRef<HTMLDivElement>(function BackofficeContent(
       case "/analytics": return <AnalyticsPage />;
       case "/supplier-sales": return <SupplierSalesPage />;
       case "/admin/roles": return <UserRolesPage />;
-      
       case "/admin/settings": return <SettingsPage />;
       default: return <Dashboard />;
     }
@@ -102,13 +139,23 @@ const BackofficeContent = forwardRef<HTMLDivElement>(function BackofficeContent(
 
   return (
     <NotificationProvider>
-      <div ref={ref} className="min-h-screen bg-background">
-        <Sidebar currentPath={currentPath} onNavigate={setCurrentPath} />
-        <PageLayout title={pageInfo.title} subtitle={pageInfo.subtitle} onNavigate={setCurrentPath}>
+      <div className="min-h-screen bg-background">
+        <Sidebar currentPath={currentPath} onNavigate={handleNavigate} />
+        <PageLayout title={pageInfo.title} subtitle={pageInfo.subtitle} onNavigate={handleNavigate}>
           {renderPage()}
         </PageLayout>
       </div>
     </NotificationProvider>
+  );
+}
+
+const BackofficeContent = forwardRef<HTMLDivElement>(function BackofficeContent(_props, ref) {
+  return (
+    <AuthProvider>
+      <div ref={ref}>
+        <BackofficeContentInner onNavigate={() => {}} />
+      </div>
+    </AuthProvider>
   );
 });
 
@@ -142,11 +189,7 @@ function AppRouter() {
     );
   }
 
-  return (
-    <AuthProvider>
-      <BackofficeContent />
-    </AuthProvider>
-  );
+  return <BackofficeContent />;
 }
 
 function App() {
