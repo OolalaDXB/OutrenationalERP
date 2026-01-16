@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from "react";
-import { X, ShoppingCart, Plus, Trash2, Loader2, Search, UserPlus, User, Percent } from "lucide-react";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { X, ShoppingCart, Plus, Trash2, Loader2, Search, UserPlus, User, Percent, ScanLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,7 @@ import { useCustomers, useCreateCustomer } from "@/hooks/useCustomers";
 import { useCreateOrder, type OrderInsert, type OrderItemInsert, type Order, type OrderItem } from "@/hooks/useOrders";
 import { formatCurrency } from "@/lib/format";
 import { ProductSearchInput } from "./ProductSearchInput";
+import { BarcodeScanner } from "./BarcodeScanner";
 
 type OrderWithItems = Order & { order_items?: OrderItem[] };
 
@@ -97,6 +98,54 @@ export function OrderFormModal({ isOpen, onClose, duplicateFrom }: OrderFormProp
   const [internalNotes, setInternalNotes] = useState<string>("");
 
   const [items, setItems] = useState<OrderItemForm[]>([]);
+
+  // Barcode scanner
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+
+  // Handle barcode scan
+  const handleBarcodeScan = useCallback((barcode: string) => {
+    // Search for product by barcode (SKU or barcode field)
+    const product = products.find(p => 
+      p.sku === barcode || 
+      p.barcode === barcode
+    );
+
+    if (product) {
+      // Check if product already in items
+      const existingIndex = items.findIndex(item => item.product_id === product.id);
+      
+      if (existingIndex >= 0) {
+        // Increment quantity
+        const newItems = [...items];
+        newItems[existingIndex].quantity += 1;
+        setItems(newItems);
+        toast({
+          title: "Quantité mise à jour",
+          description: `${product.title} (x${newItems[existingIndex].quantity})`,
+        });
+      } else {
+        // Add new item
+        setItems(prev => [...prev, {
+          product_id: product.id,
+          title: product.title,
+          quantity: 1,
+          unit_price: product.selling_price,
+        }]);
+        toast({
+          title: "Produit ajouté",
+          description: product.title,
+        });
+      }
+    } else {
+      toast({
+        title: "Produit non trouvé",
+        description: `Aucun produit avec le code-barres: ${barcode}`,
+        variant: "destructive",
+      });
+    }
+    
+    setIsScannerOpen(false);
+  }, [products, items, toast]);
 
   // Pre-fill form when duplicating
   useEffect(() => {
@@ -660,15 +709,22 @@ export function OrderFormModal({ isOpen, onClose, duplicateFrom }: OrderFormProp
           <div>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold">Articles</h3>
-              <Button type="button" variant="outline" size="sm" onClick={addItem}>
-                <Plus className="w-4 h-4 mr-1" />
-                Ajouter
-              </Button>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => setIsScannerOpen(true)}>
+                  <ScanLine className="w-4 h-4 mr-1" />
+                  Scanner
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={addItem}>
+                  <Plus className="w-4 h-4 mr-1" />
+                  Ajouter
+                </Button>
+              </div>
             </div>
             
             {items.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground border border-dashed border-border rounded-lg">
-                Aucun article. Cliquez sur "Ajouter" pour commencer.
+                <ScanLine className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p>Aucun article. Scannez un code-barres ou cliquez sur "Ajouter".</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -766,6 +822,13 @@ export function OrderFormModal({ isOpen, onClose, duplicateFrom }: OrderFormProp
             </Button>
           </div>
         </form>
+
+        {/* Barcode Scanner Modal */}
+        <BarcodeScanner
+          isOpen={isScannerOpen}
+          onClose={() => setIsScannerOpen(false)}
+          onScan={handleBarcodeScan}
+        />
       </div>
     </div>
   );
