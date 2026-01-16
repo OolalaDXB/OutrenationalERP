@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { BulkStockAdjustmentModal } from "@/components/inventory/BulkStockAdjustmentModal";
 import { CSVImportModal } from "@/components/inventory/CSVImportModal";
 import { InventoryPrintReport } from "@/components/inventory/InventoryPrintReport";
+import { ProductDrawer } from "@/components/drawers/ProductDrawer";
 import { toast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -22,6 +23,8 @@ export function InventoryPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   // Filtrage
   const filteredProducts = useMemo(() => {
@@ -163,6 +166,16 @@ export function InventoryPage() {
     queryClient.invalidateQueries({ queryKey: ['products'] });
   };
 
+  const handleRowClick = (product: Product) => {
+    setSelectedProduct(product);
+    setIsDrawerOpen(true);
+  };
+
+  const handleCloseDrawer = () => {
+    setIsDrawerOpen(false);
+    setSelectedProduct(null);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -275,12 +288,13 @@ export function InventoryPage() {
                 {filteredProducts.map((item) => (
                   <tr 
                     key={item.id} 
-                    className={`border-b border-border last:border-b-0 hover:bg-secondary/50 transition-colors ${
+                    className={`border-b border-border last:border-b-0 hover:bg-secondary/50 cursor-pointer transition-colors ${
                       selectedIds.has(item.id) ? 'bg-primary/5' : ''
                     }`}
+                    onClick={() => handleRowClick(item)}
                   >
                     {canWrite() && (
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           checked={selectedIds.has(item.id)}
                           onCheckedChange={() => toggleSelect(item.id)}
@@ -289,7 +303,7 @@ export function InventoryPage() {
                     )}
                     <td className="px-6 py-4">
                       <div>
-                        <div className="font-semibold">{item.title}</div>
+                        <div className="font-semibold text-primary hover:underline">{item.title}</div>
                         <div className="text-xs text-muted-foreground">{item.artist_name || '—'}</div>
                       </div>
                     </td>
@@ -325,6 +339,13 @@ export function InventoryPage() {
           isOpen={showImportModal}
           onClose={() => setShowImportModal(false)}
           onSuccess={handleImportSuccess}
+        />
+
+        {/* Product Drawer */}
+        <ProductDrawer
+          product={selectedProduct}
+          isOpen={isDrawerOpen}
+          onClose={handleCloseDrawer}
         />
       </div>
 
