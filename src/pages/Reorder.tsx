@@ -26,8 +26,8 @@ interface ReorderSuggestion {
 }
 
 export function ReorderPage() {
-  const { data: lowStockProducts = [], isLoading: productsLoading } = useLowStockProducts();
-  const { data: suppliers = [], isLoading: suppliersLoading } = useSuppliers();
+  const { data: lowStockProducts = [], isLoading: productsLoading, isError: productsError, error: productsErr, refetch: refetchProducts } = useLowStockProducts();
+  const { data: suppliers = [], isLoading: suppliersLoading, isError: suppliersError, error: suppliersErr, refetch: refetchSuppliers } = useSuppliers();
   
   const [searchTerm, setSearchTerm] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("all");
@@ -35,6 +35,8 @@ export function ReorderPage() {
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
 
   const isLoading = productsLoading || suppliersLoading;
+  const isError = productsError || suppliersError;
+  const errorMessage = productsErr instanceof Error ? productsErr.message : suppliersErr instanceof Error ? suppliersErr.message : "Erreur inconnue";
 
   // Générer les suggestions de réappro
   const suggestions = useMemo(() => {
@@ -149,6 +151,21 @@ export function ReorderPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="rounded-lg border border-border bg-card p-6 text-center">
+        <p className="font-semibold text-danger">Impossible de charger les suggestions</p>
+        <p className="mt-1 text-sm text-muted-foreground">{errorMessage}</p>
+        <button
+          onClick={() => { refetchProducts(); refetchSuppliers(); }}
+          className="mt-4 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
+        >
+          Réessayer
+        </button>
       </div>
     );
   }

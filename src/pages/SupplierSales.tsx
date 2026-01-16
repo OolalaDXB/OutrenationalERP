@@ -8,11 +8,13 @@ import { useSuppliers } from "@/hooks/useSuppliers";
 import { formatCurrency } from "@/lib/format";
 
 export function SupplierSalesPage() {
-  const { data: supplierSales = [], isLoading: salesLoading } = useSupplierSalesView();
-  const { data: suppliers = [], isLoading: suppliersLoading } = useSuppliers();
+  const { data: supplierSales = [], isLoading: salesLoading, isError: salesError, error: salesErr, refetch: refetchSales } = useSupplierSalesView();
+  const { data: suppliers = [], isLoading: suppliersLoading, isError: suppliersError, error: suppliersErr, refetch: refetchSuppliers } = useSuppliers();
   const [selectedPeriod, setSelectedPeriod] = useState("all");
 
   const isLoading = salesLoading || suppliersLoading;
+  const isError = salesError || suppliersError;
+  const errorMessage = salesErr instanceof Error ? salesErr.message : suppliersErr instanceof Error ? suppliersErr.message : "Erreur inconnue";
 
   // Totaux globaux
   const totals = useMemo(() => {
@@ -35,6 +37,21 @@ export function SupplierSalesPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="rounded-lg border border-border bg-card p-6 text-center">
+        <p className="font-semibold text-danger">Impossible de charger les ventes fournisseurs</p>
+        <p className="mt-1 text-sm text-muted-foreground">{errorMessage}</p>
+        <button
+          onClick={() => { refetchSales(); refetchSuppliers(); }}
+          className="mt-4 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
+        >
+          Réessayer
+        </button>
       </div>
     );
   }

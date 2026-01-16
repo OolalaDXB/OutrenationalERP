@@ -8,15 +8,32 @@ import type { Tables } from "@/integrations/supabase/types";
 type SupplierSalesRow = Tables<'v_supplier_sales'>;
 
 export function Dashboard() {
-  const { data: kpis, isLoading: kpisLoading } = useDashboardKpis();
-  const { data: supplierSales = [], isLoading: salesLoading } = useSupplierSalesView();
+  const { data: kpis, isLoading: kpisLoading, isError: kpisError, error: kpisErr, refetch: refetchKpis } = useDashboardKpis();
+  const { data: supplierSales = [], isLoading: salesLoading, isError: salesError, error: salesErr, refetch: refetchSales } = useSupplierSalesView();
 
   const isLoading = kpisLoading || salesLoading;
+  const isError = kpisError || salesError;
+  const errorMessage = kpisErr instanceof Error ? kpisErr.message : salesErr instanceof Error ? salesErr.message : "Erreur inconnue";
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="rounded-lg border border-border bg-card p-6 text-center">
+        <p className="font-semibold text-danger">Impossible de charger le dashboard</p>
+        <p className="mt-1 text-sm text-muted-foreground">{errorMessage}</p>
+        <button
+          onClick={() => { refetchKpis(); refetchSales(); }}
+          className="mt-4 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
+        >
+          Réessayer
+        </button>
       </div>
     );
   }
