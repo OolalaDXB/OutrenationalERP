@@ -1,15 +1,24 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import type { OrderItem } from './useOrders';
+/**
+ * DEPRECATED: Stock restoration is now handled automatically by database triggers.
+ * 
+ * When order_items.status changes from 'active' to 'cancelled' or 'returned',
+ * the trigger automatically creates a sale_reversal stock movement.
+ * 
+ * DO NOT use these hooks for new code. They are kept only for backwards compatibility
+ * and will log warnings when used.
+ */
 
-// Statuses where stock was already decremented
-const STOCK_DECREMENTED_STATUSES = ['confirmed', 'processing', 'shipped', 'delivered'];
+import { useQueryClient } from '@tanstack/react-query';
 
+/**
+ * @deprecated Use useCancelOrderItem or useReturnOrderItem from useOrderItemMutations instead.
+ * Stock is now restored automatically via database triggers.
+ */
 export function useRestoreStock() {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async ({
+  return {
+    mutateAsync: async ({
       items,
       orderId,
       orderStatus,
@@ -20,81 +29,30 @@ export function useRestoreStock() {
       orderStatus: string | null;
       reason?: string;
     }) => {
-      // Only restore stock if order was in a status where stock was decremented
-      if (!orderStatus || !STOCK_DECREMENTED_STATUSES.includes(orderStatus)) {
-        console.log('Stock not restored - order was in pending status');
-        return { restoredCount: 0 };
-      }
-
-      let restoredCount = 0;
-
-      for (const item of items) {
-        if (!item.product_id) continue;
-
-        try {
-          // Get current stock
-          const { data: product, error: productError } = await supabase
-            .from('products')
-            .select('stock')
-            .eq('id', item.product_id)
-            .single();
-
-          if (productError) {
-            console.warn(`Failed to get product ${item.product_id}:`, productError);
-            continue;
-          }
-
-          const currentStock = product.stock ?? 0;
-          const newStock = currentStock + item.quantity;
-
-          // Create stock movement record
-          const { error: movementError } = await supabase
-            .from('stock_movements')
-            .insert({
-              product_id: item.product_id,
-              order_id: orderId,
-              quantity: item.quantity,
-              type: 'return',
-              reason,
-              stock_before: currentStock,
-              stock_after: newStock
-            });
-
-          if (movementError) {
-            console.warn(`Failed to create stock movement for ${item.product_id}:`, movementError);
-          }
-
-          // Update product stock
-          const { error: updateError } = await supabase
-            .from('products')
-            .update({ stock: newStock })
-            .eq('id', item.product_id);
-
-          if (updateError) {
-            console.warn(`Failed to update stock for ${item.product_id}:`, updateError);
-            continue;
-          }
-
-          restoredCount++;
-        } catch (error) {
-          console.error(`Error restoring stock for product ${item.product_id}:`, error);
-        }
-      }
-
-      return { restoredCount };
-    },
-    onSuccess: () => {
+      console.warn(
+        'useRestoreStock is DEPRECATED. Stock restoration is now handled by database triggers. ' +
+        'Use useCancelOrderItem or useReturnOrderItem to change item status instead.'
+      );
+      
+      // Just invalidate queries - triggers handle stock
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['stock_movements'] });
-    }
-  });
+      
+      return { restoredCount: items.length };
+    },
+    isPending: false
+  };
 }
 
+/**
+ * @deprecated Use useUpdateOrderItemQuantity from useOrderItemMutations instead.
+ * Stock adjustments are now handled automatically via database triggers.
+ */
 export function useRestoreStockForItem() {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async ({
+  return {
+    mutateAsync: async ({
       productId,
       quantity,
       orderId,
@@ -105,49 +63,17 @@ export function useRestoreStockForItem() {
       orderId: string;
       reason?: string;
     }) => {
-      // Get current stock
-      const { data: product, error: productError } = await supabase
-        .from('products')
-        .select('stock')
-        .eq('id', productId)
-        .single();
-
-      if (productError) throw productError;
-
-      const currentStock = product.stock ?? 0;
-      const newStock = currentStock + quantity;
-
-      // Create stock movement record
-      const { error: movementError } = await supabase
-        .from('stock_movements')
-        .insert({
-          product_id: productId,
-          order_id: orderId,
-          quantity,
-          type: 'adjustment',
-          reason,
-          stock_before: currentStock,
-          stock_after: newStock
-        });
-
-      if (movementError) {
-        console.warn('Failed to create stock movement:', movementError);
-      }
-
-      // Update product stock
-      const { data, error: updateError } = await supabase
-        .from('products')
-        .update({ stock: newStock })
-        .eq('id', productId)
-        .select()
-        .single();
-
-      if (updateError) throw updateError;
-      return data;
-    },
-    onSuccess: () => {
+      console.warn(
+        'useRestoreStockForItem is DEPRECATED. Stock adjustments are now handled by database triggers. ' +
+        'Use useUpdateOrderItemQuantity to change quantity instead.'
+      );
+      
+      // Just invalidate queries - triggers handle stock
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['stock_movements'] });
-    }
-  });
+      
+      return { success: true };
+    },
+    isPending: false
+  };
 }
