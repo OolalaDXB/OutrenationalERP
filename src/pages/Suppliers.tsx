@@ -141,7 +141,8 @@ export function SuppliersPage() {
             onChange={(e) => setTypeFilter(e.target.value)}
           >
             <option value="all">Tous les types</option>
-            <option value="consignment">Dépôt-vente</option>
+            <option value="depot_vente">Dépôt-vente</option>
+            <option value="consignment">Consignation</option>
             <option value="purchase">Achat ferme</option>
             <option value="own">Propre</option>
           </select>
@@ -204,7 +205,7 @@ export function SuppliersPage() {
                 </td>
                 <td className="px-6 py-4">
                   <span className="text-sm tabular-nums">
-                    {supplier.type === "consignment" && supplier.commission_rate 
+                    {(supplier.type === "consignment" || supplier.type === "depot_vente") && supplier.commission_rate 
                       ? `${(supplier.commission_rate * 100).toFixed(0)}%` 
                       : "—"}
                   </span>
