@@ -1,0 +1,269 @@
+import { useMemo, useState } from "react";
+import { format, subDays, startOfMonth, endOfMonth, startOfYear, subMonths, subYears } from "date-fns";
+import { fr } from "date-fns/locale";
+import { Users, TrendingUp, Euro, ShoppingCart, Crown, Medal, Award } from "lucide-react";
+import { formatCurrency } from "@/lib/format";
+import type { Customer } from "@/hooks/useCustomers";
+
+interface Order {
+  id: string;
+  customer_id: string | null;
+  customer_name?: string | null;
+  customer_email: string;
+  total: number;
+  status?: string | null;
+  created_at?: string | null;
+}
+
+interface TopCustomersWidgetProps {
+  orders: Order[];
+  customers: Customer[];
+  selectedPeriod: string;
+  onPeriodChange: (period: string) => void;
+  customStartDate?: string;
+  customEndDate?: string;
+  onCustomDateChange?: (start: string, end: string) => void;
+}
+
+export const periodPresets = [
+  { value: "30days", label: "30 derniers jours" },
+  { value: "thisMonth", label: "Ce mois" },
+  { value: "lastMonth", label: "Mois dernier" },
+  { value: "ytd", label: "Année en cours (YTD)" },
+  { value: "lastYear", label: "Année passée" },
+  { value: "all", label: "Toutes les périodes" },
+  { value: "custom", label: "Personnalisé" },
+];
+
+export function getDateRangeForPeriod(period: string, customStart?: string, customEnd?: string): { start: Date; end: Date } | null {
+  const now = new Date();
+  
+  switch (period) {
+    case "30days":
+      return { start: subDays(now, 30), end: now };
+    case "thisMonth":
+      return { start: startOfMonth(now), end: now };
+    case "lastMonth":
+      const lastMonth = subMonths(now, 1);
+      return { start: startOfMonth(lastMonth), end: endOfMonth(lastMonth) };
+    case "ytd":
+      return { start: startOfYear(now), end: now };
+    case "lastYear":
+      const lastYear = subYears(now, 1);
+      return { start: startOfYear(lastYear), end: new Date(lastYear.getFullYear(), 11, 31, 23, 59, 59) };
+    case "custom":
+      if (customStart && customEnd) {
+        return { start: new Date(customStart), end: new Date(customEnd) };
+      }
+      return null;
+    case "all":
+    default:
+      return null;
+  }
+}
+
+export function TopCustomersWidget({ 
+  orders, 
+  customers, 
+  selectedPeriod, 
+  onPeriodChange,
+  customStartDate,
+  customEndDate,
+  onCustomDateChange
+}: TopCustomersWidgetProps) {
+  const dateRange = getDateRangeForPeriod(selectedPeriod, customStartDate, customEndDate);
+
+  // Filter orders by period
+  const filteredOrders = useMemo(() => {
+    return orders.filter(order => {
+      if (order.status === "cancelled" || order.status === "refunded") return false;
+      if (!dateRange) return true;
+      if (!order.created_at) return false;
+      const orderDate = new Date(order.created_at);
+      return orderDate >= dateRange.start && orderDate <= dateRange.end;
+    });
+  }, [orders, dateRange]);
+
+  // Calculate top customers
+  const topCustomers = useMemo(() => {
+    const customerStats: Record<string, {
+      customer_id: string;
+      name: string;
+      email: string;
+      total_spent: number;
+      orders_count: number;
+      avg_order: number;
+    }> = {};
+
+    filteredOrders.forEach(order => {
+      const customerId = order.customer_id || order.customer_email;
+      if (!customerId) return;
+
+      const customer = customers.find(c => c.id === order.customer_id);
+      const name = customer 
+        ? `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || customer.company_name || customer.email
+        : order.customer_name || order.customer_email;
+
+      if (!customerStats[customerId]) {
+        customerStats[customerId] = {
+          customer_id: customerId,
+          name,
+          email: customer?.email || order.customer_email,
+          total_spent: 0,
+          orders_count: 0,
+          avg_order: 0,
+        };
+      }
+
+      customerStats[customerId].total_spent += order.total;
+      customerStats[customerId].orders_count += 1;
+    });
+
+    // Calculate averages
+    Object.values(customerStats).forEach(stat => {
+      stat.avg_order = stat.orders_count > 0 ? stat.total_spent / stat.orders_count : 0;
+    });
+
+    return Object.values(customerStats)
+      .sort((a, b) => b.total_spent - a.total_spent)
+      .slice(0, 10);
+  }, [filteredOrders, customers]);
+
+  // Global stats
+  const stats = useMemo(() => {
+    const totalRevenue = filteredOrders.reduce((sum, o) => sum + o.total, 0);
+    const uniqueCustomers = new Set(filteredOrders.map(o => o.customer_id || o.customer_email)).size;
+    const avgOrderValue = filteredOrders.length > 0 ? totalRevenue / filteredOrders.length : 0;
+    const topCustomerRevenue = topCustomers[0]?.total_spent || 0;
+    const topCustomerShare = totalRevenue > 0 ? (topCustomerRevenue / totalRevenue) * 100 : 0;
+
+    return { totalRevenue, uniqueCustomers, avgOrderValue, topCustomerShare };
+  }, [filteredOrders, topCustomers]);
+
+  const periodLabel = dateRange 
+    ? `${format(dateRange.start, "d MMM yyyy", { locale: fr })} - ${format(dateRange.end, "d MMM yyyy", { locale: fr })}`
+    : "Toutes les périodes";
+
+  const rankIcons = [Crown, Medal, Award];
+  const rankColors = ["text-amber-500", "text-slate-400", "text-amber-700"];
+
+  return (
+    <div className="bg-card rounded-xl border border-border shadow-sm p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Users className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold">Meilleurs clients</h3>
+            <p className="text-sm text-muted-foreground">{periodLabel}</p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <select
+            value={selectedPeriod}
+            onChange={(e) => onPeriodChange(e.target.value)}
+            className="px-3 py-2 rounded-md border border-border bg-background text-sm"
+          >
+            {periodPresets.map(p => (
+              <option key={p.value} value={p.value}>{p.label}</option>
+            ))}
+          </select>
+          
+          {selectedPeriod === "custom" && onCustomDateChange && (
+            <>
+              <input
+                type="date"
+                value={customStartDate || ""}
+                onChange={(e) => onCustomDateChange(e.target.value, customEndDate || "")}
+                className="px-3 py-2 rounded-md border border-border bg-background text-sm"
+              />
+              <input
+                type="date"
+                value={customEndDate || ""}
+                onChange={(e) => onCustomDateChange(customStartDate || "", e.target.value)}
+                className="px-3 py-2 rounded-md border border-border bg-background text-sm"
+              />
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="bg-secondary/30 rounded-lg p-3 text-center">
+          <div className="text-2xl font-bold">{stats.uniqueCustomers}</div>
+          <div className="text-xs text-muted-foreground">Clients actifs</div>
+        </div>
+        <div className="bg-secondary/30 rounded-lg p-3 text-center">
+          <div className="text-2xl font-bold">{formatCurrency(stats.totalRevenue)}</div>
+          <div className="text-xs text-muted-foreground">CA total</div>
+        </div>
+        <div className="bg-secondary/30 rounded-lg p-3 text-center">
+          <div className="text-2xl font-bold">{formatCurrency(stats.avgOrderValue)}</div>
+          <div className="text-xs text-muted-foreground">Panier moyen</div>
+        </div>
+        <div className="bg-secondary/30 rounded-lg p-3 text-center">
+          <div className="text-2xl font-bold">{stats.topCustomerShare.toFixed(1)}%</div>
+          <div className="text-xs text-muted-foreground">Part top client</div>
+        </div>
+      </div>
+
+      {/* Top Customers Table */}
+      {topCustomers.length === 0 ? (
+        <div className="py-8 text-center text-muted-foreground">
+          Aucune commande sur cette période
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="text-left py-3 px-2 font-medium text-muted-foreground w-12">#</th>
+                <th className="text-left py-3 px-2 font-medium text-muted-foreground">Client</th>
+                <th className="text-right py-3 px-2 font-medium text-muted-foreground">Commandes</th>
+                <th className="text-right py-3 px-2 font-medium text-muted-foreground">Total dépensé</th>
+                <th className="text-right py-3 px-2 font-medium text-muted-foreground">Panier moyen</th>
+              </tr>
+            </thead>
+            <tbody>
+              {topCustomers.map((customer, index) => {
+                const RankIcon = rankIcons[index] || null;
+                const rankColor = rankColors[index] || "text-muted-foreground";
+                
+                return (
+                  <tr key={customer.customer_id} className="border-b border-border/50 hover:bg-secondary/30">
+                    <td className="py-3 px-2">
+                      {RankIcon ? (
+                        <RankIcon className={`w-5 h-5 ${rankColor}`} />
+                      ) : (
+                        <span className="text-muted-foreground">{index + 1}</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-2">
+                      <div className="font-medium">{customer.name}</div>
+                      <div className="text-xs text-muted-foreground">{customer.email}</div>
+                    </td>
+                    <td className="py-3 px-2 text-right">
+                      <span className="inline-flex items-center gap-1">
+                        <ShoppingCart className="w-3 h-3 text-muted-foreground" />
+                        {customer.orders_count}
+                      </span>
+                    </td>
+                    <td className="py-3 px-2 text-right font-semibold text-primary">
+                      {formatCurrency(customer.total_spent)}
+                    </td>
+                    <td className="py-3 px-2 text-right text-muted-foreground">
+                      {formatCurrency(customer.avg_order)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
