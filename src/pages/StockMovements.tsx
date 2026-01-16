@@ -1,7 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { format, subDays, startOfMonth, endOfMonth, startOfYear } from "date-fns";
 import { fr } from "date-fns/locale";
-import { ArrowUpCircle, ArrowDownCircle, RefreshCw, TrendingUp, TrendingDown, Package, Search, Filter, Calendar, X, Download } from "lucide-react";
+import { ArrowUpCircle, ArrowDownCircle, RefreshCw, TrendingUp, TrendingDown, Package, Search, Filter, X, Download, FileSpreadsheet, FileText } from "lucide-react";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -131,6 +134,91 @@ export function StockMovementsPage() {
 
   const hasActiveFilters = typeFilter !== "all" || supplierFilter !== "all" || periodPreset !== "30days" || searchTerm !== "";
 
+  // Export to Excel
+  const exportToExcel = useCallback(() => {
+    const data = movements.map(m => ({
+      "Date": m.created_at ? format(new Date(m.created_at), "dd/MM/yyyy HH:mm", { locale: fr }) : "",
+      "Produit": m.products?.title || "Produit inconnu",
+      "SKU": m.products?.sku || "",
+      "Artiste": m.products?.artist_name || "",
+      "Type": typeStyles[m.type]?.label || m.type,
+      "Quantité": m.type === "purchase" || m.type === "return" || m.type === "consignment_in" ? `+${m.quantity}` : `-${m.quantity}`,
+      "Stock avant": m.stock_before,
+      "Stock après": m.stock_after,
+      "Raison": m.reason || "",
+      "Référence": m.reference || "",
+      "Fournisseur": m.suppliers?.name || ""
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Mouvements");
+    
+    // Auto-size columns
+    const colWidths = Object.keys(data[0] || {}).map(key => ({ wch: Math.max(key.length, 15) }));
+    ws["!cols"] = colWidths;
+
+    const fileName = `mouvements-stock-${format(new Date(), "yyyy-MM-dd")}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  }, [movements]);
+
+  // Export to PDF
+  const exportToPDF = useCallback(() => {
+    const doc = new jsPDF({ orientation: "landscape" });
+    
+    // Title
+    doc.setFontSize(16);
+    doc.text("Mouvements de stock", 14, 15);
+    
+    // Period info
+    doc.setFontSize(10);
+    if (dateRange) {
+      doc.text(
+        `Période: ${format(new Date(dateRange.start), "d MMMM yyyy", { locale: fr })} - ${format(new Date(dateRange.end), "d MMMM yyyy", { locale: fr })}`,
+        14,
+        22
+      );
+    }
+    doc.text(`Généré le ${format(new Date(), "d MMMM yyyy à HH:mm", { locale: fr })}`, 14, 28);
+    
+    // Stats
+    doc.text(`Entrées: +${stats.entries} | Sorties: -${stats.exits} | Ajustements: ${stats.adjustments} | Variation nette: ${stats.netChange >= 0 ? "+" : ""}${stats.netChange}`, 14, 34);
+
+    // Table data
+    const tableData = movements.map(m => [
+      m.created_at ? format(new Date(m.created_at), "dd/MM/yyyy HH:mm") : "",
+      m.products?.title || "Produit inconnu",
+      m.products?.sku || "",
+      typeStyles[m.type]?.label || m.type,
+      m.type === "purchase" || m.type === "return" || m.type === "consignment_in" ? `+${m.quantity}` : `-${m.quantity}`,
+      `${m.stock_before} → ${m.stock_after}`,
+      m.reason || "",
+      m.suppliers?.name || ""
+    ]);
+
+    autoTable(doc, {
+      startY: 40,
+      head: [["Date", "Produit", "SKU", "Type", "Qté", "Stock", "Raison", "Fournisseur"]],
+      body: tableData,
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      columnStyles: {
+        0: { cellWidth: 30 },
+        1: { cellWidth: 50 },
+        2: { cellWidth: 25 },
+        3: { cellWidth: 30 },
+        4: { cellWidth: 15 },
+        5: { cellWidth: 25 },
+        6: { cellWidth: 35 },
+        7: { cellWidth: 30 },
+      }
+    });
+
+    const fileName = `mouvements-stock-${format(new Date(), "yyyy-MM-dd")}.pdf`;
+    doc.save(fileName);
+  }, [movements, dateRange, stats]);
+
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
@@ -206,6 +294,30 @@ export function StockMovementsPage() {
               Effacer
             </Button>
           )}
+
+          {/* Export buttons */}
+          <div className="flex items-center gap-2 ml-auto">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={exportToExcel}
+              disabled={movements.length === 0}
+              className="gap-2"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Excel
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={exportToPDF}
+              disabled={movements.length === 0}
+              className="gap-2"
+            >
+              <FileText className="w-4 h-4" />
+              PDF
+            </Button>
+          </div>
         </div>
 
         {/* Advanced Filters */}
