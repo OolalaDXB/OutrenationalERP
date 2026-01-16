@@ -11,6 +11,7 @@ import { useProducts } from "@/hooks/useProducts";
 import { useCustomers, useCreateCustomer } from "@/hooks/useCustomers";
 import { useCreateOrder, type OrderInsert, type OrderItemInsert, type Order, type OrderItem } from "@/hooks/useOrders";
 import { formatCurrency } from "@/lib/format";
+import { ProductSearchInput } from "./ProductSearchInput";
 
 type OrderWithItems = Order & { order_items?: OrderItem[] };
 
@@ -675,18 +676,17 @@ export function OrderFormModal({ isOpen, onClose, duplicateFrom }: OrderFormProp
                   <div key={index} className="flex gap-3 items-end p-3 bg-secondary/50 rounded-lg">
                     <div className="flex-1">
                       <Label className="text-xs text-muted-foreground">Produit</Label>
-                      <select
-                        value={item.product_id}
-                        onChange={(e) => updateItem(index, { product_id: e.target.value })}
-                        className="w-full mt-1 px-3 py-2 rounded-md border border-border bg-card text-sm"
-                      >
-                        <option value="">Sélectionner...</option>
-                        {products.map(p => (
-                          <option key={p.id} value={p.id}>
-                            {p.title} - {formatCurrency(p.selling_price)}
-                          </option>
-                        ))}
-                      </select>
+                      <ProductSearchInput
+                        products={products}
+                        selectedProductId={item.product_id}
+                        onSelect={(product) => updateItem(index, { 
+                          product_id: product.id,
+                          title: product.title,
+                          unit_price: product.selling_price
+                        })}
+                        placeholder="Rechercher par titre, artiste ou SKU..."
+                        className="mt-1"
+                      />
                     </div>
                     <div className="w-20">
                       <Label className="text-xs text-muted-foreground">Qté</Label>
