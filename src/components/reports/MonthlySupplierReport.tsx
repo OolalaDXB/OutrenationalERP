@@ -693,7 +693,7 @@ export function MonthlySupplierReport({ isOpen, onClose, suppliers, orderItems }
                   contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
                   formatter={(value: number, name: string) => [formatCurrency(value), name === "current" ? periodLabel : prevPeriodLabel]}
                 />
-                <Bar dataKey="previous" fill="hsl(var(--muted-foreground) / 0.4)" radius={[0, 4, 4, 0]} name={prevPeriodLabel} />
+                <Bar dataKey="previous" fill="#9ca3af" radius={[0, 4, 4, 0]} name={prevPeriodLabel} />
                 <Bar dataKey="current" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} name={periodLabel} />
               </BarChart>
             </ResponsiveContainer>
