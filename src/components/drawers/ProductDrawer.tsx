@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Disc3, MapPin, Tag, Package, Euro, TrendingUp, Pencil, Trash2, ExternalLink, Plus, Minus, History, Loader2, Building2, ChevronRight } from "lucide-react";
+import { X, Disc3, MapPin, Tag, Package, Euro, TrendingUp, Pencil, Trash2, ExternalLink, Plus, Minus, History, Loader2, Building2, ChevronRight, Music } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { StockIndicator } from "@/components/ui/stock-indicator";
@@ -8,11 +8,13 @@ import type { Product } from "@/hooks/useProducts";
 import { useDeleteProduct } from "@/hooks/useProducts";
 import { useStockMovements, useAdjustStock } from "@/hooks/useStockMovements";
 import { useSupplier } from "@/hooks/useSuppliers";
+import { useArtist } from "@/hooks/useArtists";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
 import { ProductFormModal } from "@/components/forms/ProductFormModal";
 import { SupplierDrawer } from "@/components/drawers/SupplierDrawer";
+import { ArtistDrawer } from "@/components/drawers/ArtistDrawer";
 
 interface ProductDrawerProps {
   product: Product | null;
@@ -82,9 +84,11 @@ export function ProductDrawer({ product, isOpen, onClose }: ProductDrawerProps) 
   const adjustStock = useAdjustStock();
   const { data: stockMovements = [], isLoading: movementsLoading } = useStockMovements(product?.id);
   const { data: supplier } = useSupplier(product?.supplier_id || '');
+  const { data: artist } = useArtist(product?.artist_id || '');
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showSupplierDrawer, setShowSupplierDrawer] = useState(false);
+  const [showArtistDrawer, setShowArtistDrawer] = useState(false);
 
   const handleDelete = async () => {
     if (!product) return;
@@ -140,7 +144,17 @@ export function ProductDrawer({ product, isOpen, onClose }: ProductDrawerProps) 
               <div>
                 <h2 className="text-lg font-semibold line-clamp-1">{product.title}</h2>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-sm text-muted-foreground">{product.artist_name || "Artiste inconnu"}</span>
+                  {product.artist_name ? (
+                    <button 
+                      onClick={() => setShowArtistDrawer(true)}
+                      className="text-sm text-primary hover:underline flex items-center gap-1"
+                    >
+                      <Music className="w-3 h-3" />
+                      {product.artist_name}
+                    </button>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">Artiste inconnu</span>
+                  )}
                   {product.status && (
                     <StatusBadge variant={statusVariant[product.status] || "info"}>
                       {statusLabels[product.status] || product.status}
@@ -494,6 +508,13 @@ export function ProductDrawer({ product, isOpen, onClose }: ProductDrawerProps) 
         supplier={supplier || null}
         isOpen={showSupplierDrawer}
         onClose={() => setShowSupplierDrawer(false)}
+      />
+
+      {/* Artist Drawer */}
+      <ArtistDrawer
+        artist={artist || null}
+        isOpen={showArtistDrawer}
+        onClose={() => setShowArtistDrawer(false)}
       />
     </>
   );

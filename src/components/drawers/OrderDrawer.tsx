@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, ShoppingCart, MapPin, Truck, Clock, Package, Pencil, Trash2, Loader2, CreditCard, Copy } from "lucide-react";
+import { X, ShoppingCart, MapPin, Truck, Clock, Package, Pencil, Trash2, Loader2, CreditCard, Copy, FileText, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatusBadge, orderStatusVariant, orderStatusLabel } from "@/components/ui/status-badge";
@@ -17,6 +17,7 @@ import { toast } from "@/hooks/use-toast";
 import { OrderEditModal } from "@/components/forms/OrderEditModal";
 import { OrderFormModal } from "@/components/forms/OrderFormModal";
 import { ProductDrawer } from "@/components/drawers/ProductDrawer";
+import { useNavigate } from "react-router-dom";
 
 type OrderWithItems = Order & { order_items?: OrderItem[] };
 
@@ -46,6 +47,7 @@ const PAYMENT_STATUSES = [
 
 export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   const { canWrite, canDelete } = useAuth();
+  const navigate = useNavigate();
   const cancelOrder = useCancelOrder();
   const updateOrder = useUpdateOrder();
   const restoreStock = useRestoreStock();
@@ -59,6 +61,11 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   const [trackingUrl, setTrackingUrl] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isProductDrawerOpen, setIsProductDrawerOpen] = useState(false);
+
+  const handleViewInvoice = () => {
+    onClose();
+    navigate(`/invoices?search=${order?.order_number}`);
+  };
 
   const handleProductClick = (productId: string | null) => {
     if (!productId) return;
@@ -417,9 +424,18 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
               </div>
             </div>
 
+            {/* Invoice Link */}
+            <div className="pt-4 border-t border-border">
+              <Button variant="secondary" className="w-full" onClick={handleViewInvoice}>
+                <FileText className="w-4 h-4 mr-2" />
+                Voir la facture
+                <ExternalLink className="w-3 h-3 ml-auto" />
+              </Button>
+            </div>
+
             {/* Edit/Duplicate/Cancel Actions */}
             {canWrite() && (
-              <div className="flex gap-3 pt-4 border-t border-border">
+              <div className="flex gap-3">
                 {canModifyOrder && (
                   <Button variant="outline" className="flex-1" onClick={() => setShowEditModal(true)}>
                     <Pencil className="w-4 h-4 mr-2" />
