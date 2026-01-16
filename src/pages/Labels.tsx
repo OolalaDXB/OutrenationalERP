@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Plus, Tag, Disc, Loader2, Globe, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export function LabelsPage() {
+  const navigate = useNavigate();
   const { data: labels = [], isLoading, error } = useLabels();
   const { data: products = [] } = useProducts();
   const { canWrite } = useAuth();
@@ -71,6 +73,10 @@ export function LabelsPage() {
   const handleCloseForm = () => {
     setIsFormOpen(false);
     setEditingLabel(null);
+  };
+
+  const handleNavigateToProducts = (labelId: string) => {
+    navigate(`/products?label=${labelId}`);
   };
 
   if (isLoading) {
@@ -162,10 +168,13 @@ export function LabelsPage() {
                   )}
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-1 text-muted-foreground">
+                  <button
+                    onClick={() => handleNavigateToProducts(label.id)}
+                    className="flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors"
+                  >
                     <Disc className="w-3 h-3" />
-                    <span>{productsCount} produit{productsCount > 1 ? 's' : ''}</span>
-                  </div>
+                    <span className="hover:underline">{productsCount} produit{productsCount > 1 ? 's' : ''}</span>
+                  </button>
                   {label.website && (
                     <a
                       href={label.website}
