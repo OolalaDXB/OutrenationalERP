@@ -407,33 +407,96 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
                 Articles ({order.order_items?.length || 0})
               </h3>
               <div className="space-y-3">
-                {order.order_items?.map((item) => (
-                  <div 
-                    key={item.id} 
-                    className={`flex items-center gap-3 p-3 bg-secondary rounded-lg transition-colors ${
-                      item.product_id ? 'cursor-pointer hover:bg-secondary/80' : ''
-                    }`}
-                    onClick={() => handleProductClick(item.product_id)}
-                  >
-                    {item.image_url ? (
-                      <img src={item.image_url} alt={item.title} className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
-                    ) : (
-                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-sidebar to-foreground flex items-center justify-center flex-shrink-0">
-                        <span className="text-[0.5rem] text-muted-foreground/50">VINYL</span>
+                {order.order_items?.map((item) => {
+                  const isItemActive = item.status === 'active';
+                  const isItemCancelled = item.status === 'cancelled';
+                  const isItemReturned = item.status === 'returned';
+                  
+                  return (
+                    <div 
+                      key={item.id} 
+                      className={`p-3 bg-secondary rounded-lg transition-colors ${
+                        isItemCancelled || isItemReturned ? 'opacity-60' : ''
+                      }`}
+                    >
+                      <div 
+                        className={`flex items-center gap-3 ${
+                          item.product_id ? 'cursor-pointer hover:bg-secondary/80 rounded-lg -m-1 p-1' : ''
+                        }`}
+                        onClick={() => handleProductClick(item.product_id)}
+                      >
+                        {item.image_url ? (
+                          <img src={item.image_url} alt={item.title} className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
+                        ) : (
+                          <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-sidebar to-foreground flex items-center justify-center flex-shrink-0">
+                            <span className="text-[0.5rem] text-muted-foreground/50">VINYL</span>
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className={`font-medium text-sm truncate ${item.product_id ? 'text-primary hover:underline' : ''}`}>
+                            {item.title}
+                          </div>
+                          <div className="text-xs text-muted-foreground">{item.artist_name || '—'}</div>
+                          {/* Status badges */}
+                          {isItemCancelled && (
+                            <span className="inline-flex items-center gap-1 text-xs text-destructive mt-1">
+                              <Ban className="w-3 h-3" />
+                              Annulé {item.cancelled_at && `le ${new Date(item.cancelled_at).toLocaleDateString('fr-FR')}`}
+                            </span>
+                          )}
+                          {isItemReturned && (
+                            <span className="inline-flex items-center gap-1 text-xs text-warning mt-1">
+                              <RotateCcw className="w-3 h-3" />
+                              Retourné {item.returned_at && `le ${new Date(item.returned_at).toLocaleDateString('fr-FR')}`}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <div className={`font-medium text-sm ${isItemCancelled || isItemReturned ? 'line-through' : ''}`}>
+                            {formatCurrency(item.unit_price * item.quantity)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">×{item.quantity}</div>
+                        </div>
                       </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className={`font-medium text-sm truncate ${item.product_id ? 'text-primary hover:underline' : ''}`}>
-                        {item.title}
-                      </div>
-                      <div className="text-xs text-muted-foreground">{item.artist_name || '—'}</div>
+                      
+                      {/* Item Actions (staff/admin only, active items only) */}
+                      {canWrite() && isItemActive && canModifyOrder && (
+                        <div className="flex gap-2 mt-2 pt-2 border-t border-border/50" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="flex-1 h-7 text-xs"
+                            onClick={() => {
+                              setItemToEdit(item);
+                              setEditQuantity(item.quantity);
+                            }}
+                          >
+                            <Edit3 className="w-3 h-3 mr-1" />
+                            Modifier qté
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="flex-1 h-7 text-xs text-warning hover:text-warning"
+                            onClick={() => setItemToReturn(item)}
+                          >
+                            <RotateCcw className="w-3 h-3 mr-1" />
+                            Retour
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="flex-1 h-7 text-xs text-destructive hover:text-destructive"
+                            onClick={() => setItemToCancel(item)}
+                          >
+                            <Ban className="w-3 h-3 mr-1" />
+                            Annuler
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                    <div className="text-right">
-                      <div className="font-medium text-sm">{formatCurrency(item.unit_price * item.quantity)}</div>
-                      <div className="text-xs text-muted-foreground">×{item.quantity}</div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -608,6 +671,114 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
           onClose={() => setShowDocumentsDialog(false)}
         />
       )}
+
+      {/* Cancel Item Dialog */}
+      <AlertDialog open={!!itemToCancel} onOpenChange={(open) => !open && setItemToCancel(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Annuler cet article ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              L'article "{itemToCancel?.title}" sera annulé et le stock sera restauré automatiquement.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Retour</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleCancelItem} 
+              disabled={cancelOrderItem.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {cancelOrderItem.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Annuler l'article
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Return Item Dialog */}
+      <Dialog open={!!itemToReturn} onOpenChange={(open) => { if (!open) { setItemToReturn(null); setReturnReason(""); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RotateCcw className="w-5 h-5" />
+              Retour article
+            </DialogTitle>
+            <DialogDescription>
+              Enregistrer le retour de "{itemToReturn?.title}"
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Motif du retour *</Label>
+              <Textarea
+                value={returnReason}
+                onChange={(e) => setReturnReason(e.target.value)}
+                placeholder="Ex: Article défectueux, erreur de commande..."
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setItemToReturn(null); setReturnReason(""); }}>
+              Annuler
+            </Button>
+            <Button 
+              onClick={handleReturnItem} 
+              disabled={returnOrderItem.isPending || !returnReason.trim()}
+            >
+              {returnOrderItem.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Confirmer le retour
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Quantity Dialog */}
+      <Dialog open={!!itemToEdit} onOpenChange={(open) => !open && setItemToEdit(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit3 className="w-5 h-5" />
+              Modifier la quantité
+            </DialogTitle>
+            <DialogDescription>
+              Modifier la quantité pour "{itemToEdit?.title}"
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Nouvelle quantité</Label>
+              <Input
+                type="number"
+                min={1}
+                value={editQuantity}
+                onChange={(e) => setEditQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+              />
+              {itemToEdit && editQuantity !== itemToEdit.quantity && (
+                <p className="text-xs text-muted-foreground">
+                  Nouveau total : {formatCurrency(editQuantity * itemToEdit.unit_price)}
+                  {editQuantity > itemToEdit.quantity 
+                    ? ` (stock -${editQuantity - itemToEdit.quantity})`
+                    : ` (stock +${itemToEdit.quantity - editQuantity})`
+                  }
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setItemToEdit(null)}>
+              Annuler
+            </Button>
+            <Button 
+              onClick={handleUpdateQuantity} 
+              disabled={updateItemQuantity.isPending || editQuantity <= 0 || (itemToEdit && editQuantity === itemToEdit.quantity)}
+            >
+              {updateItemQuantity.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Enregistrer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
