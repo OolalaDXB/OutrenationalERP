@@ -21,7 +21,8 @@ import {
   Shield,
   ShieldCheck,
   Eye,
-  Database
+  Database,
+  Settings
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import outreNationalLogo from "@/assets/outre-national-logo.png";
@@ -82,6 +83,7 @@ const navigation: NavSection[] = [
     items: [
       { icon: UserCog, label: "Gestion des rôles", href: "/admin/roles", adminOnly: true },
       { icon: Database, label: "Cache TVA", href: "/admin/vat-cache", adminOnly: true },
+      { icon: Settings, label: "Paramètres", href: "/admin/settings", adminOnly: true },
     ],
   },
 ];
