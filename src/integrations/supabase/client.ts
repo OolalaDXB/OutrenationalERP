@@ -5,6 +5,10 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  console.error('Missing Supabase environment variables');
+}
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
@@ -13,5 +17,51 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
-  }
+    // Detect OAuth/magic link tokens in URL (important for password reset flow)
+    detectSessionInUrl: true,
+    // Flow type for better compatibility
+    flowType: 'pkce',
+  },
+  global: {
+    headers: {
+      'x-application-name': 'sillon-erp',
+    },
+  },
+  // Add request timeout
+  db: {
+    schema: 'public',
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 2,
+    },
+  },
 });
+
+// Helper to check if session is valid
+export async function isSessionValid(): Promise<boolean> {
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error || !session) return false;
+    
+    // Check if token is expired
+    const expiresAt = session.expires_at;
+    if (expiresAt && expiresAt * 1000 < Date.now()) {
+      return false;
+    }
+    
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Helper to clear corrupted session
+export async function clearSession(): Promise<void> {
+  try {
+    await supabase.auth.signOut();
+  } catch {
+    // Force clear localStorage if signOut fails
+    localStorage.removeItem('sb-' + new URL(SUPABASE_URL).hostname.split('.')[0] + '-auth-token');
+  }
+}
