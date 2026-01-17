@@ -1872,6 +1872,15 @@ export type Database = {
         }
         Returns: string
       }
+      debug_admin_ctx: {
+        Args: never
+        Returns: {
+          is_staff: boolean
+          roles_count: number
+          uid: string
+          users_count: number
+        }[]
+      }
       get_auth_users_for_admin: {
         Args: never
         Returns: {

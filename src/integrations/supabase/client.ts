@@ -38,6 +38,11 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   },
 });
 
+// Expose supabase client to browser console in DEV for debugging
+if (import.meta.env.DEV) {
+  (window as any).supabase = supabase;
+}
+
 // Helper to check if session is valid
 export async function isSessionValid(): Promise<boolean> {
   try {
