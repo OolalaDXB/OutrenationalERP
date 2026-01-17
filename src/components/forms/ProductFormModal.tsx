@@ -20,6 +20,7 @@ import { useProductNotifications } from "@/hooks/useProductNotifications";
 import type { Enums } from "@/integrations/supabase/types";
 import { ProductImageGallery } from "./ProductImageGallery";
 import { CurrencyExchangeField } from "./CurrencyExchangeField";
+import { SupplierSelectorWithCreate } from "./InlineSupplierCreator";
 import type { DiscogsProductData } from "./DiscogsImageSearch";
 
 interface ProductFormProps {
@@ -369,19 +370,14 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
                 />
               </div>
 
-              <div>
-                <Label className="text-sm font-medium text-muted-foreground">Fournisseur *</Label>
-                <select
-                  value={formData.supplier_id}
-                  onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
-                  className="w-full mt-1.5 px-3 py-2 rounded-lg border border-border bg-card text-sm"
-                >
-                  <option value="">Sélectionner...</option>
-                  {suppliers.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              </div>
+              <SupplierSelectorWithCreate
+                value={formData.supplier_id}
+                onChange={(value) => setFormData({ ...formData, supplier_id: value })}
+                suppliers={suppliers}
+                label="Fournisseur"
+                placeholder="Sélectionner..."
+                required
+              />
 
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">Format</Label>

@@ -1,16 +1,16 @@
 import { useState, useRef, useMemo } from "react";
-import { Loader2, Upload, Download, FileSpreadsheet, XCircle, AlertTriangle, FileDown, RefreshCw, Plus, Eye, Building2 } from "lucide-react";
+import { Loader2, Upload, Download, FileSpreadsheet, XCircle, AlertTriangle, FileDown, RefreshCw, Plus, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useCreateImportHistory } from "@/hooks/useImportHistory";
 import { useSuppliers } from "@/hooks/useSuppliers";
+import { SupplierSelectorWithCreate } from "@/components/forms/InlineSupplierCreator";
 import {
   exportToXLS,
   generateTemplateXLS,
@@ -529,23 +529,13 @@ export function ImportExportModal({ isOpen, onClose, entityType, data, onImportS
             {/* Supplier selector for labels */}
             {entityType === 'labels' && (
               <div className="p-4 bg-secondary/50 rounded-lg space-y-3">
-                <div className="flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-muted-foreground" />
-                  <p className="text-sm font-medium">Fournisseur associé (optionnel)</p>
-                </div>
-                <Select value={selectedSupplierId} onValueChange={setSelectedSupplierId}>
-                  <SelectTrigger className="w-full bg-card">
-                    <SelectValue placeholder="Sélectionner un fournisseur..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Aucun fournisseur</SelectItem>
-                    {suppliers.map((supplier) => (
-                      <SelectItem key={supplier.id} value={supplier.id}>
-                        {supplier.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SupplierSelectorWithCreate
+                  value={selectedSupplierId}
+                  onChange={setSelectedSupplierId}
+                  suppliers={suppliers}
+                  label="Fournisseur associé (optionnel)"
+                  placeholder="Aucun fournisseur"
+                />
                 <p className="text-xs text-muted-foreground">
                   Tous les labels importés seront associés à ce fournisseur
                 </p>
