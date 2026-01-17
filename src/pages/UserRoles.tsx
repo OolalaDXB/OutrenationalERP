@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Loader2, Shield, ShieldCheck, Eye, UserCog, Pencil, Filter } from "lucide-react";
+import { Loader2, Shield, ShieldCheck, Eye, UserCog, Pencil, Filter, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useUsersWithRoles, useUpdateUserRole, useUpdateUserInfo, type UserWithRole } from "@/hooks/useUserRoles";
 import { useAuth, type AppRole } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { RoleChangeHistoryPanel } from "@/components/roles/RoleChangeHistoryPanel";
 import {
   Select,
   SelectContent,
@@ -29,6 +30,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 const roleConfig: Record<AppRole, { label: string; icon: React.ElementType; color: string; description: string }> = {
   admin: { 
@@ -88,7 +97,11 @@ export function UserRolesPage() {
 
     setUpdatingUser(userWithRole.user_id);
     try {
-      await updateRole.mutateAsync({ userId: userWithRole.user_id, newRole });
+      await updateRole.mutateAsync({ 
+        userId: userWithRole.user_id, 
+        newRole,
+        oldRole: userWithRole.role
+      });
       toast({
         title: "Rôle mis à jour",
         description: `${userWithRole.email} est maintenant ${roleConfig[newRole].label}`
@@ -189,49 +202,75 @@ export function UserRolesPage() {
           <p className="text-sm text-muted-foreground">{users.length} utilisateur(s)</p>
         </div>
         
-        {/* Role Filter */}
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-muted-foreground" />
-          <Select value={roleFilter} onValueChange={(v) => setRoleFilter(v as AppRole | 'all')}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filtrer par rôle" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">
-                <div className="flex items-center justify-between w-full gap-4">
-                  <span>Tous les rôles</span>
-                  <Badge variant="secondary" className="text-xs">{users.length}</Badge>
-                </div>
-              </SelectItem>
-              <SelectItem value="admin">
-                <div className="flex items-center justify-between w-full gap-4">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-red-500" />
-                    Administrateurs
+        <div className="flex items-center gap-3">
+          {/* History Sheet */}
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="sm">
+                <History className="w-4 h-4 mr-2" />
+                Historique
+              </Button>
+            </SheetTrigger>
+            <SheetContent>
+              <SheetHeader>
+                <SheetTitle className="flex items-center gap-2">
+                  <History className="w-5 h-5" />
+                  Historique des changements
+                </SheetTitle>
+                <SheetDescription>
+                  Suivez les modifications de rôles effectuées
+                </SheetDescription>
+              </SheetHeader>
+              <div className="mt-6">
+                <RoleChangeHistoryPanel />
+              </div>
+            </SheetContent>
+          </Sheet>
+
+          {/* Role Filter */}
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-muted-foreground" />
+            <Select value={roleFilter} onValueChange={(v) => setRoleFilter(v as AppRole | 'all')}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filtrer par rôle" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">
+                  <div className="flex items-center justify-between w-full gap-4">
+                    <span>Tous les rôles</span>
+                    <Badge variant="secondary" className="text-xs">{users.length}</Badge>
                   </div>
-                  <Badge variant="secondary" className="text-xs">{roleCounts.admin}</Badge>
-                </div>
-              </SelectItem>
-              <SelectItem value="staff">
-                <div className="flex items-center justify-between w-full gap-4">
-                  <div className="flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-blue-500" />
-                    Staff
+                </SelectItem>
+                <SelectItem value="admin">
+                  <div className="flex items-center justify-between w-full gap-4">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-red-500" />
+                      Administrateurs
+                    </div>
+                    <Badge variant="secondary" className="text-xs">{roleCounts.admin}</Badge>
                   </div>
-                  <Badge variant="secondary" className="text-xs">{roleCounts.staff}</Badge>
-                </div>
-              </SelectItem>
-              <SelectItem value="viewer">
-                <div className="flex items-center justify-between w-full gap-4">
-                  <div className="flex items-center gap-2">
-                    <Eye className="w-4 h-4 text-gray-500" />
-                    Viewers
+                </SelectItem>
+                <SelectItem value="staff">
+                  <div className="flex items-center justify-between w-full gap-4">
+                    <div className="flex items-center gap-2">
+                      <Shield className="w-4 h-4 text-blue-500" />
+                      Staff
+                    </div>
+                    <Badge variant="secondary" className="text-xs">{roleCounts.staff}</Badge>
                   </div>
-                  <Badge variant="secondary" className="text-xs">{roleCounts.viewer}</Badge>
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
+                </SelectItem>
+                <SelectItem value="viewer">
+                  <div className="flex items-center justify-between w-full gap-4">
+                    <div className="flex items-center gap-2">
+                      <Eye className="w-4 h-4 text-gray-500" />
+                      Viewers
+                    </div>
+                    <Badge variant="secondary" className="text-xs">{roleCounts.viewer}</Badge>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth, type AppRole } from './useAuth';
 import { toast } from 'sonner';
+import { logRoleChange } from './useRoleChangeHistory';
 
 export interface UserWithRole {
   id: string;
@@ -80,18 +81,30 @@ export function useUsersWithRoles() {
 
 export function useUpdateUserRole() {
   const queryClient = useQueryClient();
+  const { user: currentUser } = useAuth();
 
   return useMutation({
-    mutationFn: async ({ userId, newRole }: { userId: string; newRole: AppRole }) => {
+    mutationFn: async ({ userId, newRole, oldRole }: { userId: string; newRole: AppRole; oldRole?: AppRole }) => {
       const { error } = await supabase
         .from('user_roles')
         .update({ role: newRole })
         .eq('user_id', userId);
 
       if (error) throw error;
+
+      // Log the role change to history
+      if (currentUser?.id) {
+        try {
+          await logRoleChange(userId, currentUser.id, oldRole || null, newRole);
+        } catch (logError) {
+          console.error('Failed to log role change:', logError);
+          // Don't fail the mutation if logging fails
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users-with-roles'] });
+      queryClient.invalidateQueries({ queryKey: ['role-change-history'] });
     }
   });
 }
