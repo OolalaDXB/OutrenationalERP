@@ -43,6 +43,40 @@ export function useImportHistory(entityType?: string) {
   });
 }
 
+export interface ImportHistoryFilters {
+  entityType?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+}
+
+export function useImportHistoryWithFilters(filters: ImportHistoryFilters) {
+  return useQuery({
+    queryKey: ['import_history', filters],
+    queryFn: async () => {
+      let query = supabase
+        .from('import_history')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (filters.entityType) {
+        query = query.eq('entity_type', filters.entityType);
+      }
+
+      if (filters.dateFrom) {
+        query = query.gte('created_at', filters.dateFrom.toISOString());
+      }
+
+      if (filters.dateTo) {
+        query = query.lte('created_at', filters.dateTo.toISOString());
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as ImportHistory[];
+    },
+  });
+}
+
 export function useCreateImportHistory() {
   const queryClient = useQueryClient();
 
