@@ -406,19 +406,28 @@ export function detectMarketplaceMapping(
 }
 
 /**
- * Get merged header mapping combining default + marketplace-specific
+ * Get merged header mapping combining default + marketplace-specific + custom
  */
 export function getMergedHeaderMapping(
   defaultMapping: Record<string, string>,
-  marketplace: MarketplaceMapping | null
+  marketplace: MarketplaceMapping | null,
+  customMappings?: Record<string, { sourceColumn: string; targetField: string }[]> | null
 ): Record<string, string> {
-  if (!marketplace) return defaultMapping;
+  let result = { ...defaultMapping };
   
-  // Marketplace mapping takes priority
-  return {
-    ...defaultMapping,
-    ...marketplace.headerMapping,
-  };
+  // Add marketplace mappings
+  if (marketplace) {
+    result = { ...result, ...marketplace.headerMapping };
+    
+    // Add custom mappings for this marketplace (highest priority)
+    if (customMappings && customMappings[marketplace.id]) {
+      for (const mapping of customMappings[marketplace.id]) {
+        result[mapping.sourceColumn] = mapping.targetField;
+      }
+    }
+  }
+  
+  return result;
 }
 
 /**

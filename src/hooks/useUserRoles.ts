@@ -97,11 +97,11 @@ export function useUpdateUserInfo() {
 
   return useMutation({
     mutationFn: async ({ userId, firstName, lastName }: { userId: string; firstName: string; lastName: string }) => {
-      // First check if user exists in the users table
+      // Check if user exists in the users table by their id (which is the auth user id)
       const { data: existingUser } = await supabase
         .from('users')
         .select('id')
-        .eq('auth_user_id', userId)
+        .eq('id', userId)
         .maybeSingle();
 
       if (existingUser) {
@@ -112,31 +112,12 @@ export function useUpdateUserInfo() {
             first_name: firstName || null, 
             last_name: lastName || null 
           })
-          .eq('auth_user_id', userId);
+          .eq('id', userId);
 
         if (error) throw error;
       } else {
-        // Get email from auth users RPC
-        let email = '';
-        try {
-          const { data: authUsers } = await supabase.rpc('get_auth_users_for_admin');
-          const authUser = authUsers?.find((u: { id: string; email: string }) => u.id === userId);
-          email = authUser?.email || '';
-        } catch (e) {
-          console.error('Could not fetch auth user email');
-        }
-
-        // Create new user entry
-        const { error } = await supabase
-          .from('users')
-          .insert({
-            auth_user_id: userId,
-            email,
-            first_name: firstName || null,
-            last_name: lastName || null
-          });
-
-        if (error) throw error;
+        // User doesn't exist in public.users, can't update
+        throw new Error('Utilisateur non trouvé dans la base de données');
       }
     },
     onSuccess: () => {
