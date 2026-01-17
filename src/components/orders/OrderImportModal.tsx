@@ -1,19 +1,26 @@
-import { useState, useCallback, useEffect } from "react";
-import { Upload, Download, X, FileSpreadsheet, AlertTriangle, CheckCircle, Loader2, Info } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Upload, Download, X, FileSpreadsheet, AlertTriangle, CheckCircle, Loader2, Info, Zap } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { generateTemplateXLS, parseXLSFile } from "@/lib/excel-utils";
+import { generateTemplateXLS, parseXLSFileWithHeaders, getXLSHeaders } from "@/lib/excel-utils";
 import { orderTemplateColumns, orderHeaderMapping } from "@/lib/order-import-utils";
 import { useImportOrders, ParsedOrder, ParsedOrderItem, ImportWarning } from "@/hooks/useImportOrders";
 import { useOrdersWithItems } from "@/hooks/useOrders";
 import { useProducts } from "@/hooks/useProducts";
-import { useSalesChannels, detectSourceFromFile } from "@/hooks/useSalesChannels";
+import { useSalesChannels } from "@/hooks/useSalesChannels";
 import { useCreateOrderImportHistory } from "@/hooks/useOrderImportHistory";
+import { 
+  detectMarketplaceMapping, 
+  getMergedHeaderMapping, 
+  MarketplaceMapping,
+  MARKETPLACE_MAPPINGS 
+} from "@/lib/marketplace-column-mappings";
 
 interface OrderImportModalProps {
   isOpen: boolean;
@@ -34,6 +41,7 @@ export function OrderImportModal({ isOpen, onClose, onSuccess }: OrderImportModa
   const [updateExisting, setUpdateExisting] = useState(false);
   const [detectedSource, setDetectedSource] = useState<string | null>(null);
   const [selectedSource, setSelectedSource] = useState<string>("");
+  const [detectedMapping, setDetectedMapping] = useState<MarketplaceMapping | null>(null);
   
   const { data: existingOrders = [] } = useOrdersWithItems();
   const { data: products = [] } = useProducts();
@@ -41,11 +49,12 @@ export function OrderImportModal({ isOpen, onClose, onSuccess }: OrderImportModa
   const { enabledChannels } = useSalesChannels();
   const createImportHistory = useCreateOrderImportHistory();
 
-  // Reset detected source when file changes
+  // Reset state when file changes
   useEffect(() => {
     if (!file) {
       setDetectedSource(null);
       setSelectedSource("");
+      setDetectedMapping(null);
     }
   }, [file]);
 
@@ -56,6 +65,7 @@ export function OrderImportModal({ isOpen, onClose, onSuccess }: OrderImportModa
     setUpdateExisting(false);
     setDetectedSource(null);
     setSelectedSource("");
+    setDetectedMapping(null);
     setActiveTab("import");
     onClose();
   };
@@ -67,27 +77,44 @@ export function OrderImportModal({ isOpen, onClose, onSuccess }: OrderImportModa
     setFile(selectedFile);
     setIsParsing(true);
     setParsedData(null);
+    setDetectedMapping(null);
     
     try {
-      const rows = await parseXLSFile<Record<string, unknown>>(selectedFile, orderHeaderMapping);
+      // First, get raw headers to detect marketplace
+      const rawHeaders = await getXLSHeaders(selectedFile);
+      
+      // Detect marketplace mapping
+      const marketplace = detectMarketplaceMapping(selectedFile.name, rawHeaders);
+      setDetectedMapping(marketplace);
+      
+      // Get merged header mapping (default + marketplace-specific)
+      const mergedMapping = getMergedHeaderMapping(orderHeaderMapping, marketplace);
+      
+      // Parse file with merged mapping and value transformers
+      const { rows, headers } = await parseXLSFileWithHeaders<Record<string, unknown>>(
+        selectedFile, 
+        mergedMapping,
+        marketplace?.valueTransformers
+      );
+      
       const existingOrderNumbers = existingOrders.map(o => o.order_number);
       const existingSkus = products.map(p => p.sku);
       
       const result = await parseOrdersFile(rows, existingOrderNumbers, existingSkus);
       setParsedData(result);
       
-      // Auto-detect source from file name and headers
-      const headers = rows.length > 0 ? Object.keys(rows[0]) : [];
-      const detected = detectSourceFromFile(selectedFile.name, headers);
-      
-      if (detected) {
-        // Check if detected source is in enabled channels
+      // Auto-set source based on detected marketplace
+      if (marketplace) {
         const matchingChannel = enabledChannels.find(
-          c => c.id === detected || c.name.toLowerCase() === detected.toLowerCase()
+          c => c.id === marketplace.id || c.name.toLowerCase() === marketplace.name.toLowerCase()
         );
         if (matchingChannel) {
           setDetectedSource(matchingChannel.name);
           setSelectedSource(matchingChannel.name);
+        } else {
+          // Use marketplace name even if not in enabled channels
+          setDetectedSource(marketplace.name);
+          setSelectedSource(marketplace.name);
         }
       }
       
@@ -214,28 +241,52 @@ export function OrderImportModal({ isOpen, onClose, onSuccess }: OrderImportModa
               </label>
             </div>
 
-            {/* Source Selection */}
+            {/* Marketplace Detection & Source Selection */}
             {parsedData && (
-              <div className="p-3 bg-secondary/50 rounded-lg space-y-2">
-                <Label className="text-sm">Source des commandes</Label>
-                <select
-                  value={selectedSource}
-                  onChange={(e) => setSelectedSource(e.target.value)}
-                  className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm"
-                >
-                  <option value="">Non spécifiée</option>
-                  {enabledChannels.map(channel => (
-                    <option key={channel.id} value={channel.name}>
-                      {channel.name}
-                    </option>
-                  ))}
-                </select>
-                {detectedSource && selectedSource === detectedSource && (
-                  <p className="text-xs text-success flex items-center gap-1">
-                    <CheckCircle className="w-3 h-3" />
-                    Source détectée automatiquement depuis le fichier
-                  </p>
+              <div className="p-3 bg-secondary/50 rounded-lg space-y-3">
+                {/* Detected Marketplace Mapping */}
+                {detectedMapping && (
+                  <div className="flex items-center gap-2 pb-2 border-b border-border">
+                    <Zap className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-medium">Format détecté:</span>
+                    <Badge variant="secondary" className="gap-1">
+                      {detectedMapping.name}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      ({detectedMapping.description})
+                    </span>
+                  </div>
                 )}
+                
+                <div className="space-y-2">
+                  <Label className="text-sm">Source des commandes</Label>
+                  <select
+                    value={selectedSource}
+                    onChange={(e) => setSelectedSource(e.target.value)}
+                    className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm"
+                  >
+                    <option value="">Non spécifiée</option>
+                    {enabledChannels.map(channel => (
+                      <option key={channel.id} value={channel.name}>
+                        {channel.name}
+                      </option>
+                    ))}
+                    {/* Add detected marketplace if not in enabled channels */}
+                    {detectedMapping && !enabledChannels.some(c => 
+                      c.id === detectedMapping.id || c.name.toLowerCase() === detectedMapping.name.toLowerCase()
+                    ) && (
+                      <option value={detectedMapping.name}>
+                        {detectedMapping.name} (détecté)
+                      </option>
+                    )}
+                  </select>
+                  {detectedSource && selectedSource === detectedSource && (
+                    <p className="text-xs text-success flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" />
+                      Source détectée automatiquement depuis le fichier
+                    </p>
+                  )}
+                </div>
               </div>
             )}
 
@@ -436,15 +487,33 @@ export function OrderImportModal({ isOpen, onClose, onSuccess }: OrderImportModa
                 </div>
 
                 <div>
-                  <h3 className="font-semibold mb-2">Détection automatique de la source</h3>
-                  <p className="text-sm text-muted-foreground">
-                    La source est automatiquement détectée à partir du nom du fichier ou des en-têtes :
+                  <h3 className="font-semibold mb-2 flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-primary" />
+                    Mapping automatique par marketplace
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    L'import détecte automatiquement le format d'export de chaque marketplace et adapte le mapping des colonnes :
                   </p>
-                  <ul className="text-sm text-muted-foreground mt-2 space-y-1">
-                    <li>• <strong>Discogs</strong> : nom de fichier contient "discogs" ou colonnes spécifiques</li>
-                    <li>• <strong>eBay</strong> : nom de fichier contient "ebay" ou colonnes spécifiques</li>
-                    <li>• <strong>Bandcamp</strong> : nom de fichier contient "bandcamp"</li>
-                  </ul>
+                  
+                  <div className="space-y-3">
+                    {Object.values(MARKETPLACE_MAPPINGS).map(mapping => (
+                      <div key={mapping.id} className="bg-secondary/50 p-3 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge variant="outline">{mapping.name}</Badge>
+                          <span className="text-xs text-muted-foreground">{mapping.description}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          <strong>Colonnes reconnues :</strong>{' '}
+                          {mapping.identifyingHeaders.slice(0, 5).join(', ')}
+                          {mapping.identifyingHeaders.length > 5 && '...'}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          <strong>Transformations :</strong>{' '}
+                          Statuts normalisés, prix avec symboles monétaires, etc.
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 <div>
