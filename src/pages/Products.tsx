@@ -1,8 +1,9 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Plus, MoreHorizontal, Loader2, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StockIndicator } from "@/components/ui/stock-indicator";
+import { ImportExportDropdowns } from "@/components/ui/import-export-dropdowns";
 import { useProducts, useDeleteProduct, type Product } from "@/hooks/useProducts";
 import { useSuppliers } from "@/hooks/useSuppliers";
 import { useLabels } from "@/hooks/useLabels";
@@ -10,7 +11,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency } from "@/lib/format";
 import { ProductFormModal } from "@/components/forms/ProductFormModal";
 import { ProductDrawer } from "@/components/drawers/ProductDrawer";
+import { ImportExportModal } from "@/components/import-export/ImportExportModal";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +36,7 @@ const formatLabels: Record<string, string> = {
 
 export function ProductsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const queryClient = useQueryClient();
   const { data: products = [], isLoading: productsLoading } = useProducts();
   const { data: suppliers = [], isLoading: suppliersLoading } = useSuppliers();
   const { data: labels = [], isLoading: labelsLoading } = useLabels();
@@ -45,6 +49,7 @@ export function ProductsPage() {
   const [labelFilter, setLabelFilter] = useState("all");
   const [formatFilter, setFormatFilter] = useState("all");
   const [stockFilter, setStockFilter] = useState("all");
+  const [showImportExport, setShowImportExport] = useState(false);
 
   // Initialize filters from URL params
   useEffect(() => {
@@ -146,6 +151,42 @@ export function ProductsPage() {
     setSelectedProduct(null);
   };
 
+  // CSV Export function
+  const exportToCSV = useCallback(() => {
+    const dataToExport = filteredProducts;
+    
+    if (dataToExport.length === 0) {
+      toast({ title: "Aucune donnée", description: "Aucun produit à exporter", variant: "destructive" });
+      return;
+    }
+
+    const headers = ["SKU", "Titre", "Artiste", "Fournisseur", "Label", "Format", "Prix", "Stock", "Emplacement"];
+    const rows = dataToExport.map(product => [
+      product.sku,
+      `"${(product.title || '').replace(/"/g, '""')}"`,
+      `"${(product.artist_name || '').replace(/"/g, '""')}"`,
+      `"${(product.supplier_name || '').replace(/"/g, '""')}"`,
+      `"${(product.label_name || '').replace(/"/g, '""')}"`,
+      product.format || '',
+      product.selling_price?.toString() || '',
+      (product.stock ?? 0).toString(),
+      `"${(product.location || '').replace(/"/g, '""')}"`
+    ].join(";"));
+
+    const csvContent = [headers.join(";"), ...rows].join("\n");
+    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `produits_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast({ title: "Export réussi", description: `${dataToExport.length} produit(s) exporté(s)` });
+  }, [filteredProducts, toast]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -161,12 +202,20 @@ export function ProductsPage() {
           <h2 className="text-lg font-semibold">Tous les produits</h2>
           <p className="text-sm text-muted-foreground">{filteredProducts.length} références</p>
         </div>
-        {canWrite() && (
-          <Button className="gap-2" onClick={handleCreateNew}>
-            <Plus className="w-4 h-4" />
-            Nouveau produit
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <ImportExportDropdowns
+            onExportCSV={exportToCSV}
+            onExportXLS={() => setShowImportExport(true)}
+            onImportXLS={() => setShowImportExport(true)}
+            canWrite={canWrite()}
+          />
+          {canWrite() && (
+            <Button className="gap-2" onClick={handleCreateNew}>
+              <Plus className="w-4 h-4" />
+              Nouveau produit
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
@@ -327,6 +376,15 @@ export function ProductsPage() {
         product={selectedProduct}
         isOpen={isDrawerOpen}
         onClose={handleCloseDrawer}
+      />
+
+      {/* Import/Export Modal */}
+      <ImportExportModal
+        isOpen={showImportExport}
+        onClose={() => setShowImportExport(false)}
+        entityType="products"
+        data={products as unknown as Record<string, unknown>[]}
+        onImportSuccess={() => queryClient.invalidateQueries({ queryKey: ['products'] })}
       />
     </div>
   );

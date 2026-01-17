@@ -1,8 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, Tag, Disc, Loader2, Globe, Pencil, Trash2, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ImportExportDropdowns } from "@/components/ui/import-export-dropdowns";
 import { useLabels, useDeleteLabel, type LabelWithSupplier } from "@/hooks/useLabels";
 import { useProducts } from "@/hooks/useProducts";
 import { useSuppliers } from "@/hooks/useSuppliers";
@@ -10,6 +11,7 @@ import { useAllSupplierLabels } from "@/hooks/useSupplierLabels";
 import { useAuth } from "@/hooks/useAuth";
 import { LabelFormModal } from "@/components/forms/LabelFormModal";
 import { LabelDrawer } from "@/components/drawers/LabelDrawer";
+import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,6 +25,7 @@ import {
 
 export function LabelsPage() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { data: labels = [], isLoading, error } = useLabels();
   const { data: products = [] } = useProducts();
   const { data: suppliers = [] } = useSuppliers();
@@ -107,6 +110,36 @@ export function LabelsPage() {
     setSelectedLabel(null);
   };
 
+  // CSV Export function
+  const exportToCSV = useCallback(() => {
+    if (filteredLabels.length === 0) {
+      toast({ title: "Aucune donnée", description: "Aucun label à exporter", variant: "destructive" });
+      return;
+    }
+
+    const headers = ["Nom", "Pays", "Fournisseur", "Site Web", "Produits"];
+    const rows = filteredLabels.map(label => [
+      `"${(label.name || '').replace(/"/g, '""')}"`,
+      label.country || '',
+      `"${(label.suppliers?.name || '').replace(/"/g, '""')}"`,
+      label.website || '',
+      (labelStats.get(label.id) || 0).toString()
+    ].join(";"));
+
+    const csvContent = [headers.join(";"), ...rows].join("\n");
+    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `labels_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast({ title: "Export réussi", description: `${filteredLabels.length} label(s) exporté(s)` });
+  }, [filteredLabels, labelStats, toast]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -132,12 +165,18 @@ export function LabelsPage() {
             {labels.length} label{labels.length > 1 ? 's' : ''} au catalogue
           </p>
         </div>
-        {canWrite() && (
-          <Button className="gap-2" onClick={() => setIsFormOpen(true)}>
-            <Plus className="w-4 h-4" />
-            Ajouter un label
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <ImportExportDropdowns
+            onExportCSV={exportToCSV}
+            canWrite={canWrite()}
+          />
+          {canWrite() && (
+            <Button className="gap-2" onClick={() => setIsFormOpen(true)}>
+              <Plus className="w-4 h-4" />
+              Ajouter un label
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
