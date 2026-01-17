@@ -233,4 +233,10 @@ export const fieldLabels: Record<string, Record<string, string>> = {
     website: 'Site web',
     notes: 'Notes',
   },
+  labels: {
+    name: 'Nom',
+    country: 'Pays',
+    website: 'Site web',
+    discogs_id: 'Discogs ID',
+  },
 };

@@ -4,6 +4,7 @@ import { Plus, Tag, Disc, Loader2, Globe, Pencil, Trash2, Building2 } from "luci
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ImportExportDropdowns } from "@/components/ui/import-export-dropdowns";
+import { ImportExportModal } from "@/components/import-export/ImportExportModal";
 import { useLabels, useDeleteLabel, type LabelWithSupplier } from "@/hooks/useLabels";
 import { useProducts } from "@/hooks/useProducts";
 import { useSuppliers } from "@/hooks/useSuppliers";
@@ -12,6 +13,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { LabelFormModal } from "@/components/forms/LabelFormModal";
 import { LabelDrawer } from "@/components/drawers/LabelDrawer";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
+import { exportToXLS, labelExportColumns } from "@/lib/excel-utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,6 +29,7 @@ import {
 export function LabelsPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { data: labels = [], isLoading, error } = useLabels();
   const { data: products = [] } = useProducts();
   const { data: suppliers = [] } = useSuppliers();
@@ -36,6 +40,7 @@ export function LabelsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [supplierFilter, setSupplierFilter] = useState("all");
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isImportExportOpen, setIsImportExportOpen] = useState(false);
   const [editingLabel, setEditingLabel] = useState<LabelWithSupplier | null>(null);
   const [deletingLabel, setDeletingLabel] = useState<LabelWithSupplier | null>(null);
   const [selectedLabel, setSelectedLabel] = useState<LabelWithSupplier | null>(null);
@@ -140,6 +145,24 @@ export function LabelsPage() {
     toast({ title: "Export réussi", description: `${filteredLabels.length} label(s) exporté(s)` });
   }, [filteredLabels, labelStats, toast]);
 
+  // XLS Export function
+  const handleExportXLS = useCallback(() => {
+    if (filteredLabels.length === 0) {
+      toast({ title: "Aucune donnée", description: "Aucun label à exporter", variant: "destructive" });
+      return;
+    }
+    exportToXLS(
+      filteredLabels as unknown as Record<string, unknown>[],
+      labelExportColumns as { key: string; header: string }[],
+      `labels_export_${new Date().toISOString().split('T')[0]}`
+    );
+    toast({ title: "Export réussi", description: `${filteredLabels.length} label(s) exporté(s)` });
+  }, [filteredLabels, toast]);
+
+  const handleImportSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['labels'] });
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -168,7 +191,10 @@ export function LabelsPage() {
         <div className="flex items-center gap-2">
           <ImportExportDropdowns
             onExportCSV={exportToCSV}
+            onExportXLS={handleExportXLS}
+            onImportXLS={() => setIsImportExportOpen(true)}
             canWrite={canWrite()}
+            entityType="labels"
           />
           {canWrite() && (
             <Button className="gap-2" onClick={() => setIsFormOpen(true)}>
@@ -313,6 +339,15 @@ export function LabelsPage() {
         label={selectedLabel}
         isOpen={isDrawerOpen}
         onClose={handleCloseDrawer}
+      />
+
+      {/* Import/Export Modal */}
+      <ImportExportModal
+        isOpen={isImportExportOpen}
+        onClose={() => setIsImportExportOpen(false)}
+        entityType="labels"
+        data={labels as unknown as Record<string, unknown>[]}
+        onImportSuccess={handleImportSuccess}
       />
     </div>
   );
