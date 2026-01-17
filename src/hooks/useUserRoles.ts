@@ -16,60 +16,40 @@ export function useUsersWithRoles() {
   return useQuery({
     queryKey: ['users-with-roles'],
     queryFn: async () => {
-      // First get all user roles
-      const { data: roles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (rolesError) throw rolesError;
-
-      // Get user info from the users table
+      // Query public.users joined with user_roles
+      // This avoids auth.users which is not accessible via RLS
       const { data: users, error: usersError } = await supabase
         .from('users')
-        .select('auth_user_id, email, first_name, last_name');
+        .select('id, email, first_name, last_name')
+        .order('email');
 
       if (usersError) throw usersError;
 
-      // Try to get auth user emails using the RPC function (admin only)
-      let authUsersMap = new Map<string, { email: string; created_at: string }>();
-      try {
-        const { data: authUsers, error: authError } = await supabase
-          .rpc('get_auth_users_for_admin');
-        
-        if (!authError && authUsers) {
-          authUsersMap = new Map(authUsers.map((u: { id: string; email: string; created_at: string }) => [
-            u.id, 
-            { email: u.email, created_at: u.created_at }
-          ]));
-        }
-      } catch (e) {
-        // If RPC fails (non-admin), we'll use the users table fallback
-        console.log('Could not fetch auth users (expected for non-admin)');
-      }
+      // Get all user roles
+      const { data: roles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('*');
 
-      // Map roles to include user info
-      const usersMap = new Map(users?.map(u => [u.auth_user_id, {
-        email: u.email,
-        first_name: u.first_name,
-        last_name: u.last_name
-      }]) || []);
-      
-      return (roles || []).map(role => {
-        const userInfo = usersMap.get(role.user_id);
-        const authUserInfo = authUsersMap.get(role.user_id);
-        
-        // Prioritize: users table email > auth users email > 'Email inconnu'
-        const email = userInfo?.email || authUserInfo?.email || 'Email inconnu';
+      if (rolesError) throw rolesError;
+
+      // Create a map of user_id -> role
+      const rolesMap = new Map(
+        (roles || []).map(r => [r.user_id, r])
+      );
+
+      // Map users to include role info
+      // users.id is the auth user id (from the id column which references auth.users)
+      return (users || []).map(user => {
+        const roleRecord = rolesMap.get(user.id);
         
         return {
-          id: role.id,
-          user_id: role.user_id,
-          email,
-          first_name: userInfo?.first_name || null,
-          last_name: userInfo?.last_name || null,
-          role: role.role as AppRole,
-          created_at: role.created_at
+          id: roleRecord?.id || user.id,
+          user_id: user.id,
+          email: user.email || 'Email inconnu',
+          first_name: user.first_name || null,
+          last_name: user.last_name || null,
+          role: (roleRecord?.role as AppRole) || 'viewer',
+          created_at: roleRecord?.created_at || new Date().toISOString()
         };
       }) as UserWithRole[];
     }
