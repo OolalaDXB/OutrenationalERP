@@ -40,12 +40,20 @@ export function useDiscogsSearch() {
         body: { barcode, type: 'release' },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Discogs search error:', error);
+        throw new Error(error.message || 'Erreur de connexion à Discogs');
+      }
 
-      const searchResults = data.results || [];
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      const searchResults = data?.results || [];
       setResults(searchResults);
       return searchResults;
     } catch (err) {
+      console.error('Discogs search catch:', err);
       const message = err instanceof Error ? err.message : 'Erreur de recherche Discogs';
       setError(message);
       return [];
@@ -63,12 +71,20 @@ export function useDiscogsSearch() {
         body: { query, type: 'release' },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Discogs search error:', error);
+        throw new Error(error.message || 'Erreur de connexion à Discogs');
+      }
 
-      const searchResults = data.results || [];
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      const searchResults = data?.results || [];
       setResults(searchResults);
       return searchResults;
     } catch (err) {
+      console.error('Discogs search catch:', err);
       const message = err instanceof Error ? err.message : 'Erreur de recherche Discogs';
       setError(message);
       return [];
