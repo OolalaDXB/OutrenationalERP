@@ -274,3 +274,27 @@ export const supplierHeaderMapping: Record<string, string> = {
   'Site Web': 'website',
   'Notes': 'notes',
 };
+
+// Label template columns
+export const labelTemplateColumns = [
+  { header: 'Nom', example: 'Blue Note Records' },
+  { header: 'Pays', example: 'USA' },
+  { header: 'Site Web', example: 'https://www.bluenote.com' },
+  { header: 'Discogs ID', example: '281' },
+];
+
+// Label export columns
+export const labelExportColumns = [
+  { key: 'name' as const, header: 'Nom' },
+  { key: 'country' as const, header: 'Pays' },
+  { key: 'website' as const, header: 'Site Web' },
+  { key: 'discogs_id' as const, header: 'Discogs ID' },
+];
+
+// Label header mapping
+export const labelHeaderMapping: Record<string, string> = {
+  'Nom': 'name',
+  'Pays': 'country',
+  'Site Web': 'website',
+  'Discogs ID': 'discogs_id',
+};

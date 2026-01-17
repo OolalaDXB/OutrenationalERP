@@ -16,16 +16,19 @@ import {
   productTemplateColumns,
   customerTemplateColumns,
   supplierTemplateColumns,
+  labelTemplateColumns,
   productExportColumns,
   customerExportColumns,
   supplierExportColumns,
+  labelExportColumns,
   productHeaderMapping,
   customerHeaderMapping,
   supplierHeaderMapping,
+  labelHeaderMapping,
 } from "@/lib/excel-utils";
 import { ChangesPreviewModal, fieldLabels } from "./ChangesPreviewModal";
 
-type EntityType = 'products' | 'customers' | 'suppliers';
+type EntityType = 'products' | 'customers' | 'suppliers' | 'labels';
 type ImportMode = 'insert' | 'update';
 
 interface ImportExportModalProps {
@@ -67,6 +70,15 @@ const entityConfig = {
     templateColumns: supplierTemplateColumns,
     exportColumns: supplierExportColumns,
     headerMapping: supplierHeaderMapping,
+    requiredFields: ['name'],
+    uniqueField: 'name',
+    uniqueFieldLabel: 'Nom',
+  },
+  labels: {
+    title: 'Labels',
+    templateColumns: labelTemplateColumns,
+    exportColumns: labelExportColumns,
+    headerMapping: labelHeaderMapping,
     requiredFields: ['name'],
     uniqueField: 'name',
     uniqueFieldLabel: 'Nom',
@@ -259,7 +271,7 @@ export function ImportExportModal({ isOpen, onClose, entityType, data, onImportS
             payment_terms: num(row.payment_terms),
             notes: str(row.notes),
           };
-        } else {
+        } else if (entityType === 'suppliers') {
           return {
             name: str(row.name) || '',
             type: (str(row.type) || 'purchase') as 'consignment' | 'purchase' | 'own' | 'depot_vente',
@@ -277,6 +289,14 @@ export function ImportExportModal({ isOpen, onClose, entityType, data, onImportS
             bic: str(row.bic),
             website: str(row.website),
             notes: str(row.notes),
+          };
+        } else {
+          // Labels
+          return {
+            name: str(row.name) || '',
+            country: str(row.country),
+            website: str(row.website),
+            discogs_id: str(row.discogs_id),
           };
         }
       };
