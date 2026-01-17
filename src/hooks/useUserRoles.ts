@@ -33,31 +33,58 @@ export function useUsersWithRoles() {
   return useQuery({
     queryKey: ['users-with-roles', userId],
     queryFn: async () => {
-      // Use RPC to get users with roles (handles RLS properly)
-      const { data, error } = await supabase.rpc('admin_list_users_with_roles');
+      // Fetch users from public.users (users.id = auth.uid after M000)
+      const { data: users, error: usersError } = await supabase
+        .from('users')
+        .select('id, email, first_name, last_name, active, created_at');
 
-      if (error) {
-        console.error('Error fetching users with roles:', error);
-        // Handle forbidden error specifically
-        if (error.message?.includes('forbidden')) {
+      if (usersError) {
+        console.error('Error fetching users:', usersError);
+        if (usersError.message?.includes('permission denied') || usersError.code === '42501') {
           toast.error('Accès refusé (admin/staff uniquement).');
           throw new Error('Access denied (admin/staff only).');
         }
-        toast.error(`Erreur lors du chargement des utilisateurs: ${error.message}`);
-        throw error;
+        toast.error(`Erreur lors du chargement des utilisateurs: ${usersError.message}`);
+        throw usersError;
       }
 
-      // Map RPC results to UserWithRole format
-      return ((data || []) as RpcUserRow[]).map(row => ({
-        id: row.id,
-        user_id: row.id,
-        email: row.email || 'Email inconnu',
-        first_name: row.first_name || null,
-        last_name: row.last_name || null,
-        role: row.role || 'viewer',
-        active: row.active ?? true,
-        created_at: row.created_at || new Date().toISOString()
-      })) as UserWithRole[];
+      // Fetch all user roles
+      const { data: roles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id, role');
+
+      if (rolesError) {
+        console.error('Error fetching user roles:', rolesError);
+        toast.error(`Erreur lors du chargement des rôles: ${rolesError.message}`);
+        throw rolesError;
+      }
+
+      // Create a map of user_id -> role (user_roles.user_id = auth uid = users.id)
+      const rolesMap = new Map(roles?.map(r => [r.user_id, r.role]) || []);
+
+      // Create usersMap keyed by users.id
+      const usersMap = new Map(users?.map(u => [u.id, { 
+        email: u.email, 
+        first_name: u.first_name, 
+        last_name: u.last_name,
+        active: u.active,
+        created_at: u.created_at
+      }]) || []);
+
+      // Map users with their roles
+      return (users || []).map(u => {
+        const userInfo = usersMap.get(u.id);
+        return {
+          id: u.id,
+          user_id: u.id,
+          email: userInfo?.email || 'Email inconnu',
+          first_name: userInfo?.first_name || null,
+          last_name: userInfo?.last_name || null,
+          role: (rolesMap.get(u.id) || 'viewer') as AppRole,
+          active: userInfo?.active ?? true,
+          created_at: userInfo?.created_at || new Date().toISOString()
+        };
+      }) as UserWithRole[];
     },
     enabled: authReady && !!userId,
   });
