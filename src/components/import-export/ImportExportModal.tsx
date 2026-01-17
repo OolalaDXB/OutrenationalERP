@@ -8,6 +8,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useCreateImportHistory } from "@/hooks/useImportHistory";
 import {
   exportToXLS,
   generateTemplateXLS,
@@ -75,6 +76,7 @@ const entityConfig = {
 export function ImportExportModal({ isOpen, onClose, entityType, data, onImportSuccess }: ImportExportModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const config = entityConfig[entityType];
+  const createImportHistory = useCreateImportHistory();
   const [activeTab, setActiveTab] = useState<'import' | 'export'>('import');
   const [importMode, setImportMode] = useState<ImportMode>('insert');
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
@@ -281,14 +283,23 @@ export function ImportExportModal({ isOpen, onClose, entityType, data, onImportS
 
       let insertedCount = 0;
       let updatedCount = 0;
+      const createdRecordIds: string[] = [];
 
       // Process inserts (new records)
       const rowsToInsert = rowsToProcess.filter(r => r.status === 'valid');
       if (rowsToInsert.length > 0) {
         const dataToInsert = rowsToInsert.map(r => transformRow(r.data));
-        const { error } = await supabase.from(entityType).insert(dataToInsert);
+        const { data: insertedData, error } = await supabase
+          .from(entityType)
+          .insert(dataToInsert)
+          .select('id');
         if (error) throw error;
         insertedCount = rowsToInsert.length;
+        
+        // Collect created record IDs
+        if (insertedData) {
+          createdRecordIds.push(...insertedData.map(r => r.id));
+        }
       }
 
       // Process updates (existing records)
@@ -307,6 +318,17 @@ export function ImportExportModal({ isOpen, onClose, entityType, data, onImportS
           if (error) throw error;
           updatedCount++;
         }
+      }
+
+      // Save import history
+      if (insertedCount > 0 || updatedCount > 0) {
+        await createImportHistory.mutateAsync({
+          entityType,
+          fileName: fileName || undefined,
+          recordsCreated: insertedCount,
+          recordsUpdated: updatedCount,
+          createdRecordIds,
+        });
       }
 
       const messages: string[] = [];

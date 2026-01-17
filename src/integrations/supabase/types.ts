@@ -231,6 +231,77 @@ export type Database = {
           },
         ]
       }
+      import_created_records: {
+        Row: {
+          created_at: string
+          entity_type: string
+          id: string
+          import_id: string
+          record_id: string
+        }
+        Insert: {
+          created_at?: string
+          entity_type: string
+          id?: string
+          import_id: string
+          record_id: string
+        }
+        Update: {
+          created_at?: string
+          entity_type?: string
+          id?: string
+          import_id?: string
+          record_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_created_records_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "import_history"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_history: {
+        Row: {
+          created_at: string
+          entity_type: string
+          file_name: string | null
+          id: string
+          records_created: number
+          records_updated: number
+          rolled_back_at: string | null
+          status: string
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          entity_type: string
+          file_name?: string | null
+          id?: string
+          records_created?: number
+          records_updated?: number
+          rolled_back_at?: string | null
+          status?: string
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          entity_type?: string
+          file_name?: string | null
+          id?: string
+          records_created?: number
+          records_updated?: number
+          rolled_back_at?: string | null
+          status?: string
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       invoice_history: {
         Row: {
           action: string

@@ -208,6 +208,7 @@ export function ProductsPage() {
             onExportXLS={() => setShowImportExport(true)}
             onImportXLS={() => setShowImportExport(true)}
             canWrite={canWrite()}
+            entityType="products"
           />
           {canWrite() && (
             <Button className="gap-2" onClick={handleCreateNew}>
