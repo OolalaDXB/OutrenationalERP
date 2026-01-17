@@ -1,16 +1,19 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Upload, Download, X, FileSpreadsheet, AlertTriangle, CheckCircle, Loader2, Info } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { generateTemplateXLS, parseXLSFile } from "@/lib/excel-utils";
 import { orderTemplateColumns, orderHeaderMapping } from "@/lib/order-import-utils";
 import { useImportOrders, ParsedOrder, ParsedOrderItem, ImportWarning } from "@/hooks/useImportOrders";
 import { useOrdersWithItems } from "@/hooks/useOrders";
 import { useProducts } from "@/hooks/useProducts";
+import { useSalesChannels, detectSourceFromFile } from "@/hooks/useSalesChannels";
+import { useCreateOrderImportHistory } from "@/hooks/useOrderImportHistory";
 
 interface OrderImportModalProps {
   isOpen: boolean;
@@ -29,16 +32,30 @@ export function OrderImportModal({ isOpen, onClose, onSuccess }: OrderImportModa
   } | null>(null);
   const [skipDuplicates, setSkipDuplicates] = useState(true);
   const [updateExisting, setUpdateExisting] = useState(false);
+  const [detectedSource, setDetectedSource] = useState<string | null>(null);
+  const [selectedSource, setSelectedSource] = useState<string>("");
   
   const { data: existingOrders = [] } = useOrdersWithItems();
   const { data: products = [] } = useProducts();
   const { parseOrdersFile, importOrders, isImporting } = useImportOrders();
+  const { enabledChannels } = useSalesChannels();
+  const createImportHistory = useCreateOrderImportHistory();
+
+  // Reset detected source when file changes
+  useEffect(() => {
+    if (!file) {
+      setDetectedSource(null);
+      setSelectedSource("");
+    }
+  }, [file]);
 
   const handleClose = () => {
     setFile(null);
     setParsedData(null);
     setSkipDuplicates(true);
     setUpdateExisting(false);
+    setDetectedSource(null);
+    setSelectedSource("");
     setActiveTab("import");
     onClose();
   };
@@ -58,6 +75,21 @@ export function OrderImportModal({ isOpen, onClose, onSuccess }: OrderImportModa
       
       const result = await parseOrdersFile(rows, existingOrderNumbers, existingSkus);
       setParsedData(result);
+      
+      // Auto-detect source from file name and headers
+      const headers = rows.length > 0 ? Object.keys(rows[0]) : [];
+      const detected = detectSourceFromFile(selectedFile.name, headers);
+      
+      if (detected) {
+        // Check if detected source is in enabled channels
+        const matchingChannel = enabledChannels.find(
+          c => c.id === detected || c.name.toLowerCase() === detected.toLowerCase()
+        );
+        if (matchingChannel) {
+          setDetectedSource(matchingChannel.name);
+          setSelectedSource(matchingChannel.name);
+        }
+      }
       
       if (result.orders.length === 0) {
         toast({
@@ -85,6 +117,23 @@ export function OrderImportModal({ isOpen, onClose, onSuccess }: OrderImportModa
       parsedData.items,
       { skipDuplicates, updateExisting }
     );
+    
+    // Record import history
+    try {
+      const fileExt = file?.name.split('.').pop()?.toLowerCase() || 'xls';
+      await createImportHistory.mutateAsync({
+        file_name: file?.name,
+        import_type: fileExt === 'csv' ? 'csv' : 'xls',
+        source: selectedSource || undefined,
+        orders_created: result.created,
+        orders_updated: result.updated,
+        orders_skipped: result.skipped,
+        items_created: parsedData.items.length,
+        errors: result.errors,
+      });
+    } catch (historyError) {
+      console.error('Failed to record import history:', historyError);
+    }
     
     if (result.errors.length > 0) {
       toast({
@@ -164,6 +213,31 @@ export function OrderImportModal({ isOpen, onClose, onSuccess }: OrderImportModa
                 )}
               </label>
             </div>
+
+            {/* Source Selection */}
+            {parsedData && (
+              <div className="p-3 bg-secondary/50 rounded-lg space-y-2">
+                <Label className="text-sm">Source des commandes</Label>
+                <select
+                  value={selectedSource}
+                  onChange={(e) => setSelectedSource(e.target.value)}
+                  className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm"
+                >
+                  <option value="">Non spécifiée</option>
+                  {enabledChannels.map(channel => (
+                    <option key={channel.id} value={channel.name}>
+                      {channel.name}
+                    </option>
+                  ))}
+                </select>
+                {detectedSource && selectedSource === detectedSource && (
+                  <p className="text-xs text-success flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3" />
+                    Source détectée automatiquement depuis le fichier
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Preview */}
             {parsedData && (
@@ -359,6 +433,18 @@ export function OrderImportModal({ isOpen, onClose, onSuccess }: OrderImportModa
                       </tbody>
                     </table>
                   </div>
+                </div>
+
+                <div>
+                  <h3 className="font-semibold mb-2">Détection automatique de la source</h3>
+                  <p className="text-sm text-muted-foreground">
+                    La source est automatiquement détectée à partir du nom du fichier ou des en-têtes :
+                  </p>
+                  <ul className="text-sm text-muted-foreground mt-2 space-y-1">
+                    <li>• <strong>Discogs</strong> : nom de fichier contient "discogs" ou colonnes spécifiques</li>
+                    <li>• <strong>eBay</strong> : nom de fichier contient "ebay" ou colonnes spécifiques</li>
+                    <li>• <strong>Bandcamp</strong> : nom de fichier contient "bandcamp"</li>
+                  </ul>
                 </div>
 
                 <div>

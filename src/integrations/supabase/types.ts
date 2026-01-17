@@ -556,6 +556,51 @@ export type Database = {
           },
         ]
       }
+      order_import_history: {
+        Row: {
+          created_at: string
+          errors: Json | null
+          file_name: string | null
+          id: string
+          import_type: string
+          items_created: number
+          orders_created: number
+          orders_skipped: number
+          orders_updated: number
+          source: string | null
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          errors?: Json | null
+          file_name?: string | null
+          id?: string
+          import_type?: string
+          items_created?: number
+          orders_created?: number
+          orders_skipped?: number
+          orders_updated?: number
+          source?: string | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          errors?: Json | null
+          file_name?: string | null
+          id?: string
+          import_type?: string
+          items_created?: number
+          orders_created?: number
+          orders_skipped?: number
+          orders_updated?: number
+          source?: string | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       order_items: {
         Row: {
           artist_name: string | null
@@ -1157,6 +1202,7 @@ export type Database = {
           payout_invoice_next_number: number | null
           payout_invoice_prefix: string | null
           primary_color: string | null
+          sales_channels: Json | null
           shop_address: string | null
           shop_city: string | null
           shop_country: string | null
@@ -1190,6 +1236,7 @@ export type Database = {
           payout_invoice_next_number?: number | null
           payout_invoice_prefix?: string | null
           primary_color?: string | null
+          sales_channels?: Json | null
           shop_address?: string | null
           shop_city?: string | null
           shop_country?: string | null
@@ -1223,6 +1270,7 @@ export type Database = {
           payout_invoice_next_number?: number | null
           payout_invoice_prefix?: string | null
           primary_color?: string | null
+          sales_channels?: Json | null
           shop_address?: string | null
           shop_city?: string | null
           shop_country?: string | null
