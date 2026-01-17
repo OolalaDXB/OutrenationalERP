@@ -1,4 +1,5 @@
-import { Download, Upload, FileSpreadsheet, Printer, ChevronDown } from "lucide-react";
+import { useState } from "react";
+import { Download, Upload, FileSpreadsheet, Printer, ChevronDown, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -6,6 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ImportHistoryModal } from "@/components/import-export/ImportHistoryModal";
 
 interface ImportExportDropdownsProps {
   onExportCSV?: () => void;
@@ -14,6 +16,8 @@ interface ImportExportDropdownsProps {
   onImportCSV?: () => void;
   onImportXLS?: () => void;
   canWrite?: boolean;
+  entityType?: string;
+  showHistory?: boolean;
 }
 
 export function ImportExportDropdowns({
@@ -23,69 +27,92 @@ export function ImportExportDropdowns({
   onImportCSV,
   onImportXLS,
   canWrite = true,
+  entityType,
+  showHistory = true,
 }: ImportExportDropdownsProps) {
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  
   const hasExport = onExportCSV || onExportXLS || onPrint;
   const hasImport = onImportCSV || onImportXLS;
 
   return (
-    <div className="flex items-center gap-2">
-      {hasExport && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2">
-              <Download className="w-4 h-4" />
-              Exporter
-              <ChevronDown className="w-3 h-3" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="bg-popover z-50">
-            {onExportCSV && (
-              <DropdownMenuItem onClick={onExportCSV}>
-                <Download className="w-4 h-4 mr-2" />
-                CSV
-              </DropdownMenuItem>
-            )}
-            {onExportXLS && (
-              <DropdownMenuItem onClick={onExportXLS}>
-                <FileSpreadsheet className="w-4 h-4 mr-2" />
-                Excel (XLS)
-              </DropdownMenuItem>
-            )}
-            {onPrint && (
-              <DropdownMenuItem onClick={onPrint}>
-                <Printer className="w-4 h-4 mr-2" />
-                Imprimer
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
+    <>
+      <div className="flex items-center gap-2">
+        {hasExport && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Download className="w-4 h-4" />
+                Exporter
+                <ChevronDown className="w-3 h-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-popover z-50">
+              {onExportCSV && (
+                <DropdownMenuItem onClick={onExportCSV}>
+                  <Download className="w-4 h-4 mr-2" />
+                  CSV
+                </DropdownMenuItem>
+              )}
+              {onExportXLS && (
+                <DropdownMenuItem onClick={onExportXLS}>
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                  Excel (XLS)
+                </DropdownMenuItem>
+              )}
+              {onPrint && (
+                <DropdownMenuItem onClick={onPrint}>
+                  <Printer className="w-4 h-4 mr-2" />
+                  Imprimer
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
 
-      {hasImport && canWrite && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2">
-              <Upload className="w-4 h-4" />
-              Importer
-              <ChevronDown className="w-3 h-3" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="bg-popover z-50">
-            {onImportCSV && (
-              <DropdownMenuItem onClick={onImportCSV}>
-                <Download className="w-4 h-4 mr-2" />
-                CSV
-              </DropdownMenuItem>
-            )}
-            {onImportXLS && (
-              <DropdownMenuItem onClick={onImportXLS}>
-                <FileSpreadsheet className="w-4 h-4 mr-2" />
-                Excel (XLS)
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
-    </div>
+        {hasImport && canWrite && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Upload className="w-4 h-4" />
+                Importer
+                <ChevronDown className="w-3 h-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-popover z-50">
+              {onImportCSV && (
+                <DropdownMenuItem onClick={onImportCSV}>
+                  <Download className="w-4 h-4 mr-2" />
+                  CSV
+                </DropdownMenuItem>
+              )}
+              {onImportXLS && (
+                <DropdownMenuItem onClick={onImportXLS}>
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                  Excel (XLS)
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+
+        {showHistory && (hasImport || hasExport) && (
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setShowHistoryModal(true)}
+            title="Historique des imports"
+          >
+            <History className="w-4 h-4" />
+          </Button>
+        )}
+      </div>
+
+      <ImportHistoryModal
+        isOpen={showHistoryModal}
+        onClose={() => setShowHistoryModal(false)}
+        entityType={entityType}
+      />
+    </>
   );
 }

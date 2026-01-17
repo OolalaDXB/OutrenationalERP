@@ -225,6 +225,7 @@ export function InventoryPage() {
                 onImportCSV={() => setShowImportModal(true)}
                 onImportXLS={() => setShowImportExportModal(true)}
                 canWrite={canWrite()}
+                entityType="products"
               />
               {canWrite() && selectedIds.size > 0 && (
                 <Button size="sm" onClick={() => setShowBulkModal(true)}>
