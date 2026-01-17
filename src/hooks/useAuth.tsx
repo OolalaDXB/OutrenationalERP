@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 export type AppRole = 'admin' | 'staff' | 'viewer';
@@ -51,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const mountedRef = useRef(true);
   const initializedRef = useRef(false);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     mountedRef.current = true;
@@ -70,6 +72,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (event === 'SIGNED_OUT') {
+          // Clear all React Query cache on sign out to prevent stale data
+          queryClient.clear();
           setSession(null);
           setUser(null);
           setLoading(false);

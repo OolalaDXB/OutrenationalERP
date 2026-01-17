@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import type { AppRole } from './useAuth';
+import { useAuth, type AppRole } from './useAuth';
+import { toast } from 'sonner';
 
 export interface UserWithRole {
   id: string;
@@ -27,8 +28,13 @@ interface UserWithRoleJoin {
 }
 
 export function useUsersWithRoles() {
+  const { user, loading } = useAuth();
+  const authReady = !loading;
+  const userId = user?.id;
+
   return useQuery({
-    queryKey: ['users-with-roles'],
+    // Include user ID in cache key to prevent caching empty results from pre-auth state
+    queryKey: ['users-with-roles', userId],
     queryFn: async () => {
       // Single query: public.users joined with user_roles
       const { data, error } = await supabase
@@ -46,7 +52,11 @@ export function useUsersWithRoles() {
         `)
         .order('email');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching users with roles:', error);
+        toast.error(`Erreur lors du chargement des utilisateurs: ${error.message}`);
+        throw error;
+      }
 
       // Map users to include role info
       return ((data || []) as unknown as UserWithRoleJoin[]).map(user => {
@@ -62,7 +72,9 @@ export function useUsersWithRoles() {
           created_at: roleRecord?.created_at || new Date().toISOString()
         };
       }) as UserWithRole[];
-    }
+    },
+    // Only run query when auth is ready AND user is authenticated
+    enabled: authReady && !!userId,
   });
 }
 
