@@ -51,15 +51,7 @@ export type Database = {
           user_agent?: string | null
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "activity_log_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       artists: {
         Row: {
@@ -1600,6 +1592,39 @@ export type Database = {
       users: {
         Row: {
           active: boolean | null
+          created_at: string | null
+          email: string
+          first_name: string | null
+          id: string
+          last_name: string | null
+          role: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          email: string
+          first_name?: string | null
+          id: string
+          last_name?: string | null
+          role?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          email?: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          role?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      users_legacy: {
+        Row: {
+          active: boolean | null
           auth_user_id: string
           created_at: string | null
           email: string
@@ -1824,6 +1849,9 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_authenticated: { Args: never; Returns: boolean }
+      is_staff_or_admin: { Args: never; Returns: boolean }
+      is_viewer_or_more: { Args: never; Returns: boolean }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
     }
