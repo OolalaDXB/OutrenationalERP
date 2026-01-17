@@ -12,35 +12,45 @@ export interface UserWithRole {
   created_at: string;
 }
 
+interface UserRoleJoin {
+  id: string;
+  role: AppRole;
+  created_at: string;
+}
+
+interface UserWithRoleJoin {
+  id: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  user_roles: UserRoleJoin[];
+}
+
 export function useUsersWithRoles() {
   return useQuery({
     queryKey: ['users-with-roles'],
     queryFn: async () => {
-      // Query public.users joined with user_roles
-      // This avoids auth.users which is not accessible via RLS
-      const { data: users, error: usersError } = await supabase
+      // Single query: public.users joined with user_roles
+      const { data, error } = await supabase
         .from('users')
-        .select('id, email, first_name, last_name')
+        .select(`
+          id,
+          email,
+          first_name,
+          last_name,
+          user_roles (
+            id,
+            role,
+            created_at
+          )
+        `)
         .order('email');
 
-      if (usersError) throw usersError;
-
-      // Get all user roles
-      const { data: roles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('*');
-
-      if (rolesError) throw rolesError;
-
-      // Create a map of user_id -> role
-      const rolesMap = new Map(
-        (roles || []).map(r => [r.user_id, r])
-      );
+      if (error) throw error;
 
       // Map users to include role info
-      // users.id is the auth user id (from the id column which references auth.users)
-      return (users || []).map(user => {
-        const roleRecord = rolesMap.get(user.id);
+      return ((data || []) as unknown as UserWithRoleJoin[]).map(user => {
+        const roleRecord = user.user_roles?.[0];
         
         return {
           id: roleRecord?.id || user.id,
@@ -48,7 +58,7 @@ export function useUsersWithRoles() {
           email: user.email || 'Email inconnu',
           first_name: user.first_name || null,
           last_name: user.last_name || null,
-          role: (roleRecord?.role as AppRole) || 'viewer',
+          role: roleRecord?.role || 'viewer',
           created_at: roleRecord?.created_at || new Date().toISOString()
         };
       }) as UserWithRole[];
