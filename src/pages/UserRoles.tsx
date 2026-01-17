@@ -81,6 +81,9 @@ export function UserRolesPage() {
   const [editingUser, setEditingUser] = useState<UserWithRole | null>(null);
   const [editFirstName, setEditFirstName] = useState("");
   const [editLastName, setEditLastName] = useState("");
+  
+  // Deactivation confirmation dialog state
+  const [deactivatingUser, setDeactivatingUser] = useState<UserWithRole | null>(null);
 
   const filteredUsers = useMemo(() => {
     if (roleFilter === 'all') return users;
@@ -154,7 +157,7 @@ export function UserRolesPage() {
     }
   };
 
-  const handleToggleActive = async (userWithRole: UserWithRole) => {
+  const handleToggleActiveClick = (userWithRole: UserWithRole) => {
     if (userWithRole.user_id === currentUser?.id) {
       toast({
         title: "Action non autorisée",
@@ -164,7 +167,18 @@ export function UserRolesPage() {
       return;
     }
 
+    // If user is active (deactivating), show confirmation dialog
+    if (userWithRole.active) {
+      setDeactivatingUser(userWithRole);
+    } else {
+      // Reactivating doesn't need confirmation
+      performToggleActive(userWithRole);
+    }
+  };
+
+  const performToggleActive = async (userWithRole: UserWithRole) => {
     setTogglingUser(userWithRole.user_id);
+    setDeactivatingUser(null);
     try {
       const newActive = !userWithRole.active;
       await toggleUserActive.mutateAsync({ userId: userWithRole.user_id, active: newActive });
@@ -488,7 +502,7 @@ export function UserRolesPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => handleToggleActive(userWithRole)}
+                                onClick={() => handleToggleActiveClick(userWithRole)}
                                 disabled={isToggling}
                                 className={isInactive ? "text-green-600 hover:text-green-700" : "text-destructive hover:text-destructive/80"}
                               >
@@ -563,6 +577,33 @@ export function UserRolesPage() {
             <Button onClick={handleSaveUserInfo} disabled={updateUserInfo.isPending}>
               {updateUserInfo.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Enregistrer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Deactivation Confirmation Dialog */}
+      <Dialog open={!!deactivatingUser} onOpenChange={(open) => !open && setDeactivatingUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmer la désactivation</DialogTitle>
+            <DialogDescription>
+              Êtes-vous sûr de vouloir désactiver l'utilisateur <strong>{deactivatingUser?.email}</strong> ?
+              <br />
+              L'utilisateur ne pourra plus accéder à l'application.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeactivatingUser(null)}>
+              Annuler
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => deactivatingUser && performToggleActive(deactivatingUser)}
+              disabled={!!togglingUser}
+            >
+              {togglingUser && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Désactiver
             </Button>
           </DialogFooter>
         </DialogContent>
