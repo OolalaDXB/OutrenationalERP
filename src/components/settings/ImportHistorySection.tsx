@@ -43,7 +43,7 @@ const datePresets: { value: DatePreset; label: string }[] = [
   { value: "custom", label: "Période personnalisée" },
 ];
 
-export function ImportHistoryPage() {
+export function ImportHistorySection() {
   const [entityFilter, setEntityFilter] = useState<string>("all");
   const [datePreset, setDatePreset] = useState<DatePreset>("all");
   const [dateFrom, setDateFrom] = useState<string>("");

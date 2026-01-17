@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Settings, Save, Loader2, Upload, Image, X, Building, FileText, CreditCard, Receipt, Palette, ToggleLeft, Database, BarChart3, Store } from "lucide-react";
+import { Settings, Save, Loader2, Upload, Image, X, Building, FileText, CreditCard, Receipt, Palette, ToggleLeft, Database, BarChart3, Store, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,7 @@ import { VatCacheSection } from "@/components/settings/VatCacheSection";
 import { WidgetVisibilitySection, defaultWidgetVisibility, defaultWidgetOrder, type WidgetVisibility, type WidgetOrder } from "@/components/settings/WidgetVisibilitySection";
 import { SalesChannelsSection } from "@/components/settings/SalesChannelsSection";
 import { MarketplaceMappingsSection } from "@/components/settings/MarketplaceMappingsSection";
+import { ImportHistorySection } from "@/components/settings/ImportHistorySection";
 
 export function SettingsPage() {
   const { toast } = useToast();
@@ -205,7 +206,7 @@ export function SettingsPage() {
       </div>
 
       <Tabs defaultValue="shop" className="w-full">
-        <TabsList className="grid w-full grid-cols-9">
+        <TabsList className="grid w-full grid-cols-10">
           <TabsTrigger value="shop" className="gap-2">
             <Building className="w-4 h-4" />
             Boutique
@@ -237,6 +238,10 @@ export function SettingsPage() {
           <TabsTrigger value="vat-cache" className="gap-2">
             <Database className="w-4 h-4" />
             Cache TVA
+          </TabsTrigger>
+          <TabsTrigger value="imports" className="gap-2">
+            <History className="w-4 h-4" />
+            Imports
           </TabsTrigger>
           <TabsTrigger value="features" className="gap-2">
             <ToggleLeft className="w-4 h-4" />
@@ -626,6 +631,11 @@ Les prix de nos produits sont indiqués en euros..."
         {/* VAT Cache Tab */}
         <TabsContent value="vat-cache" className="space-y-6">
           <VatCacheSection />
+        </TabsContent>
+
+        {/* Imports Tab */}
+        <TabsContent value="imports" className="space-y-6">
+          <ImportHistorySection />
         </TabsContent>
 
         {/* Features Tab */}
