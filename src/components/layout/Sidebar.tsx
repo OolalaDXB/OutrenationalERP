@@ -54,7 +54,7 @@ const navigation: NavSection[] = [
   {
     title: "Catalogue",
     items: [
-      { icon: Package, label: "Produits", href: "/products" },
+      { icon: Package, label: "Catalogue", href: "/products" },
       { icon: Users, label: "Fournisseurs", href: "/suppliers" },
       { icon: Tag, label: "Labels", href: "/labels" },
       { icon: Palette, label: "Artistes", href: "/artists", featureFlag: "show_artists_section" },
