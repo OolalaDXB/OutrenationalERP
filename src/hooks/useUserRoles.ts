@@ -96,15 +96,40 @@ export function useUpdateUserRole() {
 
   return useMutation({
     mutationFn: async ({ userId, newRole, oldRole }: { userId: string; newRole: AppRole; oldRole?: AppRole }) => {
-      // Use upsert to handle both insert and update cases
-      const { error } = await supabase
+      // Check if user already has a role
+      const { data: existingRole, error: fetchError } = await supabase
         .from('user_roles')
-        .upsert(
-          { user_id: userId, role: newRole },
-          { onConflict: 'user_id' }
-        );
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle();
 
-      if (error) throw error;
+      if (fetchError) {
+        console.error('Error checking existing role:', fetchError);
+        throw fetchError;
+      }
+
+      if (existingRole) {
+        // Update existing role
+        const { error } = await supabase
+          .from('user_roles')
+          .update({ role: newRole })
+          .eq('user_id', userId);
+
+        if (error) {
+          console.error('Error updating role:', error);
+          throw error;
+        }
+      } else {
+        // Insert new role
+        const { error } = await supabase
+          .from('user_roles')
+          .insert({ user_id: userId, role: newRole });
+
+        if (error) {
+          console.error('Error inserting role:', error);
+          throw error;
+        }
+      }
 
       // Log the role change to history
       if (currentUser?.id) {
