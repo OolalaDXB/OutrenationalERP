@@ -21,6 +21,7 @@ import type { Enums } from "@/integrations/supabase/types";
 import { ProductImageGallery } from "./ProductImageGallery";
 import { CurrencyExchangeField } from "./CurrencyExchangeField";
 import { SupplierSelectorWithCreate } from "./InlineSupplierCreator";
+import { LabelSelectorWithCreate } from "./InlineLabelCreator";
 import type { DiscogsProductData } from "./DiscogsImageSearch";
 
 interface ProductFormProps {
@@ -398,19 +399,13 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
                 </select>
               </div>
 
-              <div>
-                <Label className="text-sm font-medium text-muted-foreground">Label</Label>
-                <select
-                  value={formData.label_id}
-                  onChange={(e) => setFormData({ ...formData, label_id: e.target.value })}
-                  className="w-full mt-1.5 px-3 py-2 rounded-lg border border-border bg-card text-sm"
-                >
-                  <option value="">Aucun label</option>
-                  {labels.map(l => (
-                    <option key={l.id} value={l.id}>{l.name}</option>
-                  ))}
-                </select>
-              </div>
+              <LabelSelectorWithCreate
+                value={formData.label_id}
+                onChange={(value) => setFormData({ ...formData, label_id: value })}
+                labels={labels}
+                label="Label"
+                placeholder="Aucun label"
+              />
 
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">Numéro de catalogue</Label>
