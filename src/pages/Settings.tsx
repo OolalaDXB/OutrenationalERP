@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VatCacheSection } from "@/components/settings/VatCacheSection";
 import { WidgetVisibilitySection, defaultWidgetVisibility, defaultWidgetOrder, type WidgetVisibility, type WidgetOrder } from "@/components/settings/WidgetVisibilitySection";
 import { SalesChannelsSection } from "@/components/settings/SalesChannelsSection";
+import { MarketplaceMappingsSection } from "@/components/settings/MarketplaceMappingsSection";
 
 export function SettingsPage() {
   const { toast } = useToast();
@@ -204,7 +205,7 @@ export function SettingsPage() {
       </div>
 
       <Tabs defaultValue="shop" className="w-full">
-        <TabsList className="grid w-full grid-cols-8">
+        <TabsList className="grid w-full grid-cols-9">
           <TabsTrigger value="shop" className="gap-2">
             <Building className="w-4 h-4" />
             Boutique
@@ -224,6 +225,10 @@ export function SettingsPage() {
           <TabsTrigger value="channels" className="gap-2">
             <Store className="w-4 h-4" />
             Canaux
+          </TabsTrigger>
+          <TabsTrigger value="mappings" className="gap-2">
+            <FileText className="w-4 h-4" />
+            Mappings
           </TabsTrigger>
           <TabsTrigger value="widgets" className="gap-2">
             <BarChart3 className="w-4 h-4" />
@@ -602,6 +607,11 @@ Les prix de nos produits sont indiqués en euros..."
         {/* Sales Channels Tab */}
         <TabsContent value="channels" className="space-y-6">
           <SalesChannelsSection />
+        </TabsContent>
+
+        {/* Marketplace Mappings Tab */}
+        <TabsContent value="mappings" className="space-y-6">
+          <MarketplaceMappingsSection />
         </TabsContent>
 
         {/* Widgets Tab */}

@@ -6,19 +6,14 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Edit2, Save, X, ArrowRight, ShoppingBag, RefreshCw } from "lucide-react";
-import { MARKETPLACE_MAPPINGS, type MarketplaceMapping } from "@/lib/marketplace-column-mappings";
+import { Plus, Trash2, ArrowRight, ShoppingBag, RefreshCw } from "lucide-react";
+import { MARKETPLACE_MAPPINGS } from "@/lib/marketplace-column-mappings";
 import { useSettings, useUpdateSettings } from "@/hooks/useSettings";
 import { useToast } from "@/hooks/use-toast";
 
 interface CustomMapping {
   sourceColumn: string;
   targetField: string;
-}
-
-interface CustomMarketplaceConfig {
-  id: string;
-  customMappings: CustomMapping[];
 }
 
 export function MarketplaceMappingsSection() {
@@ -165,7 +160,6 @@ export function MarketplaceMappingsSection() {
         <Accordion type="single" collapsible className="w-full">
           {Object.values(MARKETPLACE_MAPPINGS).map((marketplace) => {
             const marketplaceCustomMappings = customMappings[marketplace.id] || [];
-            const isEditing = editingMarketplace === marketplace.id;
             
             return (
               <AccordionItem key={marketplace.id} value={marketplace.id}>

@@ -11,6 +11,11 @@ export interface SalesChannel {
   builtin?: boolean;
 }
 
+export interface CustomMarketplaceMapping {
+  sourceColumn: string;
+  targetField: string;
+}
+
 export interface Settings {
   id: string;
   shop_name: string;
@@ -46,6 +51,8 @@ export interface Settings {
   widget_order: WidgetOrder | null;
   // Sales channels
   sales_channels: SalesChannel[] | null;
+  // Custom marketplace column mappings
+  custom_marketplace_mappings: Record<string, CustomMarketplaceMapping[]> | null;
 }
 
 export function useSettings() {
@@ -64,6 +71,7 @@ export function useSettings() {
         visible_widgets: data.visible_widgets as unknown as WidgetVisibility | null,
         widget_order: data.widget_order as unknown as WidgetOrder | null,
         sales_channels: data.sales_channels as unknown as SalesChannel[] | null,
+        custom_marketplace_mappings: (data as unknown as Record<string, unknown>).custom_marketplace_mappings as Record<string, CustomMarketplaceMapping[]> | null,
       } as Settings;
     }
   });
@@ -95,6 +103,9 @@ export function useUpdateSettings() {
       }
       if (updates.sales_channels !== undefined) {
         updatePayload.sales_channels = updates.sales_channels;
+      }
+      if (updates.custom_marketplace_mappings !== undefined) {
+        updatePayload.custom_marketplace_mappings = updates.custom_marketplace_mappings;
       }
       
       const { data, error } = await supabase

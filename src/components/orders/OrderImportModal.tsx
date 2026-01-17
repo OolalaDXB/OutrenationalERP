@@ -15,6 +15,7 @@ import { useOrdersWithItems } from "@/hooks/useOrders";
 import { useProducts } from "@/hooks/useProducts";
 import { useSalesChannels } from "@/hooks/useSalesChannels";
 import { useCreateOrderImportHistory } from "@/hooks/useOrderImportHistory";
+import { useSettings } from "@/hooks/useSettings";
 import { 
   detectMarketplaceMapping, 
   getMergedHeaderMapping, 
@@ -48,6 +49,7 @@ export function OrderImportModal({ isOpen, onClose, onSuccess }: OrderImportModa
   const { parseOrdersFile, importOrders, isImporting } = useImportOrders();
   const { enabledChannels } = useSalesChannels();
   const createImportHistory = useCreateOrderImportHistory();
+  const { data: settings } = useSettings();
 
   // Reset state when file changes
   useEffect(() => {
@@ -87,8 +89,11 @@ export function OrderImportModal({ isOpen, onClose, onSuccess }: OrderImportModa
       const marketplace = detectMarketplaceMapping(selectedFile.name, rawHeaders);
       setDetectedMapping(marketplace);
       
-      // Get merged header mapping (default + marketplace-specific)
-      const mergedMapping = getMergedHeaderMapping(orderHeaderMapping, marketplace);
+      // Get custom mappings from settings
+      const customMappings = settings?.custom_marketplace_mappings || null;
+      
+      // Get merged header mapping (default + marketplace-specific + custom)
+      const mergedMapping = getMergedHeaderMapping(orderHeaderMapping, marketplace, customMappings);
       
       // Parse file with merged mapping and value transformers
       const { rows, headers } = await parseXLSFileWithHeaders<Record<string, unknown>>(

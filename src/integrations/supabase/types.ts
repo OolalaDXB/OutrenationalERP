@@ -1182,6 +1182,7 @@ export type Database = {
           bic: string | null
           cgv: string | null
           created_at: string | null
+          custom_marketplace_mappings: Json | null
           default_currency: string | null
           eori: string | null
           iban: string | null
@@ -1216,6 +1217,7 @@ export type Database = {
           bic?: string | null
           cgv?: string | null
           created_at?: string | null
+          custom_marketplace_mappings?: Json | null
           default_currency?: string | null
           eori?: string | null
           iban?: string | null
@@ -1250,6 +1252,7 @@ export type Database = {
           bic?: string | null
           cgv?: string | null
           created_at?: string | null
+          custom_marketplace_mappings?: Json | null
           default_currency?: string | null
           eori?: string | null
           iban?: string | null
