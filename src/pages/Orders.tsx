@@ -1,16 +1,33 @@
-import { useState, useMemo } from "react";
-import { ShoppingCart, Package, Truck, CheckCircle, Plus, Loader2, X, CreditCard } from "lucide-react";
+import { useState, useMemo, useCallback } from "react";
+import { ShoppingCart, Package, Truck, CheckCircle, Plus, Loader2, X, CreditCard, MoreHorizontal, Trash2 } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { StatusBadge, orderStatusVariant, orderStatusLabel } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ImportExportDropdowns } from "@/components/ui/import-export-dropdowns";
 import { OrderDrawer } from "@/components/drawers/OrderDrawer";
 import { OrderFormModal } from "@/components/forms/OrderFormModal";
-import { useOrdersWithItems, useUpdateOrderStatus, useCancelOrder, useUpdateOrder } from "@/hooks/useOrders";
+import { useOrdersWithItems, useUpdateOrderStatus, useCancelOrder, useUpdateOrder, useDeleteOrder } from "@/hooks/useOrders";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const ALL_STATUSES = [
   { value: "pending", label: "En attente" },
@@ -27,9 +44,11 @@ export function OrdersPage() {
   const updateOrderStatus = useUpdateOrderStatus();
   const cancelOrder = useCancelOrder();
   const updateOrder = useUpdateOrder();
+  const deleteOrder = useDeleteOrder();
   const { toast } = useToast();
-  const { canWrite } = useAuth();
+  const { canWrite, canDelete } = useAuth();
   const [markingPaidId, setMarkingPaidId] = useState<string | null>(null);
+  const [deletingOrder, setDeletingOrder] = useState<typeof orders[0] | null>(null);
   
   const [selectedOrder, setSelectedOrder] = useState<typeof orders[0] | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -109,6 +128,55 @@ export function OrdersPage() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!deletingOrder) return;
+    try {
+      await deleteOrder.mutateAsync(deletingOrder.id);
+      toast({ title: "Succès", description: "Commande supprimée" });
+      setDeletingOrder(null);
+    } catch (error) {
+      toast({ title: "Erreur", description: "Impossible de supprimer la commande", variant: "destructive" });
+    }
+  };
+
+  // CSV Export function
+  const exportToCSV = useCallback(() => {
+    if (filteredOrders.length === 0) {
+      toast({ title: "Aucune donnée", description: "Aucune commande à exporter", variant: "destructive" });
+      return;
+    }
+
+    const headers = ["Numéro", "Client", "Email", "Statut", "Paiement", "Articles", "Total", "Date"];
+    const rows = filteredOrders.map(order => [
+      order.order_number,
+      `"${(order.customer_name || '').replace(/"/g, '""')}"`,
+      order.customer_email,
+      order.status || '',
+      order.payment_status || '',
+      (order.order_items?.length || 0).toString(),
+      order.total.toString(),
+      order.created_at || ''
+    ].join(";"));
+
+    const csvContent = [headers.join(";"), ...rows].join("\n");
+    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `commandes_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast({ title: "Export réussi", description: `${filteredOrders.length} commande(s) exportée(s)` });
+  }, [filteredOrders, toast]);
+
+  // Check if order can be deleted (only cancelled or refunded)
+  const canDeleteOrder = (order: typeof orders[0]) => {
+    return order.status === 'cancelled' || order.status === 'refunded';
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -139,12 +207,19 @@ export function OrdersPage() {
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Toutes les commandes</h2>
-          {canWrite() && (
-            <Button className="gap-2" onClick={handleCreateNew}>
-              <Plus className="w-4 h-4" />
-              Nouvelle commande
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            <ImportExportDropdowns
+              onExportCSV={exportToCSV}
+              canWrite={false}
+              showHistory={false}
+            />
+            {canWrite() && (
+              <Button className="gap-2" onClick={handleCreateNew}>
+                <Plus className="w-4 h-4" />
+                Nouvelle commande
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
@@ -285,23 +360,43 @@ export function OrdersPage() {
                     <td className="px-6 py-4 font-semibold tabular-nums">{formatCurrency(order.total)}</td>
                     <td className="px-6 py-4 text-sm text-muted-foreground">{formatDateTime(order.created_at)}</td>
                     {canWrite() && (
-                      <td className="px-6 py-4">
-                        {order.payment_status !== 'paid' && order.payment_status !== 'refunded' && order.status !== 'cancelled' && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-1"
-                            onClick={(e) => handleMarkAsPaid(e, order.id)}
-                            disabled={markingPaidId === order.id}
-                          >
-                            {markingPaidId === order.id ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : (
-                              <CreditCard className="w-3 h-3" />
-                            )}
-                            Payé
-                          </Button>
-                        )}
+                      <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-2">
+                          {order.payment_status !== 'paid' && order.payment_status !== 'refunded' && order.status !== 'cancelled' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1"
+                              onClick={(e) => handleMarkAsPaid(e, order.id)}
+                              disabled={markingPaidId === order.id}
+                            >
+                              {markingPaidId === order.id ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <CreditCard className="w-3 h-3" />
+                              )}
+                              Payé
+                            </Button>
+                          )}
+                          {canDelete() && canDeleteOrder(order) && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground">
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem 
+                                  onClick={() => setDeletingOrder(order)}
+                                  className="text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Supprimer
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -330,6 +425,29 @@ export function OrdersPage() {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
       />
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deletingOrder} onOpenChange={() => setDeletingOrder(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer cette commande ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir supprimer la commande "{deletingOrder?.order_number}" ? 
+              Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete} 
+              disabled={deleteOrder.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteOrder.isPending ? "Suppression..." : "Supprimer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

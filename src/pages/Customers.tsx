@@ -1,25 +1,47 @@
-import { useState, useMemo } from "react";
-import { Plus, Loader2, Building2, FileSpreadsheet } from "lucide-react";
+import { useState, useMemo, useCallback } from "react";
+import { Plus, Loader2, Building2, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CustomerFormModal } from "@/components/forms/CustomerFormModal";
 import { CustomerDrawer } from "@/components/drawers/CustomerDrawer";
 import { ImportExportModal } from "@/components/import-export/ImportExportModal";
-import { useCustomers, type Customer } from "@/hooks/useCustomers";
+import { ImportExportDropdowns } from "@/components/ui/import-export-dropdowns";
+import { useCustomers, useDeleteCustomer, type Customer } from "@/hooks/useCustomers";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function CustomersPage() {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const { data: customers = [], isLoading, error } = useCustomers();
-  const { canWrite } = useAuth();
+  const deleteCustomer = useDeleteCustomer();
+  const { canWrite, canDelete } = useAuth();
   const [showForm, setShowForm] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [showImportExport, setShowImportExport] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [countryFilter, setCountryFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null);
 
   // Pays uniques
   const countries = useMemo(() => {
@@ -56,6 +78,61 @@ export function CustomersPage() {
     setSelectedCustomer(null);
   };
 
+  const handleEdit = (customer: Customer) => {
+    setEditingCustomer(customer);
+    setShowForm(true);
+  };
+
+  const handleCloseForm = () => {
+    setShowForm(false);
+    setEditingCustomer(null);
+  };
+
+  const handleDelete = async () => {
+    if (!deletingCustomer) return;
+    try {
+      await deleteCustomer.mutateAsync(deletingCustomer.id);
+      toast({ title: "Succès", description: "Client supprimé" });
+      setDeletingCustomer(null);
+    } catch (error) {
+      toast({ title: "Erreur", description: "Impossible de supprimer le client", variant: "destructive" });
+    }
+  };
+
+  // CSV Export function
+  const exportToCSV = useCallback(() => {
+    if (filteredCustomers.length === 0) {
+      toast({ title: "Aucune donnée", description: "Aucun client à exporter", variant: "destructive" });
+      return;
+    }
+
+    const headers = ["Prénom", "Nom", "Email", "Entreprise", "Type", "Ville", "Pays", "Commandes", "CA Total"];
+    const rows = filteredCustomers.map(customer => [
+      `"${(customer.first_name || '').replace(/"/g, '""')}"`,
+      `"${(customer.last_name || '').replace(/"/g, '""')}"`,
+      customer.email,
+      `"${(customer.company_name || '').replace(/"/g, '""')}"`,
+      customer.customer_type || '',
+      `"${(customer.city || '').replace(/"/g, '""')}"`,
+      customer.country || '',
+      (customer.orders_count || 0).toString(),
+      (customer.total_spent || 0).toString()
+    ].join(";"));
+
+    const csvContent = [headers.join(";"), ...rows].join("\n");
+    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `clients_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast({ title: "Export réussi", description: `${filteredCustomers.length} client(s) exporté(s)` });
+  }, [filteredCustomers, toast]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -79,13 +156,14 @@ export function CustomersPage() {
           <h2 className="text-lg font-semibold">Tous les clients</h2>
           <p className="text-sm text-muted-foreground">{filteredCustomers.length} clients</p>
         </div>
-        <div className="flex gap-2">
-          {canWrite() && (
-            <Button variant="outline" className="gap-2" onClick={() => setShowImportExport(true)}>
-              <FileSpreadsheet className="w-4 h-4" />
-              Import / Export
-            </Button>
-          )}
+        <div className="flex items-center gap-2">
+          <ImportExportDropdowns
+            onExportCSV={exportToCSV}
+            onExportXLS={() => setShowImportExport(true)}
+            onImportXLS={() => setShowImportExport(true)}
+            canWrite={canWrite()}
+            entityType="customers"
+          />
           {canWrite() && (
             <Button className="gap-2" onClick={() => setShowForm(true)}>
               <Plus className="w-4 h-4" />
@@ -133,6 +211,9 @@ export function CustomersPage() {
               <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Commandes</th>
               <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">CA Total</th>
               <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Dernière commande</th>
+              {canWrite() && (
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border"></th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -176,6 +257,32 @@ export function CustomersPage() {
                 <td className="px-6 py-4 text-sm tabular-nums">{customer.orders_count || 0}</td>
                 <td className="px-6 py-4 font-semibold tabular-nums">{formatCurrency(customer.total_spent)}</td>
                 <td className="px-6 py-4 text-sm text-muted-foreground">{formatDate(customer.last_order_at)}</td>
+                {canWrite() && (
+                  <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleEdit(customer)}>
+                          <Pencil className="w-4 h-4 mr-2" />
+                          Modifier
+                        </DropdownMenuItem>
+                        {canDelete() && (
+                          <DropdownMenuItem 
+                            onClick={() => setDeletingCustomer(customer)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Supprimer
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -190,7 +297,8 @@ export function CustomersPage() {
 
       <CustomerFormModal
         isOpen={showForm}
-        onClose={() => setShowForm(false)}
+        onClose={handleCloseForm}
+        customer={editingCustomer}
       />
       <CustomerDrawer
         customer={selectedCustomer}
@@ -204,6 +312,28 @@ export function CustomersPage() {
         data={customers as unknown as Record<string, unknown>[]}
         onImportSuccess={() => queryClient.invalidateQueries({ queryKey: ['customers'] })}
       />
+
+      <AlertDialog open={!!deletingCustomer} onOpenChange={() => setDeletingCustomer(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer ce client ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir supprimer le client "{deletingCustomer?.first_name} {deletingCustomer?.last_name}" ? 
+              Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDelete} 
+              disabled={deleteCustomer.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteCustomer.isPending ? "Suppression..." : "Supprimer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
