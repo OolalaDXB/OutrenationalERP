@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { ShoppingCart, Package, Truck, CheckCircle, Plus, Loader2, X, CreditCard, MoreHorizontal, Trash2 } from "lucide-react";
+import { ShoppingCart, Package, Truck, CheckCircle, Plus, Loader2, X, CreditCard, MoreHorizontal, Trash2, History } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { StatusBadge, orderStatusVariant, orderStatusLabel } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,9 @@ import { ImportExportDropdowns } from "@/components/ui/import-export-dropdowns";
 import { OrderDrawer } from "@/components/drawers/OrderDrawer";
 import { OrderFormModal } from "@/components/forms/OrderFormModal";
 import { OrderImportModal } from "@/components/orders/OrderImportModal";
+import { OrderImportHistoryModal } from "@/components/orders/OrderImportHistoryModal";
 import { useOrdersWithItems, useUpdateOrderStatus, useCancelOrder, useUpdateOrder, useDeleteOrder } from "@/hooks/useOrders";
+import { useSalesChannels } from "@/hooks/useSalesChannels";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -44,6 +46,7 @@ const ALL_STATUSES = [
 
 export function OrdersPage() {
   const { data: orders = [], isLoading, error } = useOrdersWithItems();
+  const { enabledChannels } = useSalesChannels();
   const updateOrderStatus = useUpdateOrderStatus();
   const cancelOrder = useCancelOrder();
   const updateOrder = useUpdateOrder();
@@ -57,10 +60,12 @@ export function OrdersPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [selectedSource, setSelectedSource] = useState<string>("");
   
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   // Handle status toggle
   const toggleStatus = (status: string) => {
@@ -88,9 +93,12 @@ export function OrdersPage() {
       const matchesStatus = selectedStatuses.length === 0 || 
         (order.status && selectedStatuses.includes(order.status));
 
-      return matchesSearch && matchesStatus;
+      const matchesSource = selectedSource === "" ||
+        (order.source && order.source.toLowerCase() === selectedSource.toLowerCase());
+
+      return matchesSearch && matchesStatus && matchesSource;
     });
-  }, [orders, searchTerm, selectedStatuses]);
+  }, [orders, searchTerm, selectedStatuses, selectedSource]);
 
   const pendingCount = orders.filter(o => o.status === "pending").length;
   const processingCount = orders.filter(o => o.status === "processing").length;
@@ -231,6 +239,9 @@ export function OrdersPage() {
               canWrite={canWrite()}
               showHistory={false}
             />
+            <Button variant="outline" size="icon" onClick={() => setIsHistoryOpen(true)} title="Historique des imports">
+              <History className="w-4 h-4" />
+            </Button>
             {canWrite() && (
               <Button className="gap-2" onClick={handleCreateNew}>
                 <Plus className="w-4 h-4" />
@@ -282,6 +293,20 @@ export function OrdersPage() {
                 )}
               </PopoverContent>
             </Popover>
+
+            {/* Source Filter */}
+            <select
+              value={selectedSource}
+              onChange={(e) => setSelectedSource(e.target.value)}
+              className="px-3 py-2 rounded-md border border-border bg-card text-sm"
+            >
+              <option value="">Toutes les sources</option>
+              {enabledChannels.map(channel => (
+                <option key={channel.id} value={channel.name}>
+                  {channel.name}
+                </option>
+              ))}
+            </select>
 
             {/* Selected status badges */}
             {selectedStatuses.length > 0 && (
@@ -471,6 +496,12 @@ export function OrdersPage() {
       <OrderImportModal
         isOpen={isImportOpen}
         onClose={() => setIsImportOpen(false)}
+      />
+
+      {/* Import History Modal */}
+      <OrderImportHistoryModal
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
       />
     </div>
   );

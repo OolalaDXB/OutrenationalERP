@@ -2,6 +2,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { WidgetVisibility, WidgetOrder } from '@/components/settings/WidgetVisibilitySection';
 
+export interface SalesChannel {
+  id: string;
+  name: string;
+  url: string | null;
+  enabled: boolean;
+  icon?: string;
+  builtin?: boolean;
+}
+
 export interface Settings {
   id: string;
   shop_name: string;
@@ -35,6 +44,8 @@ export interface Settings {
   // Widget visibility and order
   visible_widgets: WidgetVisibility | null;
   widget_order: WidgetOrder | null;
+  // Sales channels
+  sales_channels: SalesChannel[] | null;
 }
 
 export function useSettings() {
@@ -52,6 +63,7 @@ export function useSettings() {
         ...data,
         visible_widgets: data.visible_widgets as unknown as WidgetVisibility | null,
         widget_order: data.widget_order as unknown as WidgetOrder | null,
+        sales_channels: data.sales_channels as unknown as SalesChannel[] | null,
       } as Settings;
     }
   });
@@ -71,12 +83,19 @@ export function useUpdateSettings() {
       
       if (fetchError) throw fetchError;
       
-      // Convert visible_widgets and widget_order to JSON-compatible format
-      const updatePayload = {
-        ...updates,
-        visible_widgets: updates.visible_widgets ? updates.visible_widgets as unknown as Record<string, boolean> : undefined,
-        widget_order: updates.widget_order ? updates.widget_order as unknown as Record<string, string[]> : undefined,
-      };
+      // Convert visible_widgets, widget_order, and sales_channels to JSON-compatible format
+      const { id, ...rest } = updates;
+      const updatePayload: Record<string, unknown> = { ...rest };
+      
+      if (updates.visible_widgets !== undefined) {
+        updatePayload.visible_widgets = updates.visible_widgets;
+      }
+      if (updates.widget_order !== undefined) {
+        updatePayload.widget_order = updates.widget_order;
+      }
+      if (updates.sales_channels !== undefined) {
+        updatePayload.sales_channels = updates.sales_channels;
+      }
       
       const { data, error } = await supabase
         .from('settings')

@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Settings, Save, Loader2, Upload, Image, X, Building, FileText, CreditCard, Receipt, Palette, ToggleLeft, Database, BarChart3 } from "lucide-react";
+import { Settings, Save, Loader2, Upload, Image, X, Building, FileText, CreditCard, Receipt, Palette, ToggleLeft, Database, BarChart3, Store } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VatCacheSection } from "@/components/settings/VatCacheSection";
 import { WidgetVisibilitySection, defaultWidgetVisibility, defaultWidgetOrder, type WidgetVisibility, type WidgetOrder } from "@/components/settings/WidgetVisibilitySection";
+import { SalesChannelsSection } from "@/components/settings/SalesChannelsSection";
 
 export function SettingsPage() {
   const { toast } = useToast();
@@ -203,7 +204,7 @@ export function SettingsPage() {
       </div>
 
       <Tabs defaultValue="shop" className="w-full">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="shop" className="gap-2">
             <Building className="w-4 h-4" />
             Boutique
@@ -219,6 +220,10 @@ export function SettingsPage() {
           <TabsTrigger value="banking" className="gap-2">
             <CreditCard className="w-4 h-4" />
             Bancaire
+          </TabsTrigger>
+          <TabsTrigger value="channels" className="gap-2">
+            <Store className="w-4 h-4" />
+            Canaux
           </TabsTrigger>
           <TabsTrigger value="widgets" className="gap-2">
             <BarChart3 className="w-4 h-4" />
@@ -592,6 +597,11 @@ Les prix de nos produits sont indiqués en euros..."
               </div>
             )}
           </div>
+        </TabsContent>
+
+        {/* Sales Channels Tab */}
+        <TabsContent value="channels" className="space-y-6">
+          <SalesChannelsSection />
         </TabsContent>
 
         {/* Widgets Tab */}
