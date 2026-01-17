@@ -1,13 +1,19 @@
 import { useState, useMemo } from "react";
-import { Loader2, Shield, ShieldCheck, Eye, UserCog, Pencil, Filter, History } from "lucide-react";
+import { Loader2, Shield, ShieldCheck, Eye, UserCog, Pencil, Filter, History, UserX, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useUsersWithRoles, useUpdateUserRole, useUpdateUserInfo, type UserWithRole } from "@/hooks/useUserRoles";
+import { useUsersWithRoles, useUpdateUserRole, useUpdateUserInfo, useToggleUserActive, type UserWithRole } from "@/hooks/useUserRoles";
 import { useAuth, type AppRole } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { RoleChangeHistoryPanel } from "@/components/roles/RoleChangeHistoryPanel";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Select,
   SelectContent,
@@ -64,9 +70,11 @@ export function UserRolesPage() {
   const { data: users = [], isLoading, error, isFetching } = useUsersWithRoles();
   const updateRole = useUpdateUserRole();
   const updateUserInfo = useUpdateUserInfo();
+  const toggleUserActive = useToggleUserActive();
   const { user: currentUser, hasRole, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [updatingUser, setUpdatingUser] = useState<string | null>(null);
+  const [togglingUser, setTogglingUser] = useState<string | null>(null);
   const [roleFilter, setRoleFilter] = useState<AppRole | 'all'>('all');
   
   // Edit user dialog state
@@ -143,6 +151,35 @@ export function UserRolesPage() {
         description: "Impossible de mettre à jour l'utilisateur",
         variant: "destructive"
       });
+    }
+  };
+
+  const handleToggleActive = async (userWithRole: UserWithRole) => {
+    if (userWithRole.user_id === currentUser?.id) {
+      toast({
+        title: "Action non autorisée",
+        description: "Vous ne pouvez pas vous désactiver vous-même",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setTogglingUser(userWithRole.user_id);
+    try {
+      const newActive = !userWithRole.active;
+      await toggleUserActive.mutateAsync({ userId: userWithRole.user_id, active: newActive });
+      toast({
+        title: newActive ? "Utilisateur activé" : "Utilisateur désactivé",
+        description: `${userWithRole.email} a été ${newActive ? 'activé' : 'désactivé'}`
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de modifier le statut de l'utilisateur",
+        variant: "destructive"
+      });
+    } finally {
+      setTogglingUser(null);
     }
   };
 
@@ -315,12 +352,15 @@ export function UserRolesPage() {
                 Nom / Prénom
               </th>
               <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">
+                Statut
+              </th>
+              <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">
                 Rôle actuel
               </th>
               <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">
                 Changer le rôle
               </th>
-              <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border w-[80px]">
+              <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border w-[120px]">
                 Actions
               </th>
             </tr>
@@ -331,11 +371,13 @@ export function UserRolesPage() {
               const Icon = config.icon;
               const isCurrentUser = userWithRole.user_id === currentUser?.id;
               const isUpdating = updatingUser === userWithRole.user_id;
+              const isToggling = togglingUser === userWithRole.user_id;
+              const isInactive = !userWithRole.active;
 
               return (
                 <tr 
                   key={userWithRole.id} 
-                  className="border-b border-border last:border-b-0 hover:bg-secondary/50 transition-colors"
+                  className={`border-b border-border last:border-b-0 hover:bg-secondary/50 transition-colors ${isInactive ? 'opacity-60' : ''}`}
                 >
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -362,6 +404,19 @@ export function UserRolesPage() {
                       </span>
                     ) : (
                       <span className="text-sm text-muted-foreground italic">Non renseigné</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
+                    {isInactive ? (
+                      <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">
+                        <UserX className="w-3 h-3 mr-1" />
+                        Inactif
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20">
+                        <UserCheck className="w-3 h-3 mr-1" />
+                        Actif
+                      </Badge>
                     )}
                   </td>
                   <td className="px-6 py-4">
@@ -410,14 +465,49 @@ export function UserRolesPage() {
                     )}
                   </td>
                   <td className="px-6 py-4">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleOpenEditDialog(userWithRole)}
-                      className="text-muted-foreground hover:text-foreground"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleOpenEditDialog(userWithRole)}
+                              className="text-muted-foreground hover:text-foreground"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Modifier</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      {!isCurrentUser && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleToggleActive(userWithRole)}
+                                disabled={isToggling}
+                                className={isInactive ? "text-green-600 hover:text-green-700" : "text-destructive hover:text-destructive/80"}
+                              >
+                                {isToggling ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : isInactive ? (
+                                  <UserCheck className="w-4 h-4" />
+                                ) : (
+                                  <UserX className="w-4 h-4" />
+                                )}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {isInactive ? "Réactiver" : "Désactiver"}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );

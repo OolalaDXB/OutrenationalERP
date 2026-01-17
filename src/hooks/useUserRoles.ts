@@ -147,3 +147,21 @@ export function useUpdateUserInfo() {
     }
   });
 }
+
+export function useToggleUserActive() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ userId, active }: { userId: string; active: boolean }) => {
+      const { error } = await supabase
+        .from('users')
+        .update({ active })
+        .eq('id', userId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users-with-roles'] });
+    }
+  });
+}
