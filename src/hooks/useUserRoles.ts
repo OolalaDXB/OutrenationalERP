@@ -11,21 +11,18 @@ export interface UserWithRole {
   first_name: string | null;
   last_name: string | null;
   role: AppRole;
+  active: boolean;
   created_at: string;
 }
 
-interface UserRoleJoin {
-  id: string;
-  role: AppRole;
-  created_at: string;
-}
-
-interface UserWithRoleJoin {
+interface RpcUserRow {
   id: string;
   email: string;
   first_name: string | null;
   last_name: string | null;
-  user_roles: UserRoleJoin[];
+  role: AppRole;
+  active: boolean;
+  created_at: string;
 }
 
 export function useUsersWithRoles() {
@@ -34,47 +31,34 @@ export function useUsersWithRoles() {
   const userId = user?.id;
 
   return useQuery({
-    // Include user ID in cache key to prevent caching empty results from pre-auth state
     queryKey: ['users-with-roles', userId],
     queryFn: async () => {
-      // Single query: public.users joined with user_roles
-      const { data, error } = await supabase
-        .from('users')
-        .select(`
-          id,
-          email,
-          first_name,
-          last_name,
-          user_roles (
-            id,
-            role,
-            created_at
-          )
-        `)
-        .order('email');
+      // Use RPC to get users with roles (handles RLS properly)
+      const { data, error } = await supabase.rpc('admin_list_users_with_roles');
 
       if (error) {
         console.error('Error fetching users with roles:', error);
+        // Handle forbidden error specifically
+        if (error.message?.includes('forbidden')) {
+          toast.error('Accès refusé (admin/staff uniquement).');
+          throw new Error('Access denied (admin/staff only).');
+        }
         toast.error(`Erreur lors du chargement des utilisateurs: ${error.message}`);
         throw error;
       }
 
-      // Map users to include role info
-      return ((data || []) as unknown as UserWithRoleJoin[]).map(user => {
-        const roleRecord = user.user_roles?.[0];
-        
-        return {
-          id: roleRecord?.id || user.id,
-          user_id: user.id,
-          email: user.email || 'Email inconnu',
-          first_name: user.first_name || null,
-          last_name: user.last_name || null,
-          role: roleRecord?.role || 'viewer',
-          created_at: roleRecord?.created_at || new Date().toISOString()
-        };
-      }) as UserWithRole[];
+      // Map RPC results to UserWithRole format
+      return ((data || []) as RpcUserRow[]).map(row => ({
+        id: row.id,
+        user_id: row.id,
+        email: row.email || 'Email inconnu',
+        first_name: row.first_name || null,
+        last_name: row.last_name || null,
+        role: row.role || 'viewer',
+        active: row.active ?? true,
+        created_at: row.created_at || new Date().toISOString()
+      })) as UserWithRole[];
     },
-    // Only run query when auth is ready AND user is authenticated
     enabled: authReady && !!userId,
   });
 }
@@ -85,10 +69,13 @@ export function useUpdateUserRole() {
 
   return useMutation({
     mutationFn: async ({ userId, newRole, oldRole }: { userId: string; newRole: AppRole; oldRole?: AppRole }) => {
+      // Use upsert to handle both insert and update cases
       const { error } = await supabase
         .from('user_roles')
-        .update({ role: newRole })
-        .eq('user_id', userId);
+        .upsert(
+          { user_id: userId, role: newRole },
+          { onConflict: 'user_id' }
+        );
 
       if (error) throw error;
 
