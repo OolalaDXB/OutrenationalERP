@@ -1,9 +1,10 @@
 import { useState, useMemo, useCallback, useRef } from "react";
-import { Warehouse, Package, AlertTriangle, XCircle, Loader2, Edit, Download, Upload, Printer, FileSpreadsheet } from "lucide-react";
+import { Warehouse, Package, AlertTriangle, XCircle, Loader2, Edit } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { StockIndicator } from "@/components/ui/stock-indicator";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ImportExportDropdowns } from "@/components/ui/import-export-dropdowns";
 import { useProducts, Product } from "@/hooks/useProducts";
 import { useAuth } from "@/hooks/useAuth";
 import { BulkStockAdjustmentModal } from "@/components/inventory/BulkStockAdjustmentModal";
@@ -216,27 +217,15 @@ export function InventoryPage() {
         <div>
           <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
             <h2 className="text-lg font-semibold">État des stocks</h2>
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button variant="outline" size="sm" onClick={handlePrint}>
-                <Printer className="w-4 h-4 mr-2" />
-                Imprimer
-              </Button>
-              <Button variant="outline" size="sm" onClick={exportToCSV}>
-                <Download className="w-4 h-4 mr-2" />
-                CSV
-              </Button>
-              {canWrite() && (
-                <Button variant="outline" size="sm" onClick={() => setShowImportExportModal(true)}>
-                  <FileSpreadsheet className="w-4 h-4 mr-2" />
-                  Import / Export XLS
-                </Button>
-              )}
-              {canWrite() && (
-                <Button variant="outline" size="sm" onClick={() => setShowImportModal(true)}>
-                  <Upload className="w-4 h-4 mr-2" />
-                  Importer CSV
-                </Button>
-              )}
+          <div className="flex items-center gap-2 flex-wrap">
+              <ImportExportDropdowns
+                onExportCSV={exportToCSV}
+                onExportXLS={() => setShowImportExportModal(true)}
+                onPrint={handlePrint}
+                onImportCSV={() => setShowImportModal(true)}
+                onImportXLS={() => setShowImportExportModal(true)}
+                canWrite={canWrite()}
+              />
               {canWrite() && selectedIds.size > 0 && (
                 <Button size="sm" onClick={() => setShowBulkModal(true)}>
                   <Edit className="w-4 h-4 mr-2" />

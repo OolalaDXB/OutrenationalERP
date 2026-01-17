@@ -1,10 +1,11 @@
-import { useState, useMemo } from "react";
-import { Plus, MoreHorizontal, Loader2, Pencil, Trash2, FileSpreadsheet } from "lucide-react";
+import { useState, useMemo, useCallback } from "react";
+import { Plus, MoreHorizontal, Loader2, Pencil, Trash2 } from "lucide-react";
 import { StatusBadge, supplierTypeVariant, supplierTypeLabel } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { SupplierDrawer } from "@/components/drawers/SupplierDrawer";
 import { SupplierFormModal } from "@/components/forms/SupplierFormModal";
 import { ImportExportModal } from "@/components/import-export/ImportExportModal";
+import { ImportExportDropdowns } from "@/components/ui/import-export-dropdowns";
 import { useSuppliers, useDeleteSupplier, type Supplier } from "@/hooks/useSuppliers";
 import { formatCurrency } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
@@ -93,6 +94,39 @@ export function SuppliersPage() {
     setEditingSupplier(null);
   };
 
+  // CSV Export function
+  const exportToCSV = useCallback(() => {
+    if (filteredSuppliers.length === 0) {
+      toast({ title: "Aucune donnée", description: "Aucun fournisseur à exporter", variant: "destructive" });
+      return;
+    }
+
+    const headers = ["Nom", "Type", "Email", "Téléphone", "Pays", "Commission", "Références", "CA Total"];
+    const rows = filteredSuppliers.map(s => [
+      `"${(s.name || '').replace(/"/g, '""')}"`,
+      s.type || '',
+      s.email || '',
+      s.phone || '',
+      s.country || '',
+      s.commission_rate ? `${(s.commission_rate * 100).toFixed(0)}%` : '',
+      (s.products_count || 0).toString(),
+      (s.total_revenue || 0).toString()
+    ].join(";"));
+
+    const csvContent = [headers.join(";"), ...rows].join("\n");
+    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `fournisseurs_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast({ title: "Export réussi", description: `${filteredSuppliers.length} fournisseur(s) exporté(s)` });
+  }, [filteredSuppliers, toast]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -117,12 +151,12 @@ export function SuppliersPage() {
           <p className="text-sm text-muted-foreground">{filteredSuppliers.length} fournisseurs</p>
         </div>
         <div className="flex gap-2">
-          {canWrite() && (
-            <Button variant="outline" className="gap-2" onClick={() => setShowImportExport(true)}>
-              <FileSpreadsheet className="w-4 h-4" />
-              Import / Export
-            </Button>
-          )}
+          <ImportExportDropdowns
+            onExportCSV={exportToCSV}
+            onExportXLS={() => setShowImportExport(true)}
+            onImportXLS={() => setShowImportExport(true)}
+            canWrite={canWrite()}
+          />
           {canWrite() && (
             <Button className="gap-2" onClick={handleCreateNew}>
               <Plus className="w-4 h-4" />
