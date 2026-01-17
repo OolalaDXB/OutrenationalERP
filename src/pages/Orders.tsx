@@ -8,10 +8,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ImportExportDropdowns } from "@/components/ui/import-export-dropdowns";
 import { OrderDrawer } from "@/components/drawers/OrderDrawer";
 import { OrderFormModal } from "@/components/forms/OrderFormModal";
+import { OrderImportModal } from "@/components/orders/OrderImportModal";
 import { useOrdersWithItems, useUpdateOrderStatus, useCancelOrder, useUpdateOrder, useDeleteOrder } from "@/hooks/useOrders";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { exportToXLS } from "@/lib/excel-utils";
+import { orderExportColumns, flattenOrdersForExport } from "@/lib/order-import-utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,8 +58,9 @@ export function OrdersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   
-  // Modal state
+  // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   // Handle status toggle
   const toggleStatus = (status: string) => {
@@ -172,6 +176,18 @@ export function OrdersPage() {
     toast({ title: "Export réussi", description: `${filteredOrders.length} commande(s) exportée(s)` });
   }, [filteredOrders, toast]);
 
+  // XLS Export function (Format A - one row per item)
+  const handleExportXLS = useCallback(() => {
+    if (filteredOrders.length === 0) {
+      toast({ title: "Aucune donnée", description: "Aucune commande à exporter", variant: "destructive" });
+      return;
+    }
+    
+    const flatData = flattenOrdersForExport(filteredOrders);
+    exportToXLS(flatData, orderExportColumns, `commandes_${new Date().toISOString().split('T')[0]}`);
+    toast({ title: "Export réussi", description: `${filteredOrders.length} commande(s) exportée(s) en XLS` });
+  }, [filteredOrders, toast]);
+
   // Check if order can be deleted (only cancelled or refunded)
   const canDeleteOrder = (order: typeof orders[0]) => {
     return order.status === 'cancelled' || order.status === 'refunded';
@@ -210,7 +226,9 @@ export function OrdersPage() {
           <div className="flex items-center gap-2">
             <ImportExportDropdowns
               onExportCSV={exportToCSV}
-              canWrite={false}
+              onExportXLS={handleExportXLS}
+              onImportXLS={() => setIsImportOpen(true)}
+              canWrite={canWrite()}
               showHistory={false}
             />
             {canWrite() && (
@@ -448,6 +466,12 @@ export function OrdersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Import Modal */}
+      <OrderImportModal
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+      />
     </div>
   );
 }
