@@ -38,8 +38,8 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   },
 });
 
-// Expose supabase client to browser console in DEV for debugging
-if (import.meta.env.DEV) {
+// DEV ONLY: expose supabase only when explicitly enabled
+if (import.meta.env.DEV && import.meta.env.VITE_DEBUG_SUPABASE === "true") {
   (window as any).supabase = supabase;
 }
 
