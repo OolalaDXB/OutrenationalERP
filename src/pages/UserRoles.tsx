@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Loader2, Shield, ShieldCheck, Eye, UserCog, Pencil, Filter, History, UserX, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -95,6 +95,18 @@ export function UserRolesPage() {
     users.forEach(u => counts[u.role]++);
     return counts;
   }, [users]);
+
+  // Show toast when query fails with explicit Supabase error
+  useEffect(() => {
+    if (error) {
+      const errorMessage = (error as Error).message || "Erreur inconnue";
+      toast({
+        variant: "destructive",
+        title: "Erreur de chargement des utilisateurs",
+        description: errorMessage,
+      });
+    }
+  }, [error, toast]);
 
   const handleRoleChange = async (userWithRole: UserWithRole, newRole: AppRole) => {
     if (userWithRole.user_id === currentUser?.id) {
