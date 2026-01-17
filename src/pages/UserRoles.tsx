@@ -52,10 +52,10 @@ const roleConfig: Record<AppRole, { label: string; icon: React.ElementType; colo
 };
 
 export function UserRolesPage() {
-  const { data: users = [], isLoading } = useUsersWithRoles();
+  const { data: users = [], isLoading, error, isFetching } = useUsersWithRoles();
   const updateRole = useUpdateUserRole();
   const updateUserInfo = useUpdateUserInfo();
-  const { user: currentUser, hasRole } = useAuth();
+  const { user: currentUser, hasRole, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [updatingUser, setUpdatingUser] = useState<string | null>(null);
   const [roleFilter, setRoleFilter] = useState<AppRole | 'all'>('all');
@@ -133,6 +133,16 @@ export function UserRolesPage() {
     }
   };
 
+  // Show loading while auth is initializing
+  if (authLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground">Chargement de l'authentification…</p>
+      </div>
+    );
+  }
+
   // Check if current user is admin
   if (!hasRole('admin')) {
     return (
@@ -146,10 +156,24 @@ export function UserRolesPage() {
     );
   }
 
-  if (isLoading) {
+  // Show error if query failed
+  if (error) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="flex flex-col items-center justify-center h-64 text-center">
+        <Shield className="w-12 h-12 text-destructive mb-4" />
+        <h2 className="text-lg font-semibold mb-2">Erreur de chargement</h2>
+        <p className="text-muted-foreground">
+          {(error as Error).message || "Impossible de charger les utilisateurs"}
+        </p>
+      </div>
+    );
+  }
+
+  if (isLoading || isFetching) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground">Chargement des utilisateurs…</p>
       </div>
     );
   }
@@ -366,7 +390,9 @@ export function UserRolesPage() {
           <div className="p-12 text-center text-muted-foreground">
             {roleFilter !== 'all' 
               ? `Aucun utilisateur avec le rôle "${roleConfig[roleFilter].label}"`
-              : "Aucun utilisateur trouvé"
+              : currentUser 
+                ? "Aucun utilisateur trouvé (vérifier RLS / rôle admin)"
+                : "Aucun utilisateur trouvé"
             }
           </div>
         )}
