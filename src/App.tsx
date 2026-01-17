@@ -21,7 +21,7 @@ import { InvoicesPage } from "@/pages/Invoices";
 import { AnalyticsPage } from "@/pages/Analytics";
 import { StockMovementsPage } from "@/pages/StockMovements";
 import { UserRolesPage } from "@/pages/UserRoles";
-
+import { ImportHistoryPage } from "@/pages/ImportHistory";
 import { SettingsPage } from "@/pages/Settings";
 import { LoginPage } from "@/pages/Login";
 import { ResetPasswordPage } from "@/pages/ResetPassword";
@@ -90,6 +90,7 @@ const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   "/analytics": { title: "Analytics", subtitle: "Statistiques" },
   "/supplier-sales": { title: "Ventes par fournisseur", subtitle: "Rapports" },
   "/admin/roles": { title: "Gestion des rôles", subtitle: "Administration" },
+  "/admin/imports": { title: "Historique des imports", subtitle: "Administration" },
   "/admin/settings": { title: "Paramètres", subtitle: "Configuration" },
 };
 
@@ -130,6 +131,7 @@ function BackofficeContentInner({ onNavigate }: { onNavigate: (path: string) => 
       case "/analytics": return <AnalyticsPage />;
       case "/supplier-sales": return <SupplierSalesPage />;
       case "/admin/roles": return <UserRolesPage />;
+      case "/admin/imports": return <ImportHistoryPage />;
       case "/admin/settings": return <SettingsPage />;
       default: return <Dashboard />;
     }
