@@ -88,6 +88,107 @@ export function parseXLSFile<T>(
   });
 }
 
+// Parse XLS/XLSX file and return raw headers for detection
+export function parseXLSFileWithHeaders<T>(
+  file: File,
+  headerMapping: Record<string, keyof T>,
+  valueTransformers?: Record<string, (value: unknown) => unknown>
+): Promise<{ rows: T[]; headers: string[] }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        // Get raw headers from first row
+        const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+        const headers: string[] = [];
+        for (let col = range.s.c; col <= range.e.c; col++) {
+          const cellAddress = XLSX.utils.encode_cell({ r: range.s.r, c: col });
+          const cell = worksheet[cellAddress];
+          if (cell?.v) {
+            headers.push(String(cell.v));
+          }
+        }
+        
+        const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet);
+        
+        const mappedData = jsonData.map(row => {
+          const mappedRow: Partial<T> = {};
+          
+          // Apply header mapping
+          Object.entries(headerMapping).forEach(([header, key]) => {
+            // Check for exact header match or case-insensitive match
+            const value = row[header] ?? row[header.toLowerCase()] ?? row[header.toUpperCase()];
+            if (value !== undefined) {
+              (mappedRow as Record<string, unknown>)[key as string] = value;
+            }
+          });
+          
+          // Apply value transformers
+          if (valueTransformers) {
+            Object.entries(valueTransformers).forEach(([field, transformer]) => {
+              if (field in mappedRow) {
+                (mappedRow as Record<string, unknown>)[field] = transformer(
+                  (mappedRow as Record<string, unknown>)[field]
+                );
+              }
+            });
+          }
+          
+          return mappedRow as T;
+        });
+        
+        resolve({ rows: mappedData, headers });
+      } catch (error) {
+        reject(error);
+      }
+    };
+    
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// Get raw headers from XLS file without parsing data
+export function getXLSHeaders(file: File): Promise<string[]> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+        const headers: string[] = [];
+        for (let col = range.s.c; col <= range.e.c; col++) {
+          const cellAddress = XLSX.utils.encode_cell({ r: range.s.r, c: col });
+          const cell = worksheet[cellAddress];
+          if (cell?.v) {
+            headers.push(String(cell.v));
+          }
+        }
+        
+        resolve(headers);
+      } catch (error) {
+        reject(error);
+      }
+    };
+    
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
 // Product template columns
 export const productTemplateColumns = [
   { header: 'SKU', example: 'VINYL-001' },
