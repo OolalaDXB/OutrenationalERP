@@ -1,12 +1,14 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileText, Euro, Clock, CheckCircle, XCircle, Download, Plus, Pencil, Copy, Trash2, Check } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { ImportExportDropdowns } from "@/components/ui/import-export-dropdowns";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { useToast } from "@/hooks/use-toast";
 import { addInvoiceHistory } from "@/hooks/useInvoiceHistory";
 import { InvoiceFormModal } from "@/components/forms/InvoiceFormModal";
 import { InvoiceEditModal } from "@/components/forms/InvoiceEditModal";
@@ -383,10 +385,36 @@ export function InvoicesPage() {
             className="flex-1 min-w-[200px] max-w-[300px] px-3 py-2 rounded-md border border-border bg-card text-sm"
           />
         </div>
-        <Button className="gap-2" onClick={() => setIsFormOpen(true)}>
-          <Plus className="w-4 h-4" />
-          Nouvelle facture
-        </Button>
+        <div className="flex items-center gap-2">
+          <ImportExportDropdowns
+            onExportCSV={() => {
+              const headers = ["Numéro", "Type", "Destinataire", "Email", "Statut", "Montant", "Date"];
+              const rows = filteredInvoices.map(inv => [
+                inv.invoice_number,
+                inv.type === "customer" ? "Client" : "Fournisseur",
+                `"${(inv.recipient_name || '').replace(/"/g, '""')}"`,
+                inv.recipient_email || '',
+                statusLabel[inv.status || "draft"],
+                inv.total.toString(),
+                inv.issue_date || ''
+              ].join(";"));
+              const csvContent = [headers.join(";"), ...rows].join("\n");
+              const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement("a");
+              link.href = url;
+              link.download = `factures_${new Date().toISOString().split('T')[0]}.csv`;
+              link.click();
+              URL.revokeObjectURL(url);
+            }}
+            canWrite={false}
+            showHistory={false}
+          />
+          <Button className="gap-2" onClick={() => setIsFormOpen(true)}>
+            <Plus className="w-4 h-4" />
+            Nouvelle facture
+          </Button>
+        </div>
       </div>
 
       {/* Invoice Form Modal */}
