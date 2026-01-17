@@ -1,14 +1,16 @@
 import { useState, useRef, useMemo } from "react";
-import { Loader2, Upload, Download, FileSpreadsheet, XCircle, AlertTriangle, FileDown, RefreshCw, Plus, Eye } from "lucide-react";
+import { Loader2, Upload, Download, FileSpreadsheet, XCircle, AlertTriangle, FileDown, RefreshCw, Plus, Eye, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useCreateImportHistory } from "@/hooks/useImportHistory";
+import { useSuppliers } from "@/hooks/useSuppliers";
 import {
   exportToXLS,
   generateTemplateXLS,
@@ -89,12 +91,14 @@ export function ImportExportModal({ isOpen, onClose, entityType, data, onImportS
   const fileInputRef = useRef<HTMLInputElement>(null);
   const config = entityConfig[entityType];
   const createImportHistory = useCreateImportHistory();
+  const { data: suppliers = [] } = useSuppliers();
   const [activeTab, setActiveTab] = useState<'import' | 'export'>('import');
   const [importMode, setImportMode] = useState<ImportMode>('insert');
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [fileName, setFileName] = useState("");
   const [showChangesPreview, setShowChangesPreview] = useState(false);
+  const [selectedSupplierId, setSelectedSupplierId] = useState<string>("");
 
   const handleDownloadTemplate = () => {
     generateTemplateXLS(config.templateColumns, `${entityType}_import`);
@@ -297,6 +301,7 @@ export function ImportExportModal({ isOpen, onClose, entityType, data, onImportS
             country: str(row.country),
             website: str(row.website),
             discogs_id: str(row.discogs_id),
+            supplier_id: selectedSupplierId || null,
           };
         }
       };
@@ -377,6 +382,7 @@ export function ImportExportModal({ isOpen, onClose, entityType, data, onImportS
     setActiveTab('import');
     setImportMode('insert');
     setShowChangesPreview(false);
+    setSelectedSupplierId("");
     if (fileInputRef.current) fileInputRef.current.value = "";
     onClose();
   };
@@ -519,6 +525,32 @@ export function ImportExportModal({ isOpen, onClose, entityType, data, onImportS
                 Clé de correspondance : <strong>{config.uniqueFieldLabel}</strong>
               </p>
             </div>
+
+            {/* Supplier selector for labels */}
+            {entityType === 'labels' && (
+              <div className="p-4 bg-secondary/50 rounded-lg space-y-3">
+                <div className="flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-muted-foreground" />
+                  <p className="text-sm font-medium">Fournisseur associé (optionnel)</p>
+                </div>
+                <Select value={selectedSupplierId} onValueChange={setSelectedSupplierId}>
+                  <SelectTrigger className="w-full bg-card">
+                    <SelectValue placeholder="Sélectionner un fournisseur..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Aucun fournisseur</SelectItem>
+                    {suppliers.map((supplier) => (
+                      <SelectItem key={supplier.id} value={supplier.id}>
+                        {supplier.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Tous les labels importés seront associés à ce fournisseur
+                </p>
+              </div>
+            )}
 
             {/* Template download */}
             <div className="flex items-center justify-between p-3 bg-secondary rounded-lg">
