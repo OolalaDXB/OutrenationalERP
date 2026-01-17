@@ -23,9 +23,7 @@ import {
   Shield,
   ShieldCheck,
   Eye,
-  Database,
-  Settings,
-  History
+  Settings
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import outreNationalLogo from "@/assets/outre-national-logo.png";
@@ -87,7 +85,6 @@ const navigation: NavSection[] = [
     title: "Administration",
     items: [
       { icon: UserCog, label: "Gestion des rôles", href: "/admin/roles", adminOnly: true },
-      { icon: History, label: "Historique imports", href: "/admin/imports", adminOnly: true },
       { icon: Settings, label: "Paramètres", href: "/admin/settings", adminOnly: true },
     ],
   },
