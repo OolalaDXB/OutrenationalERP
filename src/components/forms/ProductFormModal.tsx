@@ -5,6 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useSuppliers } from "@/hooks/useSuppliers";
 import { useLabels, useCreateLabel } from "@/hooks/useLabels";
@@ -742,10 +749,13 @@ function AutoCompleteButton({
 }) {
   const { isSearching, searchByBarcode, searchByQuery } = useDiscogsSearch();
   const { toast } = useToast();
-  const { data: labels = [] } = useLabels();
-  const createLabel = useCreateLabel();
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewData, setPreviewData] = useState<{
+    result: any;
+    parsedData: DiscogsProductData;
+  } | null>(null);
 
-  const handleAutoComplete = async () => {
+  const handleSearch = async () => {
     let results: any[] = [];
     
     if (barcode) {
@@ -795,7 +805,8 @@ function AutoCompleteButton({
         catalogNumber: result.catno,
       };
       
-      onProductDataSelect(data);
+      setPreviewData({ result, parsedData: data });
+      setPreviewOpen(true);
     } else {
       toast({
         title: "Aucun résultat",
@@ -805,23 +816,123 @@ function AutoCompleteButton({
     }
   };
 
+  const handleConfirm = () => {
+    if (previewData) {
+      onProductDataSelect(previewData.parsedData);
+      setPreviewOpen(false);
+      setPreviewData(null);
+    }
+  };
+
+  const handleCancel = () => {
+    setPreviewOpen(false);
+    setPreviewData(null);
+  };
+
   const canSearch = !!(barcode || title || artist);
 
+  const formatLabels: Record<string, string> = {
+    'lp': 'LP',
+    '2lp': '2LP',
+    '3lp': '3LP',
+    'cd': 'CD',
+    'boxset': 'Box Set',
+    '7inch': '7"',
+    '10inch': '10"',
+    '12inch': '12"',
+    'cassette': 'Cassette',
+    'digital': 'Digital',
+  };
+
   return (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      onClick={handleAutoComplete}
-      disabled={isSearching || !canSearch}
-      className="gap-2"
-    >
-      {isSearching ? (
-        <Loader2 className="w-4 h-4 animate-spin" />
-      ) : (
-        <Wand2 className="w-4 h-4" />
-      )}
-      Compléter automatiquement
-    </Button>
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={handleSearch}
+        disabled={isSearching || !canSearch}
+        className="gap-2"
+      >
+        {isSearching ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          <Wand2 className="w-4 h-4" />
+        )}
+        Compléter automatiquement
+      </Button>
+
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Aperçu Discogs</DialogTitle>
+          </DialogHeader>
+          
+          {previewData && (
+            <div className="space-y-4">
+              {/* Cover image */}
+              {previewData.result.cover_image && (
+                <div className="flex justify-center">
+                  <img
+                    src={previewData.result.cover_image}
+                    alt="Cover"
+                    className="w-48 h-48 object-cover rounded-lg shadow-md"
+                  />
+                </div>
+              )}
+
+              {/* Parsed data preview */}
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="space-y-1">
+                  <span className="text-muted-foreground">Titre</span>
+                  <p className="font-medium">{previewData.parsedData.title || "-"}</p>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-muted-foreground">Artiste</span>
+                  <p className="font-medium">{previewData.parsedData.artist || "-"}</p>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-muted-foreground">Label</span>
+                  <p className="font-medium">{previewData.parsedData.label || "-"}</p>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-muted-foreground">N° catalogue</span>
+                  <p className="font-medium">{previewData.parsedData.catalogNumber || "-"}</p>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-muted-foreground">Année</span>
+                  <p className="font-medium">{previewData.parsedData.year || "-"}</p>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-muted-foreground">Format</span>
+                  <p className="font-medium">
+                    {previewData.parsedData.format 
+                      ? formatLabels[previewData.parsedData.format] || previewData.parsedData.format 
+                      : "-"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Original Discogs info */}
+              <div className="pt-2 border-t text-xs text-muted-foreground">
+                <p>Source Discogs : {previewData.result.title}</p>
+                {previewData.result.format && (
+                  <p>Format original : {previewData.result.format.join(", ")}</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={handleCancel}>
+              Annuler
+            </Button>
+            <Button onClick={handleConfirm}>
+              Appliquer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
