@@ -107,8 +107,10 @@ export type Database = {
           company_name: string | null
           country: string | null
           created_at: string | null
+          created_by: string | null
           credit_limit: number | null
           customer_type: string | null
+          deleted_at: string | null
           discount_rate: number | null
           email: string
           first_name: string | null
@@ -124,6 +126,7 @@ export type Database = {
           tags: string[] | null
           total_spent: number | null
           updated_at: string | null
+          updated_by: string | null
           vat_number: string | null
           website: string | null
         }
@@ -138,8 +141,10 @@ export type Database = {
           company_name?: string | null
           country?: string | null
           created_at?: string | null
+          created_by?: string | null
           credit_limit?: number | null
           customer_type?: string | null
+          deleted_at?: string | null
           discount_rate?: number | null
           email: string
           first_name?: string | null
@@ -155,6 +160,7 @@ export type Database = {
           tags?: string[] | null
           total_spent?: number | null
           updated_at?: string | null
+          updated_by?: string | null
           vat_number?: string | null
           website?: string | null
         }
@@ -169,8 +175,10 @@ export type Database = {
           company_name?: string | null
           country?: string | null
           created_at?: string | null
+          created_by?: string | null
           credit_limit?: number | null
           customer_type?: string | null
+          deleted_at?: string | null
           discount_rate?: number | null
           email?: string
           first_name?: string | null
@@ -186,6 +194,7 @@ export type Database = {
           tags?: string[] | null
           total_spent?: number | null
           updated_at?: string | null
+          updated_by?: string | null
           vat_number?: string | null
           website?: string | null
         }
@@ -390,6 +399,7 @@ export type Database = {
       invoices: {
         Row: {
           created_at: string | null
+          created_by: string | null
           currency: string | null
           customer_id: string | null
           due_date: string | null
@@ -413,9 +423,11 @@ export type Database = {
           total: number
           type: Database["public"]["Enums"]["invoice_type"]
           updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           created_at?: string | null
+          created_by?: string | null
           currency?: string | null
           customer_id?: string | null
           due_date?: string | null
@@ -439,9 +451,11 @@ export type Database = {
           total: number
           type: Database["public"]["Enums"]["invoice_type"]
           updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           created_at?: string | null
+          created_by?: string | null
           currency?: string | null
           customer_id?: string | null
           due_date?: string | null
@@ -465,6 +479,7 @@ export type Database = {
           total?: number
           type?: Database["public"]["Enums"]["invoice_type"]
           updated_at?: string | null
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -712,11 +727,13 @@ export type Database = {
           cancel_reason: string | null
           cancelled_at: string | null
           created_at: string | null
+          created_by: string | null
           currency: string | null
           customer_email: string
           customer_id: string | null
           customer_name: string | null
           customer_notes: string | null
+          deleted_at: string | null
           delivered_at: string | null
           discount_amount: number | null
           id: string
@@ -745,16 +762,19 @@ export type Database = {
           tracking_number: string | null
           tracking_url: string | null
           updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           cancel_reason?: string | null
           cancelled_at?: string | null
           created_at?: string | null
+          created_by?: string | null
           currency?: string | null
           customer_email: string
           customer_id?: string | null
           customer_name?: string | null
           customer_notes?: string | null
+          deleted_at?: string | null
           delivered_at?: string | null
           discount_amount?: number | null
           id?: string
@@ -783,16 +803,19 @@ export type Database = {
           tracking_number?: string | null
           tracking_url?: string | null
           updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           cancel_reason?: string | null
           cancelled_at?: string | null
           created_at?: string | null
+          created_by?: string | null
           currency?: string | null
           customer_email?: string
           customer_id?: string | null
           customer_name?: string | null
           customer_notes?: string | null
+          deleted_at?: string | null
           delivered_at?: string | null
           discount_amount?: number | null
           id?: string
@@ -821,6 +844,7 @@ export type Database = {
           tracking_number?: string | null
           tracking_url?: string | null
           updated_at?: string | null
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -884,7 +908,9 @@ export type Database = {
           cost_price: number | null
           country_of_origin: string | null
           created_at: string | null
+          created_by: string | null
           currency: string | null
+          deleted_at: string | null
           description: string | null
           discogs_id: string | null
           discogs_url: string | null
@@ -916,6 +942,7 @@ export type Database = {
           total_revenue: number | null
           total_sold: number | null
           updated_at: string | null
+          updated_by: string | null
           year_released: number | null
         }
         Insert: {
@@ -934,7 +961,9 @@ export type Database = {
           cost_price?: number | null
           country_of_origin?: string | null
           created_at?: string | null
+          created_by?: string | null
           currency?: string | null
+          deleted_at?: string | null
           description?: string | null
           discogs_id?: string | null
           discogs_url?: string | null
@@ -966,6 +995,7 @@ export type Database = {
           total_revenue?: number | null
           total_sold?: number | null
           updated_at?: string | null
+          updated_by?: string | null
           year_released?: number | null
         }
         Update: {
@@ -984,7 +1014,9 @@ export type Database = {
           cost_price?: number | null
           country_of_origin?: string | null
           created_at?: string | null
+          created_by?: string | null
           currency?: string | null
+          deleted_at?: string | null
           description?: string | null
           discogs_id?: string | null
           discogs_url?: string | null
@@ -1016,6 +1048,7 @@ export type Database = {
           total_revenue?: number | null
           total_sold?: number | null
           updated_at?: string | null
+          updated_by?: string | null
           year_released?: number | null
         }
         Relationships: [
@@ -1522,7 +1555,9 @@ export type Database = {
           contact_name: string | null
           country: string | null
           created_at: string | null
+          created_by: string | null
           currency: string | null
+          deleted_at: string | null
           email: string | null
           iban: string | null
           id: string
@@ -1538,6 +1573,7 @@ export type Database = {
           total_revenue: number | null
           type: Database["public"]["Enums"]["supplier_type"]
           updated_at: string | null
+          updated_by: string | null
           vat_number: string | null
           website: string | null
         }
@@ -1551,7 +1587,9 @@ export type Database = {
           contact_name?: string | null
           country?: string | null
           created_at?: string | null
+          created_by?: string | null
           currency?: string | null
+          deleted_at?: string | null
           email?: string | null
           iban?: string | null
           id?: string
@@ -1567,6 +1605,7 @@ export type Database = {
           total_revenue?: number | null
           type?: Database["public"]["Enums"]["supplier_type"]
           updated_at?: string | null
+          updated_by?: string | null
           vat_number?: string | null
           website?: string | null
         }
@@ -1580,7 +1619,9 @@ export type Database = {
           contact_name?: string | null
           country?: string | null
           created_at?: string | null
+          created_by?: string | null
           currency?: string | null
+          deleted_at?: string | null
           email?: string | null
           iban?: string | null
           id?: string
@@ -1596,6 +1637,7 @@ export type Database = {
           total_revenue?: number | null
           type?: Database["public"]["Enums"]["supplier_type"]
           updated_at?: string | null
+          updated_by?: string | null
           vat_number?: string | null
           website?: string | null
         }
@@ -1739,6 +1781,18 @@ export type Database = {
         }
         Relationships: []
       }
+      v_dashboard_stats: {
+        Row: {
+          active_products: number | null
+          low_stock_count: number | null
+          orders_this_month: number | null
+          overdue_invoices: number | null
+          pending_orders: number | null
+          revenue_this_month: number | null
+          total_customers: number | null
+        }
+        Relationships: []
+      }
       v_low_stock_products: {
         Row: {
           artist_id: string | null
@@ -1872,6 +1926,22 @@ export type Database = {
         }
         Returns: string
       }
+      count_orders: {
+        Args: {
+          p_customer_id?: string
+          p_include_deleted?: boolean
+          p_status?: string
+        }
+        Returns: number
+      }
+      count_products: {
+        Args: {
+          p_include_deleted?: boolean
+          p_status?: string
+          p_supplier_id?: string
+        }
+        Returns: number
+      }
       debug_admin_ctx: {
         Args: never
         Returns: {
@@ -1906,8 +1976,16 @@ export type Database = {
       is_authenticated: { Args: never; Returns: boolean }
       is_staff_or_admin: { Args: never; Returns: boolean }
       is_viewer_or_more: { Args: never; Returns: boolean }
+      restore_deleted: {
+        Args: { p_id: string; p_table_name: string }
+        Returns: boolean
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      soft_delete: {
+        Args: { p_id: string; p_table_name: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "staff" | "viewer"

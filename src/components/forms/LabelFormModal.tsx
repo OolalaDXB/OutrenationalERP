@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -11,6 +9,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { FormField, FormSelectField, ValidationErrors, extractZodErrors } from "@/components/ui/form-field";
+import { labelSchema, LabelFormValues } from "@/lib/validations/schemas";
 import { useCreateLabel, useUpdateLabel, Label as LabelType } from "@/hooks/useLabels";
 import { useSuppliers } from "@/hooks/useSuppliers";
 
@@ -34,6 +34,7 @@ export function LabelFormModal({ isOpen, onClose, label, defaultSupplierId }: La
     discogs_id: "",
     supplier_id: "",
   });
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors<LabelFormValues>>({});
 
   useEffect(() => {
     if (label) {
@@ -54,10 +55,28 @@ export function LabelFormModal({ isOpen, onClose, label, defaultSupplierId }: La
         supplier_id: defaultSupplierId || "",
       });
     }
+    setValidationErrors({});
   }, [label, isOpen, defaultSupplierId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    const dataToValidate = {
+      name: formData.name.trim(),
+      country: formData.country.trim() || undefined,
+      website: formData.website.trim() || undefined,
+      discogs_id: formData.discogs_id.trim() || undefined,
+      supplier_id: formData.supplier_id || undefined,
+    };
+
+    const result = labelSchema.safeParse(dataToValidate);
+    
+    if (!result.success) {
+      setValidationErrors(extractZodErrors<LabelFormValues>(result.error));
+      return;
+    }
+
+    setValidationErrors({});
     
     try {
       if (isEditing && label) {
@@ -86,6 +105,8 @@ export function LabelFormModal({ isOpen, onClose, label, defaultSupplierId }: La
 
   const isLoading = createLabel.isPending || updateLabel.isPending;
 
+  const supplierOptions = suppliers.map((s) => ({ value: s.id, label: s.name }));
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
@@ -100,62 +121,53 @@ export function LabelFormModal({ isOpen, onClose, label, defaultSupplierId }: La
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Nom *</Label>
-            <Input
-              id="name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="Nom du label"
-              required
-            />
-          </div>
+          <FormField
+            id="name"
+            label="Nom"
+            required
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            placeholder="Nom du label"
+            error={validationErrors.name}
+          />
 
-          <div className="space-y-2">
-            <Label htmlFor="country">Pays</Label>
-            <Input
-              id="country"
-              value={formData.country}
-              onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-              placeholder="ex: France, UK, USA..."
-            />
-          </div>
+          <FormField
+            id="country"
+            label="Pays"
+            value={formData.country}
+            onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+            placeholder="ex: France, UK, USA..."
+            error={validationErrors.country}
+          />
 
-          <div className="space-y-2">
-            <Label htmlFor="website">Site web</Label>
-            <Input
-              id="website"
-              type="url"
-              value={formData.website}
-              onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-              placeholder="https://..."
-            />
-          </div>
+          <FormField
+            id="website"
+            label="Site web"
+            type="url"
+            value={formData.website}
+            onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+            placeholder="https://..."
+            error={validationErrors.website}
+          />
 
-          <div className="space-y-2">
-            <Label htmlFor="discogs_id">ID Discogs</Label>
-            <Input
-              id="discogs_id"
-              value={formData.discogs_id}
-              onChange={(e) => setFormData({ ...formData, discogs_id: e.target.value })}
-              placeholder="Identifiant Discogs (optionnel)"
-            />
-          </div>
+          <FormField
+            id="discogs_id"
+            label="ID Discogs"
+            value={formData.discogs_id}
+            onChange={(e) => setFormData({ ...formData, discogs_id: e.target.value })}
+            placeholder="Identifiant Discogs (optionnel)"
+            error={validationErrors.discogs_id}
+          />
 
-          <div className="space-y-2">
-            <Label htmlFor="supplier_id">Fournisseur</Label>
-            <select
-              id="supplier_id"
-              value={formData.supplier_id}
-              onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
-              className="w-full px-3 py-2 rounded-md border border-border bg-card text-sm"
-            >
-              <option value="">Aucun fournisseur</option>
-              {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-          </div>
+          <FormSelectField
+            id="supplier_id"
+            label="Fournisseur"
+            value={formData.supplier_id}
+            onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
+            options={supplierOptions}
+            placeholder="Aucun fournisseur"
+            error={validationErrors.supplier_id}
+          />
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>

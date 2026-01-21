@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { X, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,8 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { addInvoiceHistory } from "@/hooks/useInvoiceHistory";
+import { FormField, FormTextareaField, ValidationErrors, extractZodErrors } from "@/components/ui/form-field";
+import { invoiceSchema, InvoiceFormValues } from "@/lib/validations/schemas";
 
 interface InvoiceFormModalProps {
   open: boolean;
@@ -36,6 +38,7 @@ interface InvoiceLineItem {
 export function InvoiceFormModal({ open, onOpenChange }: InvoiceFormModalProps) {
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors<InvoiceFormValues>>({});
 
   // Form state
   const [invoiceNumber, setInvoiceNumber] = useState("");
@@ -84,24 +87,41 @@ export function InvoiceFormModal({ open, onOpenChange }: InvoiceFormModalProps) 
     setDueDate("");
     setNotes("");
     setItems([{ description: "", quantity: 1, unit_price: 0 }]);
+    setValidationErrors({});
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!invoiceNumber.trim()) {
-      toast.error("Le numéro de facture est requis");
-      return;
-    }
-    if (!recipientName.trim()) {
-      toast.error("Le nom du destinataire est requis");
-      return;
-    }
-    if (items.some((item) => !item.description.trim())) {
-      toast.error("Toutes les lignes doivent avoir une description");
+    const formData = {
+      invoice_number: invoiceNumber.trim(),
+      type,
+      recipient_name: recipientName.trim(),
+      recipient_email: recipientEmail.trim() || undefined,
+      recipient_address: recipientAddress.trim() || undefined,
+      issue_date: issueDate,
+      due_date: dueDate || undefined,
+      notes: notes.trim() || undefined,
+      items: items.map((item) => ({
+        description: item.description.trim(),
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+      })),
+    };
+
+    const result = invoiceSchema.safeParse(formData);
+
+    if (!result.success) {
+      setValidationErrors(extractZodErrors<InvoiceFormValues>(result.error));
+      // Check for item-level errors
+      const itemErrors = result.error.errors.filter((err) => err.path[0] === "items");
+      if (itemErrors.length > 0) {
+        toast.error("Vérifiez les lignes de facture");
+      }
       return;
     }
 
+    setValidationErrors({});
     setIsSubmitting(true);
 
     try {
