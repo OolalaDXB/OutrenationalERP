@@ -126,7 +126,54 @@ export function useDeleteCustomer() {
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from('customers')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+    }
+  });
+}
+
+export function usePermanentDeleteCustomer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('customers')
         .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+    }
+  });
+}
+
+export function useDeletedCustomers() {
+  return useQuery({
+    queryKey: ['customers', 'deleted'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .not('deleted_at', 'is', null)
+        .order('deleted_at', { ascending: false });
+      if (error) throw error;
+      return data;
+    }
+  });
+}
+
+export function useRestoreCustomer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('customers')
+        .update({ deleted_at: null })
         .eq('id', id);
       if (error) throw error;
     },

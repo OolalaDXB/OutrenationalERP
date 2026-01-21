@@ -114,7 +114,58 @@ export function useDeleteSupplier() {
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from('suppliers')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+    }
+  });
+}
+
+export function usePermanentDeleteSupplier() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('suppliers')
         .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+    }
+  });
+}
+
+export function useDeletedSuppliers() {
+  return useQuery({
+    queryKey: ['suppliers', 'deleted'],
+    retry: false,
+    queryFn: async () => {
+      const request = (async () => {
+        const { data, error } = await supabase
+          .from('suppliers')
+          .select('*')
+          .not('deleted_at', 'is', null)
+          .order('deleted_at', { ascending: false });
+        if (error) throw error;
+        return data;
+      })();
+      return withTimeout(request, 15000, 'Timeout lors du chargement des fournisseurs supprimés.');
+    }
+  });
+}
+
+export function useRestoreSupplier() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('suppliers')
+        .update({ deleted_at: null })
         .eq('id', id);
       if (error) throw error;
     },

@@ -357,6 +357,22 @@ export function useDeleteOrder() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('orders')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    }
+  });
+}
+
+export function usePermanentDeleteOrder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
       // First delete order items
       const { error: itemsError } = await supabase
         .from('order_items')
@@ -368,6 +384,40 @@ export function useDeleteOrder() {
       const { error } = await supabase
         .from('orders')
         .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    }
+  });
+}
+
+export function useDeletedOrders() {
+  return useQuery({
+    queryKey: ['orders', 'deleted'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items (*)
+        `)
+        .not('deleted_at', 'is', null)
+        .order('deleted_at', { ascending: false });
+      if (error) throw error;
+      return data;
+    }
+  });
+}
+
+export function useRestoreOrder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('orders')
+        .update({ deleted_at: null })
         .eq('id', id);
       if (error) throw error;
     },
