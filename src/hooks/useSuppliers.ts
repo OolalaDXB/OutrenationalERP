@@ -16,6 +16,7 @@ export function useSuppliers() {
         const { data, error } = await supabase
           .from('suppliers')
           .select('*')
+          .is('deleted_at', null)
           .order('name');
         if (error) throw error;
         return data;
@@ -56,6 +57,7 @@ export function useActiveSuppliers() {
         const { data, error } = await supabase
           .from('suppliers')
           .select('*')
+          .is('deleted_at', null)
           .eq('active', true)
           .order('name');
         if (error) throw error;
