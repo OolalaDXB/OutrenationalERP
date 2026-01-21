@@ -41,7 +41,7 @@ export function ProAuthProvider({ children }: { children: React.ReactNode }) {
   const [customer, setCustomer] = useState<ProCustomer | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchCustomer = useCallback(async (userId: string) => {
+  const fetchCustomer = useCallback(async (userId: string, userEmail?: string) => {
     const { data, error } = await supabase
       .from('customers')
       .select('*')
@@ -49,6 +49,43 @@ export function ProAuthProvider({ children }: { children: React.ReactNode }) {
       .single();
 
     if (error || !data) {
+      // No customer record found - check if there's pending registration data
+      const pendingData = localStorage.getItem('pendingProRegistration');
+      if (pendingData && userEmail) {
+        try {
+          const parsedData = JSON.parse(pendingData);
+          console.log('Creating customer record from pending registration data');
+          
+          const { data: newCustomer, error: insertError } = await supabase
+            .from('customers')
+            .insert({
+              auth_user_id: userId,
+              email: userEmail,
+              ...parsedData,
+              customer_type: 'professional',
+              approved: false,
+              discount_rate: 0,
+              payment_terms: 30,
+            })
+            .select()
+            .single();
+
+          if (insertError) {
+            console.error('Error creating customer from pending data:', insertError);
+            setCustomer(null);
+            return null;
+          }
+
+          // Successfully created customer - remove pending data
+          localStorage.removeItem('pendingProRegistration');
+          setCustomer(newCustomer as ProCustomer);
+          return newCustomer as ProCustomer;
+        } catch (parseError) {
+          console.error('Error parsing pending registration data:', parseError);
+          localStorage.removeItem('pendingProRegistration');
+        }
+      }
+      
       setCustomer(null);
       return null;
     }
@@ -59,7 +96,7 @@ export function ProAuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshCustomer = useCallback(async () => {
     if (user) {
-      await fetchCustomer(user.id);
+      await fetchCustomer(user.id, user.email || undefined);
     }
   }, [user, fetchCustomer]);
 
@@ -70,7 +107,7 @@ export function ProAuthProvider({ children }: { children: React.ReactNode }) {
         
         if (session?.user) {
           // Use setTimeout to avoid potential race conditions
-          setTimeout(() => fetchCustomer(session.user.id), 0);
+          setTimeout(() => fetchCustomer(session.user.id, session.user.email || undefined), 0);
         } else {
           setCustomer(null);
         }
@@ -83,7 +120,7 @@ export function ProAuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchCustomer(session.user.id);
+        fetchCustomer(session.user.id, session.user.email || undefined);
       }
       setIsLoading(false);
     });
