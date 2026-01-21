@@ -147,49 +147,9 @@ export function ProRegister() {
     setIsSubmitting(true);
 
     try {
-      // 1. Create auth user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          emailRedirectTo: window.location.origin + "/pro/login",
-        },
-      });
-
-      if (authError) {
-        if (authError.message.includes("already registered")) {
-          setError("Cet email est déjà utilisé");
-        } else {
-          setError("Erreur lors de la création du compte");
-        }
-        return;
-      }
-
-      if (!authData.user) {
-        setError("Erreur lors de la création du compte");
-        return;
-      }
-
-      // Wait for session to be available (signUp doesn't immediately set session)
-      setError("");
-      // Show a temporary message while waiting for session
-      toast({
-        title: "Création du compte...",
-        description: "Veuillez patienter pendant la configuration de votre profil.",
-      });
-
-      let session = (await supabase.auth.getSession()).data.session;
-      if (!session?.user) {
-        // Wait a bit and retry - session may take time to propagate
-        await new Promise(r => setTimeout(r, 1500));
-        session = (await supabase.auth.getSession()).data.session;
-      }
-      const userId = session?.user?.id || authData.user.id;
-
-      // 2. Create customer record (unapproved professional)
-      const { error: customerError } = await supabase.from("customers").insert({
-        auth_user_id: userId,
-        email: formData.email,
+      // 1. Store pending registration data in localStorage
+      // This will be used after email confirmation to create the customer record
+      const pendingData = {
         company_name: formData.companyName,
         vat_number: formData.vatNumber || null,
         first_name: formData.firstName || null,
@@ -204,27 +164,42 @@ export function ProRegister() {
         notes: formData.notes
           ? `Demande d'inscription: ${formData.notes}`
           : "Demande d'inscription via portail pro",
-        customer_type: "professional",
-        approved: false,
-        discount_rate: 0,
-        payment_terms: 30,
+      };
+      localStorage.setItem('pendingProRegistration', JSON.stringify(pendingData));
+
+      // 2. Create auth user only - customer record will be created after email confirmation
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          emailRedirectTo: window.location.origin + "/pro/login",
+        },
       });
 
-      if (customerError) {
-        console.error("Customer creation error:", customerError);
-        // Sign out the user if customer creation fails
-        await supabase.auth.signOut();
-        setError("Erreur lors de la création du profil client");
+      if (authError) {
+        localStorage.removeItem('pendingProRegistration');
+        if (authError.message.includes("already registered")) {
+          setError("Cet email est déjà utilisé");
+        } else {
+          setError("Erreur lors de la création du compte");
+        }
+        return;
+      }
+
+      if (!authData.user) {
+        localStorage.removeItem('pendingProRegistration');
+        setError("Erreur lors de la création du compte");
         return;
       }
 
       setIsSuccess(true);
       toast({
-        title: "Demande envoyée !",
-        description: "Votre demande d'inscription a été enregistrée.",
+        title: "Compte créé !",
+        description: "Vérifiez votre email pour confirmer votre inscription.",
       });
     } catch (err) {
       console.error("Registration error:", err);
+      localStorage.removeItem('pendingProRegistration');
       setError("Une erreur est survenue");
     } finally {
       setIsSubmitting(false);
@@ -238,16 +213,15 @@ export function ProRegister() {
           <div className="w-20 h-20 mx-auto rounded-full bg-success/20 flex items-center justify-center mb-6">
             <CheckCircle className="w-10 h-10 text-success" />
           </div>
-          <h1 className="text-2xl font-bold mb-2">Demande envoyée !</h1>
+          <h1 className="text-2xl font-bold mb-2">Compte créé !</h1>
           <p className="text-muted-foreground mb-6">
-            Votre demande d'inscription a été enregistrée. Notre équipe va examiner votre dossier
-            et vous contactera sous 24-48h.
+            Un email de confirmation a été envoyé à votre adresse. Cliquez sur le lien dans l'email pour activer votre compte.
           </p>
           <p className="text-sm text-muted-foreground mb-6">
-            Vérifiez votre boîte mail pour confirmer votre adresse email.
+            Après confirmation, connectez-vous pour finaliser votre inscription professionnelle.
           </p>
           <Link to="/pro/login">
-            <Button>Retour à la connexion</Button>
+            <Button>Aller à la connexion</Button>
           </Link>
         </div>
       </div>
