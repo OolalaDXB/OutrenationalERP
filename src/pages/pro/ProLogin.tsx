@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Navigate, Link } from "react-router-dom";
-import { Loader2, LogIn, AlertCircle, Moon, Sun, ArrowLeft } from "lucide-react";
+import { Loader2, LogIn, AlertCircle, Moon, Sun, ArrowLeft, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,7 +48,12 @@ export function ProLogin() {
       } else {
         const { error: signInError } = await signIn(email, password);
         if (signInError) {
-          setError("Email ou mot de passe incorrect");
+          // Check if it's an email confirmation error
+          if (signInError.message?.includes("Email not confirmed")) {
+            setError("Veuillez confirmer votre email avant de vous connecter. Vérifiez votre boîte de réception.");
+          } else {
+            setError("Email ou mot de passe incorrect");
+          }
           return;
         }
         navigate("/pro");
@@ -116,6 +121,15 @@ export function ProLogin() {
                 {message}
               </div>
             )}
+
+            {/* Email verification reminder */}
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-primary/5 border border-primary/10 text-sm">
+              <Mail className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+              <div className="text-muted-foreground">
+                <span className="font-medium text-foreground">Email non confirmé ?</span>{" "}
+                Vérifiez votre boîte de réception et confirmez votre adresse email avant de vous connecter.
+              </div>
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>

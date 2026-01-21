@@ -171,6 +171,13 @@ export function ProRegister() {
       }
 
       // Wait for session to be available (signUp doesn't immediately set session)
+      setError("");
+      // Show a temporary message while waiting for session
+      toast({
+        title: "Création du compte...",
+        description: "Veuillez patienter pendant la configuration de votre profil.",
+      });
+
       let session = (await supabase.auth.getSession()).data.session;
       if (!session?.user) {
         // Wait a bit and retry - session may take time to propagate
