@@ -103,8 +103,8 @@ export function ProRegister() {
       return "Les mots de passe ne correspondent pas";
     }
 
-    if (formData.password.length < 6) {
-      return "Le mot de passe doit contenir au moins 6 caractères";
+    if (formData.password.length < 8) {
+      return "Le mot de passe doit contenir au moins 8 caractères";
     }
 
     if (!formData.companyName.trim()) {
@@ -136,17 +136,19 @@ export function ProRegister() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    // Validate form before submitting
+    const validationError = validateForm();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      // Validate passwords match
-      if (formData.password !== formData.confirmPassword) {
-        setError("Les mots de passe ne correspondent pas");
-        return;
-      }
-
-      // Call Edge Function - it creates both auth user and customer
-      const { data, error } = await supabase.functions.invoke('create-pro-customer', {
+      // Call Edge Function - it creates both auth user and customer server-side
+      const { data, error } = await supabase.functions.invoke("create-pro-customer", {
         body: {
           email: formData.email,
           password: formData.password,
@@ -161,18 +163,25 @@ export function ProRegister() {
           state: formData.state,
           postalCode: formData.postalCode,
           country: formData.country,
-          notes: formData.notes
-        }
+          notes: formData.notes,
+        },
       });
 
+      // Handle network/invoke errors
       if (error) {
-        console.error("Registration error:", error);
-        const errMsg = JSON.stringify(error);
-        if (errMsg.includes("EMAIL_ALREADY_USED")) {
+        console.error("Registration invoke error:", error);
+        setError("Erreur lors de la création du compte");
+        return;
+      }
+
+      // Handle application-level errors from the Edge Function
+      if (data?.error) {
+        console.error("Registration error:", data.error);
+        if (data.error === "EMAIL_ALREADY_USED") {
           setError("Cet email est déjà utilisé");
-        } else if (errMsg.includes("PASSWORD_TOO_SHORT")) {
-          setError("Le mot de passe doit contenir au moins 6 caractères");
-        } else if (errMsg.includes("COMPANY_REQUIRED")) {
+        } else if (data.error === "PASSWORD_TOO_SHORT") {
+          setError("Mot de passe trop court (8 caractères min.)");
+        } else if (data.error === "COMPANY_REQUIRED") {
           setError("Le nom de l'entreprise est requis");
         } else {
           setError("Erreur lors de la création du compte");
@@ -180,7 +189,12 @@ export function ProRegister() {
         return;
       }
 
-      setIsSuccess(true);
+      // Success
+      if (data?.success) {
+        setIsSuccess(true);
+      } else {
+        setError("Erreur inattendue lors de la création du compte");
+      }
     } catch (err) {
       console.error("Unexpected error:", err);
       setError("Une erreur est survenue");
@@ -196,12 +210,12 @@ export function ProRegister() {
           <div className="w-20 h-20 mx-auto rounded-full bg-success/20 flex items-center justify-center mb-6">
             <CheckCircle className="w-10 h-10 text-success" />
           </div>
-          <h1 className="text-2xl font-bold mb-2">Compte créé !</h1>
+          <h1 className="text-2xl font-bold mb-2">Demande envoyée !</h1>
           <p className="text-muted-foreground mb-6">
-            Un email de confirmation a été envoyé à votre adresse. Cliquez sur le lien dans l'email pour activer votre compte.
+            Votre demande de compte professionnel a été reçue. Notre équipe va l'examiner et vous contacter prochainement.
           </p>
           <p className="text-sm text-muted-foreground mb-6">
-            Après confirmation, connectez-vous pour finaliser votre inscription professionnelle.
+            Une fois votre compte approuvé, vous pourrez vous connecter avec vos identifiants.
           </p>
           <Link to="/pro/login">
             <Button>Aller à la connexion</Button>
@@ -422,8 +436,9 @@ export function ProRegister() {
                     onChange={handleChange}
                     placeholder="••••••••"
                     required
-                    minLength={6}
+                    minLength={8}
                   />
+                  <p className="text-xs text-muted-foreground">Minimum 8 caractères</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="confirmPassword">Confirmer le mot de passe *</Label>
