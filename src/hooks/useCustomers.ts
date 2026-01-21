@@ -6,6 +6,19 @@ export type Customer = Tables<'customers'>;
 export type CustomerInsert = TablesInsert<'customers'>;
 export type CustomerUpdate = TablesUpdate<'customers'>;
 
+export interface PaginatedCustomerResult {
+  data: Customer[];
+  count: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export interface UseCustomersOptions {
+  page?: number;
+  pageSize?: number;
+}
+
 export function useCustomers() {
   return useQuery({
     queryKey: ['customers'],
@@ -13,9 +26,42 @@ export function useCustomers() {
       const { data, error } = await supabase
         .from('customers')
         .select('*')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
+    }
+  });
+}
+
+export function usePaginatedCustomers(options: UseCustomersOptions = {}) {
+  const { page = 1, pageSize = 50 } = options;
+  
+  return useQuery({
+    queryKey: ['customers', 'paginated', page, pageSize],
+    placeholderData: (previousData) => previousData,
+    queryFn: async (): Promise<PaginatedCustomerResult> => {
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+      
+      const { data, error, count } = await supabase
+        .from('customers')
+        .select('*', { count: 'exact' })
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+        .range(from, to);
+        
+      if (error) throw error;
+      
+      const totalCount = count || 0;
+      
+      return {
+        data: data || [],
+        count: totalCount,
+        page,
+        pageSize,
+        totalPages: Math.ceil(totalCount / pageSize),
+      };
     }
   });
 }

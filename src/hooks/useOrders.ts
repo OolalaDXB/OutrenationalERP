@@ -8,6 +8,19 @@ export type OrderInsert = TablesInsert<'orders'>;
 export type OrderItemInsert = TablesInsert<'order_items'>;
 export type OrderUpdate = TablesUpdate<'orders'>;
 
+export interface PaginatedOrderResult {
+  data: Order[];
+  count: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export interface UseOrdersOptions {
+  page?: number;
+  pageSize?: number;
+}
+
 export function useOrders() {
   return useQuery({
     queryKey: ['orders'],
@@ -15,9 +28,45 @@ export function useOrders() {
       const { data, error } = await supabase
         .from('orders')
         .select('*')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
+    }
+  });
+}
+
+export function usePaginatedOrdersWithItems(options: UseOrdersOptions = {}) {
+  const { page = 1, pageSize = 50 } = options;
+  
+  return useQuery({
+    queryKey: ['orders', 'with-items', 'paginated', page, pageSize],
+    placeholderData: (previousData) => previousData,
+    queryFn: async () => {
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+      
+      const { data, error, count } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items (*)
+        `, { count: 'exact' })
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+        .range(from, to);
+        
+      if (error) throw error;
+      
+      const totalCount = count || 0;
+      
+      return {
+        data: data || [],
+        count: totalCount,
+        page,
+        pageSize,
+        totalPages: Math.ceil(totalCount / pageSize),
+      };
     }
   });
 }
@@ -32,6 +81,7 @@ export function useOrdersWithItems() {
           *,
           order_items (*)
         `)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;

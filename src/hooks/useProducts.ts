@@ -10,6 +10,70 @@ export type Product = Tables<'products'> & {
 export type ProductInsert = TablesInsert<'products'>;
 export type ProductUpdate = TablesUpdate<'products'>;
 
+export interface PaginatedResult<T> {
+  data: T[];
+  count: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export interface UseProductsOptions {
+  page?: number;
+  pageSize?: number;
+}
+
+// Paginated products hook for Products page
+export function usePaginatedProducts(options: UseProductsOptions = {}) {
+  const { page = 1, pageSize = 50 } = options;
+  
+  return useQuery({
+    queryKey: ['products', 'paginated', page, pageSize],
+    retry: false,
+    placeholderData: (previousData) => previousData, // Keep previous data while fetching
+    queryFn: async (): Promise<PaginatedResult<Product>> => {
+      const request = (async () => {
+        const from = (page - 1) * pageSize;
+        const to = from + pageSize - 1;
+        
+        const { data, error, count } = await supabase
+          .from('products')
+          .select(`
+            *,
+            labels:label_id (
+              country,
+              website
+            )
+          `, { count: 'exact' })
+          .is('deleted_at', null)
+          .order('title')
+          .range(from, to);
+          
+        if (error) throw error;
+        
+        // Map label data to flat structure for easier access
+        const mappedData = (data || []).map(product => ({
+          ...product,
+          label_country: (product.labels as any)?.country ?? null,
+          label_website: (product.labels as any)?.website ?? null,
+        }));
+        
+        const totalCount = count || 0;
+        
+        return {
+          data: mappedData,
+          count: totalCount,
+          page,
+          pageSize,
+          totalPages: Math.ceil(totalCount / pageSize),
+        };
+      })();
+      return withTimeout(request, 15000, 'Timeout lors du chargement des produits.');
+    }
+  });
+}
+
+// Original hook for backward compatibility (returns all products as array)
 export function useProducts() {
   return useQuery({
     queryKey: ['products'],
@@ -25,10 +89,10 @@ export function useProducts() {
               website
             )
           `)
+          .is('deleted_at', null)
           .order('title');
         if (error) throw error;
         
-        // Map label data to flat structure for easier access
         return data.map(product => ({
           ...product,
           label_country: (product.labels as any)?.country ?? null,
