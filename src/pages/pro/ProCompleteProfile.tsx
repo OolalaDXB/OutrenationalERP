@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Building2, AlertCircle } from "lucide-react";
+import { Loader2, Building2, AlertCircle, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -198,6 +199,14 @@ export function ProCompleteProfile() {
             Pour finaliser votre inscription professionnelle
           </p>
         </div>
+
+        {/* Info banner */}
+        <Alert className="mb-6 border-primary/20 bg-primary/5">
+          <Info className="h-4 w-4 text-primary" />
+          <AlertDescription className="text-sm">
+            Vos informations d'inscription n'ont pas pu être récupérées. Veuillez compléter votre profil professionnel pour continuer.
+          </AlertDescription>
+        </Alert>
 
         {/* Form */}
         <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
