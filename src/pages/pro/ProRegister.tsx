@@ -1,57 +1,146 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { Loader2, UserPlus, AlertCircle, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { CountrySelector } from "@/components/forms/CountrySelector";
+import {
+  requiresState,
+  getTaxIdConfig,
+  getStateLabel,
+  getStateOptions,
+  isValidEuVatFormat,
+  isEuCountry,
+  getDefaultCountryForPhone,
+} from "@/lib/country-config";
+import PhoneInput, { isValidPhoneNumber, type Country } from "react-phone-number-input";
+import "react-phone-number-input/style.css";
+
+interface FormData {
+  country: string;
+  companyName: string;
+  vatNumber: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  address: string;
+  addressLine2: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  password: string;
+  confirmPassword: string;
+  notes: string;
+}
 
 export function ProRegister() {
-  const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState("");
-  
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-    confirmPassword: "",
+
+  const [formData, setFormData] = useState<FormData>({
+    country: "FR",
     companyName: "",
     vatNumber: "",
     firstName: "",
     lastName: "",
+    email: "",
     phone: "",
     address: "",
     addressLine2: "",
     city: "",
+    state: "",
     postalCode: "",
-    country: "France",
-    notes: ""
+    password: "",
+    confirmPassword: "",
+    notes: "",
   });
 
+  // Derived state based on country
+  const showState = useMemo(() => requiresState(formData.country), [formData.country]);
+  const stateLabel = useMemo(() => getStateLabel(formData.country), [formData.country]);
+  const stateOptions = useMemo(() => getStateOptions(formData.country), [formData.country]);
+  const taxIdConfig = useMemo(() => getTaxIdConfig(formData.country), [formData.country]);
+  const phoneCountry = useMemo(
+    () => getDefaultCountryForPhone(formData.country) as Country,
+    [formData.country]
+  );
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handleCountryChange = (code: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      country: code,
+      state: "", // Reset state when country changes
+      vatNumber: "", // Reset VAT when country changes
+    }));
+  };
+
+  const handlePhoneChange = (value: string | undefined) => {
+    setFormData((prev) => ({ ...prev, phone: value || "" }));
+  };
+
+  const handleStateChange = (value: string) => {
+    setFormData((prev) => ({ ...prev, state: value }));
+  };
+
+  const validateForm = (): string | null => {
+    if (formData.password !== formData.confirmPassword) {
+      return "Les mots de passe ne correspondent pas";
+    }
+
+    if (formData.password.length < 6) {
+      return "Le mot de passe doit contenir au moins 6 caractères";
+    }
+
+    if (!formData.companyName.trim()) {
+      return "Le nom de l'entreprise est requis";
+    }
+
+    if (!formData.country) {
+      return "Le pays est requis";
+    }
+
+    if (showState && !formData.state) {
+      return `${stateLabel} est requis pour ce pays`;
+    }
+
+    if (formData.phone && !isValidPhoneNumber(formData.phone)) {
+      return "Le numéro de téléphone n'est pas valide";
+    }
+
+    // Validate EU VAT format if provided
+    if (formData.vatNumber && isEuCountry(formData.country)) {
+      if (!isValidEuVatFormat(formData.vatNumber)) {
+        return "Le format du numéro de TVA n'est pas valide (ex: FR12345678901)";
+      }
+    }
+
+    return null;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    // Validation
-    if (formData.password !== formData.confirmPassword) {
-      setError("Les mots de passe ne correspondent pas");
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      setError("Le mot de passe doit contenir au moins 6 caractères");
-      return;
-    }
-
-    if (!formData.companyName.trim()) {
-      setError("Le nom de l'entreprise est requis");
+    const validationError = validateForm();
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
@@ -63,8 +152,8 @@ export function ProRegister() {
         email: formData.email,
         password: formData.password,
         options: {
-          emailRedirectTo: window.location.origin + "/pro/login"
-        }
+          emailRedirectTo: window.location.origin + "/pro/login",
+        },
       });
 
       if (authError) {
@@ -82,27 +171,28 @@ export function ProRegister() {
       }
 
       // 2. Create customer record (unapproved professional)
-      const { error: customerError } = await supabase
-        .from("customers")
-        .insert({
-          auth_user_id: authData.user.id,
-          email: formData.email,
-          company_name: formData.companyName,
-          vat_number: formData.vatNumber || null,
-          first_name: formData.firstName || null,
-          last_name: formData.lastName || null,
-          phone: formData.phone || null,
-          address: formData.address || null,
-          address_line_2: formData.addressLine2 || null,
-          city: formData.city || null,
-          postal_code: formData.postalCode || null,
-          country: formData.country || null,
-          notes: formData.notes ? `Demande d'inscription: ${formData.notes}` : "Demande d'inscription via portail pro",
-          customer_type: "professional",
-          approved: false,
-          discount_rate: 0,
-          payment_terms: 30
-        });
+      const { error: customerError } = await supabase.from("customers").insert({
+        auth_user_id: authData.user.id,
+        email: formData.email,
+        company_name: formData.companyName,
+        vat_number: formData.vatNumber || null,
+        first_name: formData.firstName || null,
+        last_name: formData.lastName || null,
+        phone: formData.phone || null,
+        address: formData.address || null,
+        address_line_2: formData.addressLine2 || null,
+        city: formData.city || null,
+        state: formData.state || null,
+        postal_code: formData.postalCode || null,
+        country: formData.country || null,
+        notes: formData.notes
+          ? `Demande d'inscription: ${formData.notes}`
+          : "Demande d'inscription via portail pro",
+        customer_type: "professional",
+        approved: false,
+        discount_rate: 0,
+        payment_terms: 30,
+      });
 
       if (customerError) {
         console.error("Customer creation error:", customerError);
@@ -115,9 +205,8 @@ export function ProRegister() {
       setIsSuccess(true);
       toast({
         title: "Demande envoyée !",
-        description: "Votre demande d'inscription a été enregistrée."
+        description: "Votre demande d'inscription a été enregistrée.",
       });
-
     } catch (err) {
       console.error("Registration error:", err);
       setError("Une erreur est survenue");
@@ -135,7 +224,8 @@ export function ProRegister() {
           </div>
           <h1 className="text-2xl font-bold mb-2">Demande envoyée !</h1>
           <p className="text-muted-foreground mb-6">
-            Votre demande d'inscription a été enregistrée. Notre équipe va examiner votre dossier et vous contactera sous 24-48h.
+            Votre demande d'inscription a été enregistrée. Notre équipe va examiner votre dossier
+            et vous contactera sous 24-48h.
           </p>
           <p className="text-sm text-muted-foreground mb-6">
             Vérifiez votre boîte mail pour confirmer votre adresse email.
@@ -170,7 +260,20 @@ export function ProRegister() {
               </div>
             )}
 
-            {/* Company info */}
+            {/* 1. COUNTRY - First field */}
+            <div>
+              <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-border">Pays</h3>
+              <div className="space-y-2">
+                <Label htmlFor="country">Pays *</Label>
+                <CountrySelector
+                  value={formData.country}
+                  onChange={handleCountryChange}
+                  placeholder="Sélectionner votre pays"
+                />
+              </div>
+            </div>
+
+            {/* 2. Company info */}
             <div>
               <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-border">
                 Informations entreprise
@@ -187,24 +290,29 @@ export function ProRegister() {
                     required
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="vatNumber">N° TVA intracommunautaire</Label>
-                  <Input
-                    id="vatNumber"
-                    name="vatNumber"
-                    value={formData.vatNumber}
-                    onChange={handleChange}
-                    placeholder="FR12345678901"
-                  />
-                </div>
+                {taxIdConfig.show && (
+                  <div className="md:col-span-2 space-y-2">
+                    <Label htmlFor="vatNumber">{taxIdConfig.label}</Label>
+                    <Input
+                      id="vatNumber"
+                      name="vatNumber"
+                      value={formData.vatNumber}
+                      onChange={handleChange}
+                      placeholder={taxIdConfig.placeholder}
+                    />
+                    {isEuCountry(formData.country) && (
+                      <p className="text-xs text-muted-foreground">
+                        Format: 2 lettres du pays + 8 à 12 caractères (ex: FR12345678901)
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Contact info */}
+            {/* 3. Contact info */}
             <div>
-              <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-border">
-                Contact
-              </h3>
+              <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-border">Contact</h3>
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="firstName">Prénom</Label>
@@ -240,23 +348,21 @@ export function ProRegister() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone">Téléphone</Label>
-                  <Input
-                    id="phone"
-                    name="phone"
-                    type="tel"
+                  <PhoneInput
+                    international
+                    defaultCountry={phoneCountry}
                     value={formData.phone}
-                    onChange={handleChange}
-                    placeholder="+33 1 23 45 67 89"
+                    onChange={handlePhoneChange}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
                   />
+                  <p className="text-xs text-muted-foreground">Format international (+33...)</p>
                 </div>
               </div>
             </div>
 
-            {/* Address */}
+            {/* 4. Address */}
             <div>
-              <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-border">
-                Adresse
-              </h3>
+              <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-border">Adresse</h3>
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="md:col-span-2 space-y-2">
                   <Label htmlFor="address">Adresse</Label>
@@ -279,16 +385,6 @@ export function ProRegister() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="postalCode">Code postal</Label>
-                  <Input
-                    id="postalCode"
-                    name="postalCode"
-                    value={formData.postalCode}
-                    onChange={handleChange}
-                    placeholder="75001"
-                  />
-                </div>
-                <div className="space-y-2">
                   <Label htmlFor="city">Ville</Label>
                   <Input
                     id="city"
@@ -298,24 +394,50 @@ export function ProRegister() {
                     placeholder="Paris"
                   />
                 </div>
+                {showState && (
+                  <div className="space-y-2">
+                    <Label htmlFor="state">{stateLabel} *</Label>
+                    {stateOptions.length > 0 ? (
+                      <Select value={formData.state} onValueChange={handleStateChange}>
+                        <SelectTrigger>
+                          <SelectValue placeholder={`Sélectionner ${stateLabel.toLowerCase()}`} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {stateOptions.map((state) => (
+                            <SelectItem key={state} value={state}>
+                              {state}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        id="state"
+                        name="state"
+                        value={formData.state}
+                        onChange={handleChange}
+                        placeholder={stateLabel}
+                        required
+                      />
+                    )}
+                  </div>
+                )}
                 <div className="space-y-2">
-                  <Label htmlFor="country">Pays</Label>
+                  <Label htmlFor="postalCode">Code postal</Label>
                   <Input
-                    id="country"
-                    name="country"
-                    value={formData.country}
+                    id="postalCode"
+                    name="postalCode"
+                    value={formData.postalCode}
                     onChange={handleChange}
-                    placeholder="France"
+                    placeholder="75001"
                   />
                 </div>
               </div>
             </div>
 
-            {/* Account */}
+            {/* 5. Account */}
             <div>
-              <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-border">
-                Compte
-              </h3>
+              <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-border">Compte</h3>
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="password">Mot de passe *</Label>
@@ -345,7 +467,7 @@ export function ProRegister() {
               </div>
             </div>
 
-            {/* Notes */}
+            {/* 6. Notes */}
             <div className="space-y-2">
               <Label htmlFor="notes">Message (optionnel)</Label>
               <Textarea
@@ -369,7 +491,8 @@ export function ProRegister() {
             </Button>
 
             <p className="text-xs text-muted-foreground text-center">
-              En soumettant ce formulaire, vous acceptez nos conditions générales de vente professionnelles.
+              En soumettant ce formulaire, vous acceptez nos conditions générales de vente
+              professionnelles.
             </p>
           </form>
         </div>
