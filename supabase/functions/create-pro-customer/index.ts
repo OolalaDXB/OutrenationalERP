@@ -23,6 +23,7 @@ interface RegistrationData {
   postalCode?: string;
   country?: string;
   notes?: string;
+  debug?: boolean;
 }
 
 Deno.serve(async (req) => {
@@ -32,22 +33,44 @@ Deno.serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const srk = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    if (!supabaseUrl || !serviceKey) {
+    if (!supabaseUrl) {
       return new Response(
         JSON.stringify({ error: "MISSING_ENV" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Service role key automatically bypasses RLS
-    const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-      global: { headers: { Authorization: `Bearer ${serviceKey}` } },
+    // Hard runtime check: service role must be present and look valid
+    if (!srk || srk.length < 40) {
+      return new Response(
+        JSON.stringify({ error: "MISSING_SERVICE_ROLE" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, srk, {
+      auth: { persistSession: false, autoRefreshToken: false },
     });
 
     const body: RegistrationData = await req.json();
+
+    const debug = !!body.debug;
+    const urlHost = (() => {
+      try {
+        return new URL(supabaseUrl).host;
+      } catch {
+        return supabaseUrl;
+      }
+    })();
+    const srkPrefix = srk.slice(0, 6);
+
+    if (debug) {
+      console.log("SRK present", !!srk);
+      console.log("SRK prefix", srkPrefix);
+      console.log("URL", supabaseUrl);
+    }
 
     if (!body.email || !body.password) {
       return new Response(
@@ -156,11 +179,35 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Prove RLS bypass with a simple admin SELECT
+    const { data: verifyRow, error: verifyError } = await supabaseAdmin
+      .from("customers")
+      .select("id")
+      .eq("email", body.email)
+      .maybeSingle();
+
+    if (verifyError) {
+      return new Response(
+        JSON.stringify({ error: "POST_INSERT_VERIFY_FAILED", details: verifyError.message }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const createdCustomerId = customerResult?.id ?? verifyRow?.id ?? null;
+
     return new Response(
       JSON.stringify({
         success: true,
         userId: authData.user.id,
-        customerId: customerResult?.id,
+        customerId: createdCustomerId,
+        ...(debug
+          ? {
+              srkPrefix,
+              urlHost,
+              createdUserId: authData.user.id,
+              createdCustomerId,
+            }
+          : {}),
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
