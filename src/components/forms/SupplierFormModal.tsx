@@ -24,6 +24,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { supplierSchema } from "@/lib/validations/schemas";
 
 interface SupplierFormProps {
   isOpen: boolean;
@@ -43,6 +44,7 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormPro
   const isEditMode = !!supplier;
   
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   const [formData, setFormData] = useState<{
     name: string;
@@ -160,10 +162,22 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormPro
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name) {
-      toast({ title: "Erreur", description: "Le nom est requis", variant: "destructive" });
+    
+    // Validate with Zod schema
+    const result = supplierSchema.safeParse(formData);
+    if (!result.success) {
+      const errors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        if (err.path[0]) {
+          errors[err.path[0] as string] = err.message;
+        }
+      });
+      setValidationErrors(errors);
+      toast({ title: "Erreur de validation", description: "Veuillez corriger les champs en erreur", variant: "destructive" });
       return;
     }
+    
+    setValidationErrors({});
 
     try {
       const supplierData: SupplierInsert = {
@@ -254,10 +268,16 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormPro
                 <Label className="text-sm font-medium text-muted-foreground">Nom *</Label>
                 <Input
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, name: e.target.value });
+                    if (validationErrors.name) setValidationErrors(prev => ({ ...prev, name: "" }));
+                  }}
                   placeholder="Sublime Frequencies"
-                  className="mt-1.5"
+                  className={`mt-1.5 ${validationErrors.name ? 'border-destructive' : ''}`}
                 />
+                {validationErrors.name && (
+                  <p className="text-xs text-destructive mt-1">{validationErrors.name}</p>
+                )}
               </div>
 
               <div>
@@ -417,10 +437,16 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormPro
                 <Input
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, email: e.target.value });
+                    if (validationErrors.email) setValidationErrors(prev => ({ ...prev, email: "" }));
+                  }}
                   placeholder="contact@example.com"
-                  className="mt-1.5"
+                  className={`mt-1.5 ${validationErrors.email ? 'border-destructive' : ''}`}
                 />
+                {validationErrors.email && (
+                  <p className="text-xs text-destructive mt-1">{validationErrors.email}</p>
+                )}
               </div>
 
               <div>
