@@ -41,8 +41,10 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Service role key automatically bypasses RLS
     const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
+      global: { headers: { Authorization: `Bearer ${serviceKey}` } },
     });
 
     const body: RegistrationData = await req.json();
