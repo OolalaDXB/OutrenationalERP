@@ -13,7 +13,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
 import { CountrySelector } from "@/components/forms/CountrySelector";
 import {
   requiresState,
@@ -137,70 +136,53 @@ export function ProRegister() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-
-    const validationError = validateForm();
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
-      // 1. Store pending registration data in localStorage with expiration timestamp
-      // This will be used after email confirmation to create the customer record
-      const pendingData = {
-        company_name: formData.companyName,
-        vat_number: formData.vatNumber || null,
-        first_name: formData.firstName || null,
-        last_name: formData.lastName || null,
-        phone: formData.phone || null,
-        address: formData.address || null,
-        address_line_2: formData.addressLine2 || null,
-        city: formData.city || null,
-        state: formData.state || null,
-        postal_code: formData.postalCode || null,
-        country: formData.country || null,
-        notes: formData.notes
-          ? `Demande d'inscription: ${formData.notes}`
-          : "Demande d'inscription via portail pro",
-        createdAt: Date.now(), // Timestamp for 7-day expiration check
-      };
-      localStorage.setItem('pendingProRegistration', JSON.stringify(pendingData));
+      // Validate passwords match
+      if (formData.password !== formData.confirmPassword) {
+        setError("Les mots de passe ne correspondent pas");
+        return;
+      }
 
-      // 2. Create auth user only - customer record will be created after email confirmation
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          emailRedirectTo: window.location.origin + "/pro/login",
-        },
+      // Call Edge Function - it creates both auth user and customer
+      const { data, error } = await supabase.functions.invoke('create-pro-customer', {
+        body: {
+          email: formData.email,
+          password: formData.password,
+          companyName: formData.companyName,
+          vatNumber: formData.vatNumber,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          phone: formData.phone,
+          address: formData.address,
+          addressLine2: formData.addressLine2,
+          city: formData.city,
+          state: formData.state,
+          postalCode: formData.postalCode,
+          country: formData.country,
+          notes: formData.notes
+        }
       });
 
-      if (authError) {
-        localStorage.removeItem('pendingProRegistration');
-        if (authError.message.includes("already registered")) {
+      if (error) {
+        console.error("Registration error:", error);
+        const errMsg = JSON.stringify(error);
+        if (errMsg.includes("EMAIL_ALREADY_USED")) {
           setError("Cet email est déjà utilisé");
+        } else if (errMsg.includes("PASSWORD_TOO_SHORT")) {
+          setError("Le mot de passe doit contenir au moins 6 caractères");
+        } else if (errMsg.includes("COMPANY_REQUIRED")) {
+          setError("Le nom de l'entreprise est requis");
         } else {
           setError("Erreur lors de la création du compte");
         }
         return;
       }
 
-      if (!authData.user) {
-        localStorage.removeItem('pendingProRegistration');
-        setError("Erreur lors de la création du compte");
-        return;
-      }
-
       setIsSuccess(true);
-      toast({
-        title: "Compte créé !",
-        description: "Vérifiez votre email pour confirmer votre inscription.",
-      });
     } catch (err) {
-      console.error("Registration error:", err);
-      localStorage.removeItem('pendingProRegistration');
+      console.error("Unexpected error:", err);
       setError("Une erreur est survenue");
     } finally {
       setIsSubmitting(false);
