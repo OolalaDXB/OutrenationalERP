@@ -29,6 +29,7 @@ import { ProLayout } from "@/components/pro/ProLayout";
 import { ProLogin } from "@/pages/pro/ProLogin";
 import { ProRegister } from "@/pages/pro/ProRegister";
 import { ProPendingApproval } from "@/pages/pro/ProPendingApproval";
+import { ProCompleteProfile } from "@/pages/pro/ProCompleteProfile";
 import { ProDashboard } from "@/pages/pro/ProDashboard";
 import { ProCatalog } from "@/pages/pro/ProCatalog";
 import { ProCart } from "@/pages/pro/ProCart";
@@ -180,6 +181,7 @@ function AppRouter() {
             <Route path="/pro/login" element={<ProLogin />} />
             <Route path="/pro/register" element={<ProRegister />} />
             <Route path="/pro/pending" element={<ProPendingApproval />} />
+            <Route path="/pro/complete-profile" element={<ProCompleteProfile />} />
             <Route path="/pro" element={<ProLayout />}>
               <Route index element={<ProDashboard />} />
               <Route path="catalog" element={<ProCatalog />} />

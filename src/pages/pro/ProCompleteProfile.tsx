@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
-import { Link } from "react-router-dom";
-import { Loader2, UserPlus, AlertCircle, CheckCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Loader2, Building2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useProAuth } from "@/hooks/useProAuth";
 import { CountrySelector } from "@/components/forms/CountrySelector";
 import {
   requiresState,
@@ -33,21 +34,19 @@ interface FormData {
   vatNumber: string;
   firstName: string;
   lastName: string;
-  email: string;
   phone: string;
   address: string;
   addressLine2: string;
   city: string;
   state: string;
   postalCode: string;
-  password: string;
-  confirmPassword: string;
   notes: string;
 }
 
-export function ProRegister() {
+export function ProCompleteProfile() {
+  const navigate = useNavigate();
+  const { user, refreshCustomer } = useProAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState("");
 
   const [formData, setFormData] = useState<FormData>({
@@ -56,15 +55,12 @@ export function ProRegister() {
     vatNumber: "",
     firstName: "",
     lastName: "",
-    email: "",
     phone: "",
     address: "",
     addressLine2: "",
     city: "",
     state: "",
     postalCode: "",
-    password: "",
-    confirmPassword: "",
     notes: "",
   });
 
@@ -86,8 +82,8 @@ export function ProRegister() {
     setFormData((prev) => ({
       ...prev,
       country: code,
-      state: "", // Reset state when country changes
-      vatNumber: "", // Reset VAT when country changes
+      state: "",
+      vatNumber: "",
     }));
   };
 
@@ -100,14 +96,6 @@ export function ProRegister() {
   };
 
   const validateForm = (): string | null => {
-    if (formData.password !== formData.confirmPassword) {
-      return "Les mots de passe ne correspondent pas";
-    }
-
-    if (formData.password.length < 6) {
-      return "Le mot de passe doit contenir au moins 6 caractères";
-    }
-
     if (!formData.companyName.trim()) {
       return "Le nom de l'entreprise est requis";
     }
@@ -124,7 +112,6 @@ export function ProRegister() {
       return "Le numéro de téléphone n'est pas valide";
     }
 
-    // Validate EU VAT format if provided
     if (formData.vatNumber && isEuCountry(formData.country)) {
       if (!isValidEuVatFormat(formData.vatNumber)) {
         return "Le format du numéro de TVA n'est pas valide (ex: FR12345678901)";
@@ -138,6 +125,11 @@ export function ProRegister() {
     e.preventDefault();
     setError("");
 
+    if (!user) {
+      setError("Vous devez être connecté");
+      return;
+    }
+
     const validationError = validateForm();
     if (validationError) {
       setError(validationError);
@@ -147,9 +139,9 @@ export function ProRegister() {
     setIsSubmitting(true);
 
     try {
-      // 1. Store pending registration data in localStorage with expiration timestamp
-      // This will be used after email confirmation to create the customer record
-      const pendingData = {
+      const { error: insertError } = await supabase.from("customers").insert({
+        auth_user_id: user.id,
+        email: user.email,
         company_name: formData.companyName,
         vat_number: formData.vatNumber || null,
         first_name: formData.firstName || null,
@@ -162,86 +154,52 @@ export function ProRegister() {
         postal_code: formData.postalCode || null,
         country: formData.country || null,
         notes: formData.notes
-          ? `Demande d'inscription: ${formData.notes}`
-          : "Demande d'inscription via portail pro",
-        createdAt: Date.now(), // Timestamp for 7-day expiration check
-      };
-      localStorage.setItem('pendingProRegistration', JSON.stringify(pendingData));
-
-      // 2. Create auth user only - customer record will be created after email confirmation
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          emailRedirectTo: window.location.origin + "/pro/login",
-        },
+          ? `Profil complété: ${formData.notes}`
+          : "Profil complété via portail pro",
+        customer_type: "professional",
+        approved: false,
+        discount_rate: 0,
+        payment_terms: 30,
       });
 
-      if (authError) {
-        localStorage.removeItem('pendingProRegistration');
-        if (authError.message.includes("already registered")) {
-          setError("Cet email est déjà utilisé");
-        } else {
-          setError("Erreur lors de la création du compte");
-        }
+      if (insertError) {
+        console.error("Error creating customer:", insertError);
+        setError("Erreur lors de la création du profil");
         return;
       }
 
-      if (!authData.user) {
-        localStorage.removeItem('pendingProRegistration');
-        setError("Erreur lors de la création du compte");
-        return;
-      }
+      // Refresh customer data in context
+      await refreshCustomer();
 
-      setIsSuccess(true);
       toast({
-        title: "Compte créé !",
-        description: "Vérifiez votre email pour confirmer votre inscription.",
+        title: "Profil créé !",
+        description: "Votre demande est en attente de validation.",
       });
+
+      navigate("/pro/pending");
     } catch (err) {
-      console.error("Registration error:", err);
-      localStorage.removeItem('pendingProRegistration');
+      console.error("Profile creation error:", err);
       setError("Une erreur est survenue");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (isSuccess) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-secondary/30 p-4">
-        <div className="w-full max-w-md text-center">
-          <div className="w-20 h-20 mx-auto rounded-full bg-success/20 flex items-center justify-center mb-6">
-            <CheckCircle className="w-10 h-10 text-success" />
-          </div>
-          <h1 className="text-2xl font-bold mb-2">Compte créé !</h1>
-          <p className="text-muted-foreground mb-6">
-            Un email de confirmation a été envoyé à votre adresse. Cliquez sur le lien dans l'email pour activer votre compte.
-          </p>
-          <p className="text-sm text-muted-foreground mb-6">
-            Après confirmation, connectez-vous pour finaliser votre inscription professionnelle.
-          </p>
-          <Link to="/pro/login">
-            <Button>Aller à la connexion</Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-secondary/30 py-8 px-4">
       <div className="w-full max-w-2xl mx-auto">
-        {/* Logo */}
+        {/* Header */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 mx-auto rounded-xl bg-primary flex items-center justify-center mb-4">
-            <span className="text-primary-foreground font-bold text-2xl">ON</span>
+            <Building2 className="w-8 h-8 text-primary-foreground" />
           </div>
-          <h1 className="text-2xl font-bold">Outre-National Pro</h1>
-          <p className="text-muted-foreground mt-1">Demande de compte professionnel</p>
+          <h1 className="text-2xl font-bold">Complétez votre profil</h1>
+          <p className="text-muted-foreground mt-1">
+            Pour finaliser votre inscription professionnelle
+          </p>
         </div>
 
-        {/* Registration form */}
+        {/* Form */}
         <div className="bg-card rounded-xl border border-border p-6 shadow-sm">
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
@@ -251,7 +209,7 @@ export function ProRegister() {
               </div>
             )}
 
-            {/* 1. COUNTRY - First field */}
+            {/* Country */}
             <div>
               <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-border">Pays</h3>
               <div className="space-y-2">
@@ -264,7 +222,7 @@ export function ProRegister() {
               </div>
             </div>
 
-            {/* 2. Company info */}
+            {/* Company info */}
             <div>
               <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-border">
                 Informations entreprise
@@ -301,7 +259,7 @@ export function ProRegister() {
               </div>
             </div>
 
-            {/* 3. Contact info */}
+            {/* Contact info */}
             <div>
               <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-border">Contact</h3>
               <div className="grid md:grid-cols-2 gap-4">
@@ -325,19 +283,7 @@ export function ProRegister() {
                     placeholder="Dupont"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email *</Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    placeholder="contact@entreprise.com"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
+                <div className="md:col-span-2 space-y-2">
                   <Label htmlFor="phone">Téléphone</Label>
                   <PhoneInput
                     international
@@ -346,12 +292,11 @@ export function ProRegister() {
                     onChange={handlePhoneChange}
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
                   />
-                  <p className="text-xs text-muted-foreground">Format international (+33...)</p>
                 </div>
               </div>
             </div>
 
-            {/* 4. Address */}
+            {/* Address */}
             <div>
               <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-border">Adresse</h3>
               <div className="grid md:grid-cols-2 gap-4">
@@ -426,39 +371,7 @@ export function ProRegister() {
               </div>
             </div>
 
-            {/* 5. Account */}
-            <div>
-              <h3 className="text-lg font-semibold mb-4 pb-2 border-b border-border">Compte</h3>
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="password">Mot de passe *</Label>
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    placeholder="••••••••"
-                    required
-                    minLength={6}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirmer le mot de passe *</Label>
-                  <Input
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    type="password"
-                    value={formData.confirmPassword}
-                    onChange={handleChange}
-                    placeholder="••••••••"
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* 6. Notes */}
+            {/* Notes */}
             <div className="space-y-2">
               <Label htmlFor="notes">Message (optionnel)</Label>
               <Textarea
@@ -476,26 +389,11 @@ export function ProRegister() {
               {isSubmitting ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
-                <UserPlus className="w-4 h-4 mr-2" />
+                <Building2 className="w-4 h-4 mr-2" />
               )}
-              Envoyer ma demande
+              Enregistrer mon profil
             </Button>
-
-            <p className="text-xs text-muted-foreground text-center">
-              En soumettant ce formulaire, vous acceptez nos conditions générales de vente
-              professionnelles.
-            </p>
           </form>
-        </div>
-
-        {/* Back to login */}
-        <div className="text-center mt-6">
-          <p className="text-sm text-muted-foreground">
-            Déjà un compte ?{" "}
-            <Link to="/pro/login" className="text-primary hover:underline">
-              Se connecter
-            </Link>
-          </p>
         </div>
       </div>
     </div>
