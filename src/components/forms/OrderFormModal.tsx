@@ -1,4 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
+import { useForm, useFieldArray } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { X, ShoppingCart, Plus, Trash2, Loader2, Search, UserPlus, User, Percent, ScanLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +15,7 @@ import { useCreateOrder, type OrderInsert, type OrderItemInsert, type Order, typ
 import { formatCurrency } from "@/lib/format";
 import { ProductSearchInput } from "./ProductSearchInput";
 import { BarcodeScanner } from "./BarcodeScanner";
+import { orderSchema, type OrderFormValues, type OrderItemFormValues } from "@/lib/validations/schemas";
 
 type OrderWithItems = Order & { order_items?: OrderItem[] };
 
@@ -98,6 +101,7 @@ export function OrderFormModal({ isOpen, onClose, duplicateFrom }: OrderFormProp
   const [internalNotes, setInternalNotes] = useState<string>("");
 
   const [items, setItems] = useState<OrderItemForm[]>([]);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   // Barcode scanner
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -304,15 +308,41 @@ export function OrderFormModal({ isOpen, onClose, duplicateFrom }: OrderFormProp
       ? selectedCustomer.email 
       : formData.customer_email;
 
-    if (!customerEmail) {
-      toast({ title: "Erreur", description: "L'email client est requis", variant: "destructive" });
+    // Prepare data for Zod validation
+    const dataToValidate = {
+      customer_email: customerEmail,
+      customer_name: customerMode === "existing" && selectedCustomer 
+        ? `${selectedCustomer.first_name || ''} ${selectedCustomer.last_name || ''}`.trim()
+        : formData.customer_name,
+      customer_id: customerMode === "existing" ? selectedCustomerId : undefined,
+      items: items.map(item => ({
+        product_id: item.product_id,
+        title: item.title,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+      })),
+    };
+
+    const result = orderSchema.safeParse(dataToValidate);
+    if (!result.success) {
+      const errors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        const path = err.path.join('.');
+        errors[path] = err.message;
+      });
+      setValidationErrors(errors);
+      
+      // Show specific error message
+      const firstError = result.error.errors[0];
+      toast({ 
+        title: "Erreur de validation", 
+        description: firstError.message, 
+        variant: "destructive" 
+      });
       return;
     }
     
-    if (items.length === 0) {
-      toast({ title: "Erreur", description: "Ajoutez au moins un article", variant: "destructive" });
-      return;
-    }
+    setValidationErrors({});
 
     try {
       let customerId: string | null = null;

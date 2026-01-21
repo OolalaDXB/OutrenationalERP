@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { X, Package, Loader2, Wand2 } from "lucide-react";
 import { useDiscogsSearch } from "@/hooks/useDiscogsSearch";
 import { Button } from "@/components/ui/button";
@@ -23,6 +25,7 @@ import { CurrencyExchangeField } from "./CurrencyExchangeField";
 import { SupplierSelectorWithCreate } from "./InlineSupplierCreator";
 import { LabelSelectorWithCreate } from "./InlineLabelCreator";
 import type { DiscogsProductData } from "./DiscogsImageSearch";
+import { productSchema, type ProductFormValues } from "@/lib/validations/schemas";
 
 interface ProductFormProps {
   isOpen: boolean;
@@ -42,6 +45,7 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
   const updateProduct = useUpdateProduct();
   
   const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   
   const [formData, setFormData] = useState<{
     sku: string;
@@ -235,10 +239,22 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.title || !formData.supplier_id) {
-      toast({ title: "Erreur", description: "Veuillez remplir les champs obligatoires", variant: "destructive" });
+    
+    // Validate with Zod schema
+    const result = productSchema.safeParse(formData);
+    if (!result.success) {
+      const errors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        if (err.path[0]) {
+          errors[err.path[0] as string] = err.message;
+        }
+      });
+      setValidationErrors(errors);
+      toast({ title: "Erreur de validation", description: "Veuillez corriger les champs en erreur", variant: "destructive" });
       return;
     }
+    
+    setValidationErrors({});
 
     try {
       // Find label to populate label_name
@@ -345,10 +361,16 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
                 <Label className="text-sm font-medium text-muted-foreground">Titre *</Label>
                 <Input
                   value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, title: e.target.value });
+                    if (validationErrors.title) setValidationErrors(prev => ({ ...prev, title: "" }));
+                  }}
                   placeholder="West Virginia Snake Handler Revival"
-                  className="mt-1.5"
+                  className={`mt-1.5 ${validationErrors.title ? 'border-destructive' : ''}`}
                 />
+                {validationErrors.title && (
+                  <p className="text-xs text-destructive mt-1">{validationErrors.title}</p>
+                )}
               </div>
 
               <div>
@@ -371,14 +393,22 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
                 />
               </div>
 
-              <SupplierSelectorWithCreate
-                value={formData.supplier_id}
-                onChange={(value) => setFormData({ ...formData, supplier_id: value })}
-                suppliers={suppliers}
-                label="Fournisseur"
-                placeholder="Sélectionner..."
-                required
-              />
+              <div>
+                <SupplierSelectorWithCreate
+                  value={formData.supplier_id}
+                  onChange={(value) => {
+                    setFormData({ ...formData, supplier_id: value });
+                    if (validationErrors.supplier_id) setValidationErrors(prev => ({ ...prev, supplier_id: "" }));
+                  }}
+                  suppliers={suppliers}
+                  label="Fournisseur"
+                  placeholder="Sélectionner..."
+                  required
+                />
+                {validationErrors.supplier_id && (
+                  <p className="text-xs text-destructive mt-1">{validationErrors.supplier_id}</p>
+                )}
+              </div>
 
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">Format</Label>
@@ -499,11 +529,17 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
                     min="0"
                     step="0.01"
                     value={formData.selling_price}
-                    onChange={(e) => setFormData({ ...formData, selling_price: Number(e.target.value) })}
-                    className="pr-8"
+                    onChange={(e) => {
+                      setFormData({ ...formData, selling_price: Number(e.target.value) });
+                      if (validationErrors.selling_price) setValidationErrors(prev => ({ ...prev, selling_price: "" }));
+                    }}
+                    className={`pr-8 ${validationErrors.selling_price ? 'border-destructive' : ''}`}
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">€</span>
                 </div>
+                {validationErrors.selling_price && (
+                  <p className="text-xs text-destructive mt-1">{validationErrors.selling_price}</p>
+                )}
               </div>
 
               <div>
@@ -669,9 +705,15 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
                   type="number"
                   min="0"
                   value={formData.stock}
-                  onChange={(e) => setFormData({ ...formData, stock: Number(e.target.value) })}
-                  className="mt-1.5"
+                  onChange={(e) => {
+                    setFormData({ ...formData, stock: Number(e.target.value) });
+                    if (validationErrors.stock) setValidationErrors(prev => ({ ...prev, stock: "" }));
+                  }}
+                  className={`mt-1.5 ${validationErrors.stock ? 'border-destructive' : ''}`}
                 />
+                {validationErrors.stock && (
+                  <p className="text-xs text-destructive mt-1">{validationErrors.stock}</p>
+                )}
               </div>
 
               <div>

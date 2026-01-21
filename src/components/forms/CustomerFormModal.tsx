@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { X, UserCircle, Building2, Info, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +24,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { customerSchema, type CustomerFormValues } from "@/lib/validations/schemas";
 
 interface CustomerFormProps {
   isOpen: boolean;
@@ -53,6 +56,8 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormPro
   const { validateVat, isValidating: isValidatingVat, result: viesResult, error: viesError, reset: resetVies } = useViesValidation();
   
   const isEditMode = !!customer;
+
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   const [formData, setFormData] = useState<CustomerFormData>({
     email: "",
@@ -156,14 +161,22 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormPro
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.email || !formData.firstName || !formData.lastName) {
-      toast({ title: "Erreur", description: "Veuillez remplir les champs obligatoires", variant: "destructive" });
+    
+    // Validate with Zod schema
+    const result = customerSchema.safeParse(formData);
+    if (!result.success) {
+      const errors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        if (err.path[0]) {
+          errors[err.path[0] as string] = err.message;
+        }
+      });
+      setValidationErrors(errors);
+      toast({ title: "Erreur de validation", description: "Veuillez corriger les champs en erreur", variant: "destructive" });
       return;
     }
-    if (formData.customerType === 'professionnel' && !formData.companyName) {
-      toast({ title: "Erreur", description: "Le nom de l'entreprise est requis pour un client professionnel", variant: "destructive" });
-      return;
-    }
+    
+    setValidationErrors({});
 
     try {
       const customerData = {
@@ -274,10 +287,16 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormPro
                   <Label className="text-sm font-medium text-muted-foreground">Nom de l'entreprise *</Label>
                   <Input
                     value={formData.companyName}
-                    onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, companyName: e.target.value });
+                      if (validationErrors.companyName) setValidationErrors(prev => ({ ...prev, companyName: "" }));
+                    }}
                     placeholder="Acme Records"
-                    className="mt-1.5"
+                    className={`mt-1.5 ${validationErrors.companyName ? 'border-destructive' : ''}`}
                   />
+                  {validationErrors.companyName && (
+                    <p className="text-xs text-destructive mt-1">{validationErrors.companyName}</p>
+                  )}
                 </div>
                 <div className="col-span-2">
                   <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -384,20 +403,32 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormPro
                 <Label className="text-sm font-medium text-muted-foreground">Prénom *</Label>
                 <Input
                   value={formData.firstName}
-                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, firstName: e.target.value });
+                    if (validationErrors.firstName) setValidationErrors(prev => ({ ...prev, firstName: "" }));
+                  }}
                   placeholder="Jean"
-                  className="mt-1.5"
+                  className={`mt-1.5 ${validationErrors.firstName ? 'border-destructive' : ''}`}
                 />
+                {validationErrors.firstName && (
+                  <p className="text-xs text-destructive mt-1">{validationErrors.firstName}</p>
+                )}
               </div>
 
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">Nom *</Label>
                 <Input
                   value={formData.lastName}
-                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, lastName: e.target.value });
+                    if (validationErrors.lastName) setValidationErrors(prev => ({ ...prev, lastName: "" }));
+                  }}
                   placeholder="Dupont"
-                  className="mt-1.5"
+                  className={`mt-1.5 ${validationErrors.lastName ? 'border-destructive' : ''}`}
                 />
+                {validationErrors.lastName && (
+                  <p className="text-xs text-destructive mt-1">{validationErrors.lastName}</p>
+                )}
               </div>
 
               <div>
@@ -405,10 +436,16 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormPro
                 <Input
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, email: e.target.value });
+                    if (validationErrors.email) setValidationErrors(prev => ({ ...prev, email: "" }));
+                  }}
                   placeholder="jean.dupont@gmail.com"
-                  className="mt-1.5"
+                  className={`mt-1.5 ${validationErrors.email ? 'border-destructive' : ''}`}
                 />
+                {validationErrors.email && (
+                  <p className="text-xs text-destructive mt-1">{validationErrors.email}</p>
+                )}
               </div>
 
               <div>
