@@ -1,18 +1,19 @@
 import { useState } from "react";
 import { useNavigate, Navigate, Link } from "react-router-dom";
-import { Loader2, LogIn, AlertCircle, Moon, Sun, ArrowLeft, Mail } from "lucide-react";
+import { Loader2, LogIn, AlertCircle, Moon, Sun, ArrowLeft, Mail, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useProAuth } from "@/hooks/useProAuth";
 import { useTheme } from "next-themes";
+import { toast } from "@/hooks/use-toast";
 import logo from "@/assets/outre-national-logo.png";
 
-type ViewMode = 'login' | 'forgot-password';
+type ViewMode = 'login' | 'forgot-password' | 'resend-email';
 
 export function ProLogin() {
   const navigate = useNavigate();
-  const { user, isLoading, isProfessional, isApproved, signIn, resetPassword } = useProAuth();
+  const { user, customer, isLoading, isProfessional, isApproved, signIn, resetPassword, resendConfirmationEmail } = useProAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -31,6 +32,11 @@ export function ProLogin() {
     return <Navigate to="/pro" replace />;
   }
 
+  // Logged in but not approved - redirect to pending page
+  if (!isLoading && user && customer && isProfessional && !isApproved) {
+    return <Navigate to="/pro/pending" replace />;
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -44,6 +50,21 @@ export function ProLogin() {
           setError(resetError.message);
         } else {
           setMessage("Un email de réinitialisation a été envoyé à votre adresse.");
+        }
+      } else if (viewMode === 'resend-email') {
+        const { error: resendError } = await resendConfirmationEmail(email);
+        if (resendError) {
+          if (resendError.message?.includes("already confirmed")) {
+            setError("Cet email a déjà été confirmé. Vous pouvez vous connecter.");
+          } else {
+            setError("Erreur lors de l'envoi de l'email. Vérifiez l'adresse et réessayez.");
+          }
+        } else {
+          setMessage("Un nouvel email de confirmation a été envoyé !");
+          toast({
+            title: "Email envoyé",
+            description: "Vérifiez votre boîte de réception pour confirmer votre compte.",
+          });
         }
       } else {
         const { error: signInError } = await signIn(email, password);
@@ -102,7 +123,11 @@ export function ProLogin() {
           <img src={logo} alt="Outre-National" className="h-16 w-16 mx-auto mb-4" />
           <h1 className="text-2xl font-bold">Outre-National Pro</h1>
           <p className="text-muted-foreground mt-1">
-            {viewMode === 'forgot-password' ? 'Réinitialisation du mot de passe' : 'Portail professionnel'}
+            {viewMode === 'forgot-password' 
+              ? 'Réinitialisation du mot de passe' 
+              : viewMode === 'resend-email'
+              ? 'Renvoyer l\'email de confirmation'
+              : 'Portail professionnel'}
           </p>
         </div>
 
@@ -123,13 +148,21 @@ export function ProLogin() {
             )}
 
             {/* Email verification reminder */}
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-primary/5 border border-primary/10 text-sm">
-              <Mail className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-              <div className="text-muted-foreground">
-                <span className="font-medium text-foreground">Email non confirmé ?</span>{" "}
-                Vérifiez votre boîte de réception et confirmez votre adresse email avant de vous connecter.
+            {viewMode === 'login' && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-primary/5 border border-primary/10 text-sm">
+                <Mail className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                <div className="text-muted-foreground">
+                  <span className="font-medium text-foreground">Email non confirmé ?</span>{" "}
+                  <button
+                    type="button"
+                    onClick={() => switchView('resend-email')}
+                    className="text-primary hover:underline"
+                  >
+                    Renvoyer l'email de confirmation
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -160,10 +193,16 @@ export function ProLogin() {
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : viewMode === 'forgot-password' ? null : (
+              ) : viewMode === 'forgot-password' ? null : viewMode === 'resend-email' ? (
+                <RefreshCw className="w-4 h-4 mr-2" />
+              ) : (
                 <LogIn className="w-4 h-4 mr-2" />
               )}
-              {viewMode === 'forgot-password' ? 'Envoyer le lien' : 'Se connecter'}
+              {viewMode === 'forgot-password' 
+                ? 'Envoyer le lien' 
+                : viewMode === 'resend-email'
+                ? 'Renvoyer l\'email'
+                : 'Se connecter'}
             </Button>
           </form>
 
@@ -181,7 +220,7 @@ export function ProLogin() {
           )}
 
           {/* Back to login */}
-          {viewMode === 'forgot-password' && (
+          {(viewMode === 'forgot-password' || viewMode === 'resend-email') && (
             <div className="mt-4 text-center">
               <button
                 type="button"
