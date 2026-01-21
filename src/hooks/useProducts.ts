@@ -202,12 +202,66 @@ export function useDeleteProduct() {
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from('products')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['products', 'deleted'] });
+    }
+  });
+}
+
+export function usePermanentDeleteProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('products')
         .delete()
         .eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['products', 'deleted'] });
+    }
+  });
+}
+
+export function useDeletedProducts() {
+  return useQuery({
+    queryKey: ['products', 'deleted'],
+    retry: false,
+    queryFn: async () => {
+      const request = (async () => {
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .not('deleted_at', 'is', null)
+          .order('deleted_at', { ascending: false });
+        if (error) throw error;
+        return data;
+      })();
+      return withTimeout(request, 15000, 'Timeout lors du chargement des produits supprimés.');
+    }
+  });
+}
+
+export function useRestoreProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('products')
+        .update({ deleted_at: null })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['products', 'deleted'] });
     }
   });
 }
