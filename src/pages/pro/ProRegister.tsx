@@ -170,9 +170,18 @@ export function ProRegister() {
         return;
       }
 
+      // Wait for session to be available (signUp doesn't immediately set session)
+      let session = (await supabase.auth.getSession()).data.session;
+      if (!session?.user) {
+        // Wait a bit and retry - session may take time to propagate
+        await new Promise(r => setTimeout(r, 1500));
+        session = (await supabase.auth.getSession()).data.session;
+      }
+      const userId = session?.user?.id || authData.user.id;
+
       // 2. Create customer record (unapproved professional)
       const { error: customerError } = await supabase.from("customers").insert({
-        auth_user_id: authData.user.id,
+        auth_user_id: userId,
         email: formData.email,
         company_name: formData.companyName,
         vat_number: formData.vatNumber || null,
