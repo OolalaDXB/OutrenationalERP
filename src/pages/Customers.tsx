@@ -1,13 +1,23 @@
 import { useState, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Plus, Loader2, Building2, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Plus, Loader2, Building2, MoreHorizontal, Pencil, Trash2, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CustomerFormModal } from "@/components/forms/CustomerFormModal";
 import { CustomerDrawer } from "@/components/drawers/CustomerDrawer";
 import { ImportExportModal } from "@/components/import-export/ImportExportModal";
 import { ImportExportDropdowns } from "@/components/ui/import-export-dropdowns";
 import { TablePagination } from "@/components/ui/table-pagination";
-import { usePaginatedCustomers, useCustomers, useDeleteCustomer, type Customer } from "@/hooks/useCustomers";
+import { 
+  usePaginatedCustomers, 
+  useCustomers, 
+  useDeleteCustomer, 
+  useDeletedCustomers,
+  useRestoreCustomer,
+  usePermanentDeleteCustomer,
+  type Customer 
+} from "@/hooks/useCustomers";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
@@ -28,6 +38,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
 
 const PAGE_SIZE = 50;
 
@@ -35,7 +47,10 @@ export function CustomersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { canWrite, canDelete } = useAuth();
+  const { canWrite, canDelete, hasRole } = useAuth();
+  
+  // View mode
+  const [viewMode, setViewMode] = useState<'active' | 'trash'>('active');
   
   // Get page from URL params
   const currentPage = parseInt(searchParams.get('page') || '1', 10);
@@ -52,7 +67,13 @@ export function CustomersPage() {
   // Use all customers for filters and export
   const { data: allCustomers = [] } = useCustomers();
   
+  // Deleted customers
+  const { data: deletedCustomers = [], isLoading: deletedLoading } = useDeletedCustomers();
+  
   const deleteCustomer = useDeleteCustomer();
+  const restoreCustomer = useRestoreCustomer();
+  const permanentDeleteCustomer = usePermanentDeleteCustomer();
+  
   const [showForm, setShowForm] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [showImportExport, setShowImportExport] = useState(false);
@@ -61,7 +82,11 @@ export function CustomersPage() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null);
+  
+  // Confirmation dialogs
+  const [softDeleteDialog, setSoftDeleteDialog] = useState<Customer | null>(null);
+  const [restoreDialog, setRestoreDialog] = useState<Customer | null>(null);
+  const [permanentDeleteDialog, setPermanentDeleteDialog] = useState<Customer | null>(null);
 
   // Get customers to display (from paginated data)
   const customers = paginatedData?.data || [];
@@ -104,6 +129,20 @@ export function CustomersPage() {
     });
   }, [customers, searchTerm, countryFilter, typeFilter]);
 
+  // Filter deleted customers
+  const filteredDeletedCustomers = useMemo(() => {
+    return deletedCustomers.filter((customer) => {
+      const fullName = `${customer.first_name || ''} ${customer.last_name || ''}`.toLowerCase();
+      const companyName = (customer.company_name || '').toLowerCase();
+      const matchesSearch =
+        searchTerm === "" ||
+        fullName.includes(searchTerm.toLowerCase()) ||
+        companyName.includes(searchTerm.toLowerCase()) ||
+        customer.email.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchesSearch;
+    });
+  }, [deletedCustomers, searchTerm]);
+
   const handleRowClick = (customer: Customer) => {
     setSelectedCustomer(customer);
     setIsDrawerOpen(true);
@@ -124,14 +163,39 @@ export function CustomersPage() {
     setEditingCustomer(null);
   };
 
-  const handleDelete = async () => {
-    if (!deletingCustomer) return;
+  const handleSoftDelete = async () => {
+    if (!softDeleteDialog) return;
     try {
-      await deleteCustomer.mutateAsync(deletingCustomer.id);
-      toast({ title: "Succès", description: "Client supprimé" });
-      setDeletingCustomer(null);
+      await deleteCustomer.mutateAsync(softDeleteDialog.id);
+      toast({ title: "Succès", description: "Client archivé" });
+    } catch (error) {
+      toast({ title: "Erreur", description: "Impossible d'archiver le client", variant: "destructive" });
+    } finally {
+      setSoftDeleteDialog(null);
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!restoreDialog) return;
+    try {
+      await restoreCustomer.mutateAsync(restoreDialog.id);
+      toast({ title: "Succès", description: "Client restauré" });
+    } catch (error) {
+      toast({ title: "Erreur", description: "Impossible de restaurer le client", variant: "destructive" });
+    } finally {
+      setRestoreDialog(null);
+    }
+  };
+
+  const handlePermanentDelete = async () => {
+    if (!permanentDeleteDialog) return;
+    try {
+      await permanentDeleteCustomer.mutateAsync(permanentDeleteDialog.id);
+      toast({ title: "Succès", description: "Client supprimé définitivement" });
     } catch (error) {
       toast({ title: "Erreur", description: "Impossible de supprimer le client", variant: "destructive" });
+    } finally {
+      setPermanentDeleteDialog(null);
     }
   };
 
@@ -201,52 +265,88 @@ export function CustomersPage() {
   }
 
   const showLoadingState = isFetching && isPlaceholderData;
+  const trashCount = deletedCustomers.length;
+
+  const getCustomerDisplayName = (customer: Customer) => {
+    if (customer.customer_type === 'professionnel' && customer.company_name) {
+      return customer.company_name;
+    }
+    return `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || customer.email;
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold">Tous les clients</h2>
-          <p className="text-sm text-muted-foreground">{totalCount} clients</p>
+          <h2 className="text-lg font-semibold">
+            {viewMode === 'active' ? 'Tous les clients' : 'Corbeille'}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {viewMode === 'active' ? `${totalCount} clients` : `${trashCount} client(s) archivé(s)`}
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          <ImportExportDropdowns
-            onExportCSV={exportToCSV}
-            onExportXLS={() => setShowImportExport(true)}
-            onImportXLS={() => setShowImportExport(true)}
-            canWrite={canWrite()}
-            entityType="customers"
-          />
-          {canWrite() && (
-            <Button className="gap-2" onClick={() => setShowForm(true)}>
-              <Plus className="w-4 h-4" />
-              Nouveau client
-            </Button>
+          {viewMode === 'active' && (
+            <>
+              <ImportExportDropdowns
+                onExportCSV={exportToCSV}
+                onExportXLS={() => setShowImportExport(true)}
+                onImportXLS={() => setShowImportExport(true)}
+                canWrite={canWrite()}
+                entityType="customers"
+              />
+              {canWrite() && (
+                <Button className="gap-2" onClick={() => setShowForm(true)}>
+                  <Plus className="w-4 h-4" />
+                  Nouveau client
+                </Button>
+              )}
+            </>
           )}
         </div>
       </div>
 
+      {/* View Mode Tabs */}
+      <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'active' | 'trash')}>
+        <TabsList>
+          <TabsTrigger value="active">Clients actifs</TabsTrigger>
+          <TabsTrigger value="trash" className="gap-2">
+            <Trash2 className="w-4 h-4" />
+            Corbeille
+            {trashCount > 0 && (
+              <Badge variant="secondary" className="ml-1">
+                {trashCount}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
         <div className="flex gap-3 p-4 border-b border-border bg-secondary flex-wrap">
-          <select
-            className="px-3 py-2 rounded-md border border-border bg-card text-sm cursor-pointer"
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-          >
-            <option value="all">Tous les types</option>
-            <option value="particulier">Particuliers</option>
-            <option value="professionnel">Professionnels</option>
-          </select>
-          <select
-            className="px-3 py-2 rounded-md border border-border bg-card text-sm cursor-pointer"
-            value={countryFilter}
-            onChange={(e) => setCountryFilter(e.target.value)}
-          >
-            <option value="all">Tous les pays</option>
-            {countries.map((country) => (
-              <option key={country} value={country}>{country}</option>
-            ))}
-          </select>
+          {viewMode === 'active' && (
+            <>
+              <select
+                className="px-3 py-2 rounded-md border border-border bg-card text-sm cursor-pointer"
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+              >
+                <option value="all">Tous les types</option>
+                <option value="particulier">Particuliers</option>
+                <option value="professionnel">Professionnels</option>
+              </select>
+              <select
+                className="px-3 py-2 rounded-md border border-border bg-card text-sm cursor-pointer"
+                value={countryFilter}
+                onChange={(e) => setCountryFilter(e.target.value)}
+              >
+                <option value="all">Tous les pays</option>
+                {countries.map((country) => (
+                  <option key={country} value={country}>{country}</option>
+                ))}
+              </select>
+            </>
+          )}
           <input
             type="text"
             placeholder="Rechercher client, entreprise, email, ville..."
@@ -256,107 +356,187 @@ export function CustomersPage() {
           />
         </div>
 
-        <div className={showLoadingState ? 'opacity-60' : ''}>
-          <table className="w-full border-collapse">
-            <thead>
-              <tr>
-                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Client</th>
-                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Localisation</th>
-                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Commandes</th>
-                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">CA Total</th>
-                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Dernière commande</th>
-                {canWrite() && (
-                  <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border"></th>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredCustomers.map((customer) => (
-                <tr
-                  key={customer.id}
-                  className="border-b border-border last:border-b-0 hover:bg-secondary/50 cursor-pointer transition-colors"
-                  onClick={() => handleRowClick(customer)}
-                >
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
-                        customer.customer_type === 'professionnel' 
-                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' 
-                          : 'bg-primary/10 text-primary'
-                      }`}>
-                        {customer.customer_type === 'professionnel' ? (
-                          <Building2 className="w-5 h-5" />
-                        ) : (
-                          <>{(customer.first_name?.[0] || '?')}{(customer.last_name?.[0] || '')}</>
-                        )}
-                      </div>
-                      <div>
-                        {customer.customer_type === 'professionnel' && customer.company_name ? (
-                          <>
-                            <div className="font-semibold">{customer.company_name}</div>
-                            <div className="text-xs text-muted-foreground">{customer.first_name} {customer.last_name} • {customer.email}</div>
-                          </>
-                        ) : (
-                          <>
-                            <div className="font-semibold">{customer.first_name} {customer.last_name}</div>
-                            <div className="text-xs text-muted-foreground">{customer.email}</div>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-muted-foreground">
-                    {customer.city ? `${customer.city}, ${customer.country || ''}` : customer.country || '—'}
-                  </td>
-                  <td className="px-6 py-4 text-sm tabular-nums">{customer.orders_count || 0}</td>
-                  <td className="px-6 py-4 font-semibold tabular-nums">{formatCurrency(customer.total_spent)}</td>
-                  <td className="px-6 py-4 text-sm text-muted-foreground">{formatDate(customer.last_order_at)}</td>
+        {/* Active Customers Table */}
+        {viewMode === 'active' && (
+          <div className={showLoadingState ? 'opacity-60' : ''}>
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Client</th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Localisation</th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Commandes</th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">CA Total</th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Dernière commande</th>
                   {canWrite() && (
-                    <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEdit(customer)}>
-                            <Pencil className="w-4 h-4 mr-2" />
-                            Modifier
-                          </DropdownMenuItem>
-                          {canDelete() && (
-                            <DropdownMenuItem 
-                              onClick={() => setDeletingCustomer(customer)}
-                              className="text-destructive focus:text-destructive"
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Supprimer
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
+                    <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border"></th>
                   )}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filteredCustomers.map((customer) => (
+                  <tr
+                    key={customer.id}
+                    className="border-b border-border last:border-b-0 hover:bg-secondary/50 cursor-pointer transition-colors"
+                    onClick={() => handleRowClick(customer)}
+                  >
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
+                          customer.customer_type === 'professionnel' 
+                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' 
+                            : 'bg-primary/10 text-primary'
+                        }`}>
+                          {customer.customer_type === 'professionnel' ? (
+                            <Building2 className="w-5 h-5" />
+                          ) : (
+                            <>{(customer.first_name?.[0] || '?')}{(customer.last_name?.[0] || '')}</>
+                          )}
+                        </div>
+                        <div>
+                          {customer.customer_type === 'professionnel' && customer.company_name ? (
+                            <>
+                              <div className="font-semibold">{customer.company_name}</div>
+                              <div className="text-xs text-muted-foreground">{customer.first_name} {customer.last_name} • {customer.email}</div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="font-semibold">{customer.first_name} {customer.last_name}</div>
+                              <div className="text-xs text-muted-foreground">{customer.email}</div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-muted-foreground">
+                      {customer.city ? `${customer.city}, ${customer.country || ''}` : customer.country || '—'}
+                    </td>
+                    <td className="px-6 py-4 text-sm tabular-nums">{customer.orders_count || 0}</td>
+                    <td className="px-6 py-4 font-semibold tabular-nums">{formatCurrency(customer.total_spent)}</td>
+                    <td className="px-6 py-4 text-sm text-muted-foreground">{formatDate(customer.last_order_at)}</td>
+                    {canWrite() && (
+                      <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEdit(customer)}>
+                              <Pencil className="w-4 h-4 mr-2" />
+                              Modifier
+                            </DropdownMenuItem>
+                            {canDelete() && (
+                              <DropdownMenuItem 
+                                onClick={() => setSoftDeleteDialog(customer)}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Archiver
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
 
-          {filteredCustomers.length === 0 && (
-            <div className="p-12 text-center text-muted-foreground">
-              Aucun client trouvé
-            </div>
-          )}
+            {filteredCustomers.length === 0 && (
+              <div className="p-12 text-center text-muted-foreground">
+                Aucun client trouvé
+              </div>
+            )}
 
-          {/* Pagination */}
-          <TablePagination
-            page={currentPage}
-            totalCount={totalCount}
-            pageSize={PAGE_SIZE}
-            onPageChange={handlePageChange}
-            isLoading={showLoadingState}
-          />
-        </div>
+            {/* Pagination */}
+            <TablePagination
+              page={currentPage}
+              totalCount={totalCount}
+              pageSize={PAGE_SIZE}
+              onPageChange={handlePageChange}
+              isLoading={showLoadingState}
+            />
+          </div>
+        )}
+
+        {/* Trash View */}
+        {viewMode === 'trash' && (
+          <>
+            {deletedLoading ? (
+              <div className="flex items-center justify-center h-32">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              </div>
+            ) : (
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr>
+                    <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Client</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Email</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Archivé le</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredDeletedCustomers.map((customer) => (
+                    <tr
+                      key={customer.id}
+                      className="border-b border-border last:border-b-0 hover:bg-secondary/50 transition-colors"
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary opacity-60">
+                            {customer.customer_type === 'professionnel' ? (
+                              <Building2 className="w-5 h-5" />
+                            ) : (
+                              <>{(customer.first_name?.[0] || '?')}{(customer.last_name?.[0] || '')}</>
+                            )}
+                          </div>
+                          <div className="text-muted-foreground">
+                            {getCustomerDisplayName(customer)}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-muted-foreground">{customer.email}</td>
+                      <td className="px-6 py-4 text-sm text-muted-foreground">
+                        {customer.deleted_at && format(new Date(customer.deleted_at), "d MMM yyyy à HH:mm", { locale: fr })}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setRestoreDialog(customer)}
+                            className="gap-1"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            Restaurer
+                          </Button>
+                          {hasRole('admin') && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => setPermanentDeleteDialog(customer)}
+                            >
+                              Supprimer définitivement
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            {filteredDeletedCustomers.length === 0 && !deletedLoading && (
+              <div className="p-12 text-center text-muted-foreground">
+                La corbeille est vide
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       <CustomerFormModal
@@ -377,23 +557,54 @@ export function CustomersPage() {
         onImportSuccess={() => queryClient.invalidateQueries({ queryKey: ['customers'] })}
       />
 
-      <AlertDialog open={!!deletingCustomer} onOpenChange={() => setDeletingCustomer(null)}>
+      {/* Soft Delete Confirmation Dialog */}
+      <AlertDialog open={!!softDeleteDialog} onOpenChange={() => setSoftDeleteDialog(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer ce client ?</AlertDialogTitle>
+            <AlertDialogTitle>Archiver ce client ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Êtes-vous sûr de vouloir supprimer le client "{deletingCustomer?.first_name} {deletingCustomer?.last_name}" ? 
-              Cette action est irréversible.
+              Êtes-vous sûr de vouloir archiver "{getCustomerDisplayName(softDeleteDialog!)}" ? Le client sera déplacé dans la corbeille et pourra être restauré ultérieurement.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleSoftDelete}>Archiver</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Restore Confirmation Dialog */}
+      <AlertDialog open={!!restoreDialog} onOpenChange={() => setRestoreDialog(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Restaurer ce client ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Restaurer "{getCustomerDisplayName(restoreDialog!)}" ? Le client sera de nouveau disponible dans la liste des clients actifs.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRestore}>Restaurer</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Permanent Delete Confirmation Dialog */}
+      <AlertDialog open={!!permanentDeleteDialog} onOpenChange={() => setPermanentDeleteDialog(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">⚠️ Suppression définitive</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. Le client "{getCustomerDisplayName(permanentDeleteDialog!)}" sera définitivement supprimé et ne pourra plus être récupéré.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={handleDelete} 
-              disabled={deleteCustomer.isPending}
+              onClick={handlePermanentDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleteCustomer.isPending ? "Suppression..." : "Supprimer"}
+              Supprimer définitivement
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
