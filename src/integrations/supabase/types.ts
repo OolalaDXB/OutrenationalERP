@@ -1974,6 +1974,7 @@ export type Database = {
         Returns: boolean
       }
       is_authenticated: { Args: never; Returns: boolean }
+      is_pro_customer: { Args: never; Returns: boolean }
       is_staff_or_admin: { Args: never; Returns: boolean }
       is_viewer_or_more: { Args: never; Returns: boolean }
       restore_deleted: {
