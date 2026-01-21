@@ -121,3 +121,47 @@ export const supplierSchema = z.object({
 });
 
 export type SupplierFormValues = z.infer<typeof supplierSchema>;
+
+// ==================== ARTIST SCHEMA ====================
+export const artistSchema = z.object({
+  name: z.string().min(1, messages.required).max(255, "Maximum 255 caractères"),
+  country: z.string().optional(),
+  bio: z.string().max(2000, "Maximum 2000 caractères").optional(),
+  discogs_id: z.string().optional(),
+  image_url: z.string().url("URL invalide").optional().or(z.literal("")),
+});
+
+export type ArtistFormValues = z.infer<typeof artistSchema>;
+
+// ==================== LABEL SCHEMA ====================
+export const labelSchema = z.object({
+  name: z.string().min(1, messages.required).max(255, "Maximum 255 caractères"),
+  country: z.string().optional(),
+  website: z.string().url("URL invalide").optional().or(z.literal("")),
+  discogs_id: z.string().optional(),
+  supplier_id: z.string().optional(),
+});
+
+export type LabelFormValues = z.infer<typeof labelSchema>;
+
+// ==================== INVOICE SCHEMA ====================
+export const invoiceLineItemSchema = z.object({
+  description: z.string().min(1, "Description requise"),
+  quantity: z.number().int().min(1, "Quantité minimum: 1"),
+  unit_price: z.number().min(0, messages.positiveNumber),
+});
+
+export const invoiceSchema = z.object({
+  invoice_number: z.string().min(1, messages.required),
+  type: z.enum(["customer", "supplier_payout"]),
+  recipient_name: z.string().min(1, "Nom du destinataire requis"),
+  recipient_email: z.string().email(messages.email).optional().or(z.literal("")),
+  recipient_address: z.string().optional(),
+  issue_date: z.string().min(1, "Date d'émission requise"),
+  due_date: z.string().optional(),
+  notes: z.string().optional(),
+  items: z.array(invoiceLineItemSchema).min(1, "Ajoutez au moins une ligne"),
+});
+
+export type InvoiceFormValues = z.infer<typeof invoiceSchema>;
+export type InvoiceLineItemFormValues = z.infer<typeof invoiceLineItemSchema>;
