@@ -79,6 +79,20 @@ export function OrdersPage() {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
+  // Handle page change
+  const handlePageChange = (newPage: number) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (newPage === 1) {
+      newParams.delete('page');
+    } else {
+      newParams.set('page', newPage.toString());
+    }
+    setSearchParams(newParams);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const showLoadingState = isFetching && isPlaceholderData;
+
   // Handle status toggle
   const toggleStatus = (status: string) => {
     setSelectedStatuses(prev => 
@@ -465,6 +479,15 @@ export function OrdersPage() {
               Aucune commande trouvée
             </div>
           )}
+
+          {/* Pagination */}
+          <TablePagination
+            page={currentPage}
+            totalCount={totalCount}
+            pageSize={PAGE_SIZE}
+            onPageChange={handlePageChange}
+            isLoading={showLoadingState}
+          />
         </div>
       </div>
 

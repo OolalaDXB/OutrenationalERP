@@ -1,11 +1,13 @@
 import { useState, useMemo, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Plus, Loader2, Building2, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CustomerFormModal } from "@/components/forms/CustomerFormModal";
 import { CustomerDrawer } from "@/components/drawers/CustomerDrawer";
 import { ImportExportModal } from "@/components/import-export/ImportExportModal";
 import { ImportExportDropdowns } from "@/components/ui/import-export-dropdowns";
-import { useCustomers, useDeleteCustomer, type Customer } from "@/hooks/useCustomers";
+import { TablePagination } from "@/components/ui/table-pagination";
+import { usePaginatedCustomers, useCustomers, useDeleteCustomer, type Customer } from "@/hooks/useCustomers";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { useAuth } from "@/hooks/useAuth";
 import { useQueryClient } from "@tanstack/react-query";
@@ -27,12 +29,30 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+const PAGE_SIZE = 50;
+
 export function CustomersPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { data: customers = [], isLoading, error } = useCustomers();
-  const deleteCustomer = useDeleteCustomer();
   const { canWrite, canDelete } = useAuth();
+  
+  // Get page from URL params
+  const currentPage = parseInt(searchParams.get('page') || '1', 10);
+  
+  // Use paginated customers for table display
+  const { 
+    data: paginatedData, 
+    isLoading,
+    isFetching,
+    isPlaceholderData,
+    error 
+  } = usePaginatedCustomers({ page: currentPage, pageSize: PAGE_SIZE });
+  
+  // Use all customers for filters and export
+  const { data: allCustomers = [] } = useCustomers();
+  
+  const deleteCustomer = useDeleteCustomer();
   const [showForm, setShowForm] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [showImportExport, setShowImportExport] = useState(false);
@@ -43,13 +63,29 @@ export function CustomersPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null);
 
-  // Pays uniques
-  const countries = useMemo(() => {
-    const unique = new Set(customers.map((c) => c.country).filter(Boolean));
-    return Array.from(unique).sort() as string[];
-  }, [customers]);
+  // Get customers to display (from paginated data)
+  const customers = paginatedData?.data || [];
+  const totalCount = paginatedData?.count || 0;
 
-  // Filtrage
+  // Pays uniques (from all customers for filter dropdown)
+  const countries = useMemo(() => {
+    const unique = new Set(allCustomers.map((c) => c.country).filter(Boolean));
+    return Array.from(unique).sort() as string[];
+  }, [allCustomers]);
+
+  // Handle page change
+  const handlePageChange = (newPage: number) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (newPage === 1) {
+      newParams.delete('page');
+    } else {
+      newParams.set('page', newPage.toString());
+    }
+    setSearchParams(newParams);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Filtrage on current page's customers
   const filteredCustomers = useMemo(() => {
     return customers.filter((customer) => {
       const fullName = `${customer.first_name || ''} ${customer.last_name || ''}`.toLowerCase();
@@ -99,15 +135,30 @@ export function CustomersPage() {
     }
   };
 
-  // CSV Export function
+  // CSV Export function (uses all filtered customers)
   const exportToCSV = useCallback(() => {
-    if (filteredCustomers.length === 0) {
+    // Filter all customers for export
+    const dataToExport = allCustomers.filter((customer) => {
+      const fullName = `${customer.first_name || ''} ${customer.last_name || ''}`.toLowerCase();
+      const companyName = (customer.company_name || '').toLowerCase();
+      const matchesSearch =
+        searchTerm === "" ||
+        fullName.includes(searchTerm.toLowerCase()) ||
+        companyName.includes(searchTerm.toLowerCase()) ||
+        customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (customer.city && customer.city.toLowerCase().includes(searchTerm.toLowerCase()));
+      const matchesCountry = countryFilter === "all" || customer.country === countryFilter;
+      const matchesType = typeFilter === "all" || customer.customer_type === typeFilter;
+      return matchesSearch && matchesCountry && matchesType;
+    });
+    
+    if (dataToExport.length === 0) {
       toast({ title: "Aucune donnée", description: "Aucun client à exporter", variant: "destructive" });
       return;
     }
 
     const headers = ["Prénom", "Nom", "Email", "Entreprise", "Type", "Ville", "Pays", "Commandes", "CA Total"];
-    const rows = filteredCustomers.map(customer => [
+    const rows = dataToExport.map(customer => [
       `"${(customer.first_name || '').replace(/"/g, '""')}"`,
       `"${(customer.last_name || '').replace(/"/g, '""')}"`,
       customer.email,
@@ -130,8 +181,8 @@ export function CustomersPage() {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    toast({ title: "Export réussi", description: `${filteredCustomers.length} client(s) exporté(s)` });
-  }, [filteredCustomers, toast]);
+    toast({ title: "Export réussi", description: `${dataToExport.length} client(s) exporté(s)` });
+  }, [allCustomers, searchTerm, countryFilter, typeFilter, toast]);
 
   if (isLoading) {
     return (
@@ -149,12 +200,14 @@ export function CustomersPage() {
     );
   }
 
+  const showLoadingState = isFetching && isPlaceholderData;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">Tous les clients</h2>
-          <p className="text-sm text-muted-foreground">{filteredCustomers.length} clients</p>
+          <p className="text-sm text-muted-foreground">{totalCount} clients</p>
         </div>
         <div className="flex items-center gap-2">
           <ImportExportDropdowns
@@ -203,96 +256,107 @@ export function CustomersPage() {
           />
         </div>
 
-        <table className="w-full border-collapse">
-          <thead>
-            <tr>
-              <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Client</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Localisation</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Commandes</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">CA Total</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Dernière commande</th>
-              {canWrite() && (
-                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border"></th>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {filteredCustomers.map((customer) => (
-              <tr
-                key={customer.id}
-                className="border-b border-border last:border-b-0 hover:bg-secondary/50 cursor-pointer transition-colors"
-                onClick={() => handleRowClick(customer)}
-              >
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
-                      customer.customer_type === 'professionnel' 
-                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' 
-                        : 'bg-primary/10 text-primary'
-                    }`}>
-                      {customer.customer_type === 'professionnel' ? (
-                        <Building2 className="w-5 h-5" />
-                      ) : (
-                        <>{(customer.first_name?.[0] || '?')}{(customer.last_name?.[0] || '')}</>
-                      )}
-                    </div>
-                    <div>
-                      {customer.customer_type === 'professionnel' && customer.company_name ? (
-                        <>
-                          <div className="font-semibold">{customer.company_name}</div>
-                          <div className="text-xs text-muted-foreground">{customer.first_name} {customer.last_name} • {customer.email}</div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="font-semibold">{customer.first_name} {customer.last_name}</div>
-                          <div className="text-xs text-muted-foreground">{customer.email}</div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-sm text-muted-foreground">
-                  {customer.city ? `${customer.city}, ${customer.country || ''}` : customer.country || '—'}
-                </td>
-                <td className="px-6 py-4 text-sm tabular-nums">{customer.orders_count || 0}</td>
-                <td className="px-6 py-4 font-semibold tabular-nums">{formatCurrency(customer.total_spent)}</td>
-                <td className="px-6 py-4 text-sm text-muted-foreground">{formatDate(customer.last_order_at)}</td>
+        <div className={showLoadingState ? 'opacity-60' : ''}>
+          <table className="w-full border-collapse">
+            <thead>
+              <tr>
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Client</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Localisation</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Commandes</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">CA Total</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Dernière commande</th>
                 {canWrite() && (
-                  <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEdit(customer)}>
-                          <Pencil className="w-4 h-4 mr-2" />
-                          Modifier
-                        </DropdownMenuItem>
-                        {canDelete() && (
-                          <DropdownMenuItem 
-                            onClick={() => setDeletingCustomer(customer)}
-                            className="text-destructive focus:text-destructive"
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Supprimer
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </td>
+                  <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border"></th>
                 )}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredCustomers.map((customer) => (
+                <tr
+                  key={customer.id}
+                  className="border-b border-border last:border-b-0 hover:bg-secondary/50 cursor-pointer transition-colors"
+                  onClick={() => handleRowClick(customer)}
+                >
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
+                        customer.customer_type === 'professionnel' 
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' 
+                          : 'bg-primary/10 text-primary'
+                      }`}>
+                        {customer.customer_type === 'professionnel' ? (
+                          <Building2 className="w-5 h-5" />
+                        ) : (
+                          <>{(customer.first_name?.[0] || '?')}{(customer.last_name?.[0] || '')}</>
+                        )}
+                      </div>
+                      <div>
+                        {customer.customer_type === 'professionnel' && customer.company_name ? (
+                          <>
+                            <div className="font-semibold">{customer.company_name}</div>
+                            <div className="text-xs text-muted-foreground">{customer.first_name} {customer.last_name} • {customer.email}</div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="font-semibold">{customer.first_name} {customer.last_name}</div>
+                            <div className="text-xs text-muted-foreground">{customer.email}</div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-muted-foreground">
+                    {customer.city ? `${customer.city}, ${customer.country || ''}` : customer.country || '—'}
+                  </td>
+                  <td className="px-6 py-4 text-sm tabular-nums">{customer.orders_count || 0}</td>
+                  <td className="px-6 py-4 font-semibold tabular-nums">{formatCurrency(customer.total_spent)}</td>
+                  <td className="px-6 py-4 text-sm text-muted-foreground">{formatDate(customer.last_order_at)}</td>
+                  {canWrite() && (
+                    <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEdit(customer)}>
+                            <Pencil className="w-4 h-4 mr-2" />
+                            Modifier
+                          </DropdownMenuItem>
+                          {canDelete() && (
+                            <DropdownMenuItem 
+                              onClick={() => setDeletingCustomer(customer)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Supprimer
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
 
-        {filteredCustomers.length === 0 && (
-          <div className="p-12 text-center text-muted-foreground">
-            Aucun client trouvé
-          </div>
-        )}
+          {filteredCustomers.length === 0 && (
+            <div className="p-12 text-center text-muted-foreground">
+              Aucun client trouvé
+            </div>
+          )}
+
+          {/* Pagination */}
+          <TablePagination
+            page={currentPage}
+            totalCount={totalCount}
+            pageSize={PAGE_SIZE}
+            onPageChange={handlePageChange}
+            isLoading={showLoadingState}
+          />
+        </div>
       </div>
 
       <CustomerFormModal
@@ -309,7 +373,7 @@ export function CustomersPage() {
         isOpen={showImportExport}
         onClose={() => setShowImportExport(false)}
         entityType="customers"
-        data={customers as unknown as Record<string, unknown>[]}
+        data={allCustomers as unknown as Record<string, unknown>[]}
         onImportSuccess={() => queryClient.invalidateQueries({ queryKey: ['customers'] })}
       />
 
