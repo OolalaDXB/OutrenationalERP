@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const srk = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const srk = Deno.env.get("MY_SERVICE_ROLE_KEY");
 
     if (!supabaseUrl) {
       return new Response(
@@ -64,12 +64,11 @@ Deno.serve(async (req) => {
         return supabaseUrl;
       }
     })();
-    const srkPrefix = srk.slice(0, 6);
+    const srkPrefix = srk.slice(0, 3);
 
     if (debug) {
       console.log("SRK present", !!srk);
       console.log("SRK prefix", srkPrefix);
-      console.log("URL", supabaseUrl);
     }
 
     if (!body.email || !body.password) {
