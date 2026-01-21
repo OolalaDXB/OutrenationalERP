@@ -13,7 +13,7 @@ type ViewMode = 'login' | 'forgot-password' | 'resend-email';
 
 export function ProLogin() {
   const navigate = useNavigate();
-  const { user, customer, isLoading, isProfessional, isApproved, signIn, resetPassword, resendConfirmationEmail } = useProAuth();
+  const { user, customer, isLoading, isProfessional, isApproved, needsProfile, signIn, resetPassword, resendConfirmationEmail } = useProAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -30,6 +30,11 @@ export function ProLogin() {
   // Already logged in and approved
   if (!isLoading && user && isProfessional && isApproved) {
     return <Navigate to="/pro" replace />;
+  }
+
+  // Logged in but needs to complete their profile (no customer record + no localStorage data)
+  if (!isLoading && user && !customer && needsProfile) {
+    return <Navigate to="/pro/complete-profile" replace />;
   }
 
   // Logged in but not approved - redirect to pending page
@@ -142,7 +147,7 @@ export function ProLogin() {
             )}
 
             {message && (
-              <div className="p-3 rounded-lg bg-green-500/10 text-green-600 dark:text-green-400 text-sm">
+              <div className="p-3 rounded-lg bg-success/10 text-success text-sm">
                 {message}
               </div>
             )}

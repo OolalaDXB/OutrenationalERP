@@ -27,6 +27,7 @@ interface ProAuthContextType {
   isLoading: boolean;
   isApproved: boolean;
   isProfessional: boolean;
+  needsProfile: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
@@ -40,8 +41,9 @@ export function ProAuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [customer, setCustomer] = useState<ProCustomer | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [needsProfile, setNeedsProfile] = useState(false);
 
-  const fetchCustomer = useCallback(async (userId: string, userEmail?: string) => {
+  const fetchCustomer = useCallback(async (userId: string, userEmail?: string): Promise<ProCustomer | null | 'needs_profile'> => {
     const { data, error } = await supabase
       .from('customers')
       .select('*')
@@ -50,18 +52,34 @@ export function ProAuthProvider({ children }: { children: React.ReactNode }) {
 
     if (error || !data) {
       // No customer record found - check if there's pending registration data
-      const pendingData = localStorage.getItem('pendingProRegistration');
-      if (pendingData && userEmail) {
+      const pendingDataStr = localStorage.getItem('pendingProRegistration');
+      if (pendingDataStr && userEmail) {
         try {
-          const parsedData = JSON.parse(pendingData);
+          const parsedData = JSON.parse(pendingDataStr);
+          
+          // Check if data is expired (7 days)
+          const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+          const isExpired = parsedData.createdAt && (Date.now() - parsedData.createdAt > SEVEN_DAYS_MS);
+          
+          if (isExpired) {
+            console.log('Pending registration data expired, removing');
+            localStorage.removeItem('pendingProRegistration');
+            setCustomer(null);
+            setNeedsProfile(true);
+            return 'needs_profile';
+          }
+          
           console.log('Creating customer record from pending registration data');
+          
+          // Remove createdAt before inserting
+          const { createdAt, ...customerData } = parsedData;
           
           const { data: newCustomer, error: insertError } = await supabase
             .from('customers')
             .insert({
               auth_user_id: userId,
               email: userEmail,
-              ...parsedData,
+              ...customerData,
               customer_type: 'professional',
               approved: false,
               discount_rate: 0,
@@ -73,24 +91,32 @@ export function ProAuthProvider({ children }: { children: React.ReactNode }) {
           if (insertError) {
             console.error('Error creating customer from pending data:', insertError);
             setCustomer(null);
-            return null;
+            setNeedsProfile(true);
+            return 'needs_profile';
           }
 
           // Successfully created customer - remove pending data
           localStorage.removeItem('pendingProRegistration');
           setCustomer(newCustomer as ProCustomer);
+          setNeedsProfile(false);
           return newCustomer as ProCustomer;
         } catch (parseError) {
           console.error('Error parsing pending registration data:', parseError);
           localStorage.removeItem('pendingProRegistration');
+          setCustomer(null);
+          setNeedsProfile(true);
+          return 'needs_profile';
         }
       }
       
+      // No pending data - user needs to complete their profile
       setCustomer(null);
-      return null;
+      setNeedsProfile(true);
+      return 'needs_profile';
     }
 
     setCustomer(data as ProCustomer);
+    setNeedsProfile(false);
     return data as ProCustomer;
   }, []);
 
@@ -167,6 +193,7 @@ export function ProAuthProvider({ children }: { children: React.ReactNode }) {
       isLoading,
       isApproved,
       isProfessional,
+      needsProfile,
       signIn,
       signOut,
       resetPassword,
