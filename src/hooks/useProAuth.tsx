@@ -30,6 +30,7 @@ interface ProAuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
+  resendConfirmationEmail: (email: string) => Promise<{ error: Error | null }>;
   refreshCustomer: () => Promise<void>;
 }
 
@@ -108,6 +109,17 @@ export function ProAuthProvider({ children }: { children: React.ReactNode }) {
     return { error: error as Error | null };
   };
 
+  const resendConfirmationEmail = async (email: string) => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/pro/login`,
+      },
+    });
+    return { error: error as Error | null };
+  };
+
   const isApproved = customer?.approved === true;
   const isProfessional = customer?.customer_type === 'professional';
 
@@ -121,6 +133,7 @@ export function ProAuthProvider({ children }: { children: React.ReactNode }) {
       signIn,
       signOut,
       resetPassword,
+      resendConfirmationEmail,
       refreshCustomer
     }}>
       {children}
