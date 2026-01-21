@@ -33,7 +33,11 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    // Debug log to confirm service role is being used
+    console.log("Using service role:", !!supabaseServiceKey);
+
+    // Create a SINGLE admin client with service role key for ALL operations
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
@@ -66,8 +70,8 @@ Deno.serve(async (req) => {
 
     console.log("Creating auth user for:", body.email);
 
-    // Create auth user
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    // Create auth user with admin client
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: body.email,
       password: body.password,
       email_confirm: false, // User must confirm email
@@ -118,9 +122,10 @@ Deno.serve(async (req) => {
         : "Demande d'inscription via portail pro",
     };
 
-    console.log("Creating customer record");
+    console.log("Creating customer record with admin client");
 
-    const { data: customerResult, error: customerError } = await supabase
+    // Insert customer with SAME admin client (service role bypasses RLS)
+    const { data: customerResult, error: customerError } = await supabaseAdmin
       .from("customers")
       .insert(customerData)
       .select()
@@ -129,7 +134,7 @@ Deno.serve(async (req) => {
     if (customerError) {
       console.error("Customer creation error:", customerError);
       // Rollback: delete the auth user if customer creation fails
-      await supabase.auth.admin.deleteUser(authData.user.id);
+      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
       return new Response(
         JSON.stringify({ error: "CUSTOMER_CREATION_FAILED", details: customerError.message }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -139,7 +144,7 @@ Deno.serve(async (req) => {
     console.log("Customer created:", customerResult.id);
 
     // Resend confirmation email via invite link (doesn't require password)
-    const { error: emailError } = await supabase.auth.admin.inviteUserByEmail(body.email, {
+    const { error: emailError } = await supabaseAdmin.auth.admin.inviteUserByEmail(body.email, {
       redirectTo: `${req.headers.get("origin") || "https://id-preview--3312b695-7d91-4ee6-9015-47e73404bb0f.lovable.app"}/pro/login`,
     });
 
