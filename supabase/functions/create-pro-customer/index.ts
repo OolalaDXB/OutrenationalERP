@@ -2,8 +2,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-application-name",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-application-name",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Credentials": "true",
 };
 
 interface RegistrationData {
@@ -24,29 +26,27 @@ interface RegistrationData {
 }
 
 Deno.serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    // Debug log to confirm service role is being used
-    console.log("Using service role:", !!supabaseServiceKey);
+    if (!supabaseUrl || !serviceKey) {
+      return new Response(
+        JSON.stringify({ error: "MISSING_ENV" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    // Create a SINGLE admin client with service role key for ALL operations
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
     });
 
     const body: RegistrationData = await req.json();
 
-    // Validate required fields
     if (!body.email || !body.password) {
       return new Response(
         JSON.stringify({ error: "EMAIL_AND_PASSWORD_REQUIRED" }),
@@ -54,39 +54,59 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (!body.companyName || body.companyName.trim() === "") {
+    if (!body.companyName || !body.companyName.trim()) {
       return new Response(
         JSON.stringify({ error: "COMPANY_REQUIRED" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    if (body.password.length < 6) {
+    if (body.password.length < 8) {
       return new Response(
         JSON.stringify({ error: "PASSWORD_TOO_SHORT" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log("Creating auth user for:", body.email);
+    // Idempotency / anti-duplicate: reject if customer already exists for email
+    const { data: existingCustomer, error: existingError } = await supabaseAdmin
+      .from("customers")
+      .select("id")
+      .eq("email", body.email)
+      .maybeSingle();
 
-    // Create auth user with admin client
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: body.email,
-      password: body.password,
-      email_confirm: false, // User must confirm email
-    });
+    if (existingError) {
+      return new Response(
+        JSON.stringify({ error: "CUSTOMER_LOOKUP_FAILED", details: existingError.message }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (existingCustomer?.id) {
+      return new Response(
+        JSON.stringify({ error: "EMAIL_ALREADY_USED" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // 1) Create auth user (admin)
+    const { data: authData, error: authError } =
+      await supabaseAdmin.auth.admin.createUser({
+        email: body.email,
+        password: body.password,
+        email_confirm: false,
+      });
 
     if (authError) {
-      console.error("Auth error:", authError);
-      if (authError.message.includes("already been registered") || authError.message.includes("already exists")) {
+      const msg = authError.message || "AUTH_ERROR";
+      if (msg.includes("already been registered") || msg.includes("already exists")) {
         return new Response(
           JSON.stringify({ error: "EMAIL_ALREADY_USED" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       return new Response(
-        JSON.stringify({ error: "AUTH_ERROR", details: authError.message }),
+        JSON.stringify({ error: "AUTH_ERROR", details: msg }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -98,42 +118,35 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log("Auth user created:", authData.user.id);
-
-    // Create customer record
-    const customerData = {
+    const customerInsert = {
       auth_user_id: authData.user.id,
       email: body.email,
       company_name: body.companyName.trim(),
-      vat_number: body.vatNumber || null,
-      first_name: body.firstName || null,
-      last_name: body.lastName || null,
-      phone: body.phone || null,
-      address: body.address || null,
-      address_line_2: body.addressLine2 || null,
-      city: body.city || null,
-      state: body.state || null,
-      postal_code: body.postalCode || null,
-      country: body.country || null,
+      vat_number: body.vatNumber ?? null,
+      first_name: body.firstName ?? null,
+      last_name: body.lastName ?? null,
+      phone: body.phone ?? null,
+      address: body.address ?? null,
+      address_line_2: body.addressLine2 ?? null,
+      city: body.city ?? null,
+      state: body.state ?? null,
+      postal_code: body.postalCode ?? null,
+      country: body.country ?? null,
       customer_type: "professional",
-      approved: false, // Requires admin approval
+      approved: false,
       notes: body.notes
         ? `Demande d'inscription: ${body.notes}`
         : "Demande d'inscription via portail pro",
     };
 
-    console.log("Creating customer record with admin client");
-
-    // Insert customer with SAME admin client (service role bypasses RLS)
     const { data: customerResult, error: customerError } = await supabaseAdmin
       .from("customers")
-      .insert(customerData)
-      .select()
+      .insert(customerInsert)
+      .select("id")
       .single();
 
     if (customerError) {
-      console.error("Customer creation error:", customerError);
-      // Rollback: delete the auth user if customer creation fails
+      // rollback user
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
       return new Response(
         JSON.stringify({ error: "CUSTOMER_CREATION_FAILED", details: customerError.message }),
@@ -141,28 +154,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log("Customer created:", customerResult.id);
-
-    // Resend confirmation email via invite link (doesn't require password)
-    const { error: emailError } = await supabaseAdmin.auth.admin.inviteUserByEmail(body.email, {
-      redirectTo: `${req.headers.get("origin") || "https://id-preview--3312b695-7d91-4ee6-9015-47e73404bb0f.lovable.app"}/pro/login`,
-    });
-
-    if (emailError) {
-      console.warn("Email sending warning:", emailError);
-      // Don't fail the registration if email fails - user was already created
-    }
-
     return new Response(
       JSON.stringify({
         success: true,
         userId: authData.user.id,
-        customerId: customerResult.id,
+        customerId: customerResult?.id,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("Unexpected error:", error);
     return new Response(
       JSON.stringify({ error: "INTERNAL_ERROR", details: String(error) }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
