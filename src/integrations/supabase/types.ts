@@ -1697,42 +1697,6 @@ export type Database = {
         }
         Relationships: []
       }
-      users_legacy: {
-        Row: {
-          active: boolean | null
-          auth_user_id: string
-          created_at: string | null
-          email: string
-          first_name: string | null
-          id: string
-          last_name: string | null
-          role: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          active?: boolean | null
-          auth_user_id: string
-          created_at?: string | null
-          email: string
-          first_name?: string | null
-          id?: string
-          last_name?: string | null
-          role?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          active?: boolean | null
-          auth_user_id?: string
-          created_at?: string | null
-          email?: string
-          first_name?: string | null
-          id?: string
-          last_name?: string | null
-          role?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       vat_validations_cache: {
         Row: {
           company_address: string | null
