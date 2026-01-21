@@ -4,7 +4,8 @@ import { Plus, MoreHorizontal, Loader2, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StockIndicator } from "@/components/ui/stock-indicator";
 import { ImportExportDropdowns } from "@/components/ui/import-export-dropdowns";
-import { useProducts, useDeleteProduct, type Product } from "@/hooks/useProducts";
+import { TablePagination, TableRowSkeleton } from "@/components/ui/table-pagination";
+import { usePaginatedProducts, useProducts, useDeleteProduct, type Product } from "@/hooks/useProducts";
 import { useSuppliers } from "@/hooks/useSuppliers";
 import { useLabels } from "@/hooks/useLabels";
 import { useAuth } from "@/hooks/useAuth";
@@ -34,15 +35,31 @@ const formatLabels: Record<string, string> = {
   digital: "Digital",
 };
 
+const PAGE_SIZE = 50;
+
 export function ProductsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
-  const { data: products = [], isLoading: productsLoading } = useProducts();
+  const { toast } = useToast();
+  const { canWrite, canDelete } = useAuth();
+  
+  // Get page from URL params
+  const currentPage = parseInt(searchParams.get('page') || '1', 10);
+  
+  // Use paginated products for table display
+  const { 
+    data: paginatedData, 
+    isLoading: productsLoading,
+    isFetching: productsFetching,
+    isPlaceholderData
+  } = usePaginatedProducts({ page: currentPage, pageSize: PAGE_SIZE });
+  
+  // Use all products for filters and export (without soft-deleted)
+  const { data: allProducts = [] } = useProducts();
+  
   const { data: suppliers = [], isLoading: suppliersLoading } = useSuppliers();
   const { data: labels = [], isLoading: labelsLoading } = useLabels();
   const deleteProduct = useDeleteProduct();
-  const { toast } = useToast();
-  const { canWrite, canDelete } = useAuth();
   
   const [searchTerm, setSearchTerm] = useState("");
   const [supplierFilter, setSupplierFilter] = useState("all");
@@ -67,10 +84,31 @@ export function ProductsPage() {
     } else {
       newParams.set(type, value);
     }
+    // Reset to page 1 when filtering
+    newParams.delete('page');
     setSearchParams(newParams);
     if (type === 'supplier') setSupplierFilter(value);
     if (type === 'label') setLabelFilter(value);
   };
+
+  // Handle page change
+  const handlePageChange = (newPage: number) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (newPage === 1) {
+      newParams.delete('page');
+    } else {
+      newParams.set('page', newPage.toString());
+    }
+    setSearchParams(newParams);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Reset to page 1 when search/filters change
+  useEffect(() => {
+    if (currentPage > 1 && (searchTerm || formatFilter !== 'all' || stockFilter !== 'all')) {
+      handlePageChange(1);
+    }
+  }, [searchTerm, formatFilter, stockFilter]);
   
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -82,13 +120,17 @@ export function ProductsPage() {
 
   const isLoading = productsLoading || suppliersLoading || labelsLoading;
 
-  // Formats uniques
+  // Formats uniques (from all products for filter dropdown)
   const formats = useMemo(() => {
-    const unique = new Set(products.map((p) => p.format));
+    const unique = new Set(allProducts.map((p) => p.format));
     return Array.from(unique);
-  }, [products]);
+  }, [allProducts]);
 
-  // Filtrage
+  // Get products to display (from paginated data)
+  const products = paginatedData?.data || [];
+  const totalCount = paginatedData?.count || 0;
+
+  // Client-side filtering on the current page's products
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
       const matchesSearch =
@@ -151,9 +193,26 @@ export function ProductsPage() {
     setSelectedProduct(null);
   };
 
-  // CSV Export function
+  // CSV Export function (uses all filtered products from allProducts)
   const exportToCSV = useCallback(() => {
-    const dataToExport = filteredProducts;
+    // Filter all products for export
+    const dataToExport = allProducts.filter((product) => {
+      const matchesSearch =
+        searchTerm === "" ||
+        product.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (product.artist_name && product.artist_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        product.sku.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSupplier = supplierFilter === "all" || product.supplier_id === supplierFilter;
+      const matchesLabel = labelFilter === "all" || product.label_id === labelFilter;
+      const matchesFormat = formatFilter === "all" || product.format === formatFilter;
+      const stock = product.stock ?? 0;
+      const threshold = product.stock_threshold ?? 5;
+      let matchesStock = true;
+      if (stockFilter === "in_stock") matchesStock = stock > threshold;
+      else if (stockFilter === "low") matchesStock = stock > 0 && stock <= threshold;
+      else if (stockFilter === "out") matchesStock = stock === 0;
+      return matchesSearch && matchesSupplier && matchesLabel && matchesFormat && matchesStock;
+    });
     
     if (dataToExport.length === 0) {
       toast({ title: "Aucune donnée", description: "Aucun produit à exporter", variant: "destructive" });
@@ -185,7 +244,7 @@ export function ProductsPage() {
     URL.revokeObjectURL(url);
 
     toast({ title: "Export réussi", description: `${dataToExport.length} produit(s) exporté(s)` });
-  }, [filteredProducts, toast]);
+  }, [allProducts, searchTerm, supplierFilter, labelFilter, formatFilter, stockFilter, toast]);
 
   if (isLoading) {
     return (
@@ -195,12 +254,14 @@ export function ProductsPage() {
     );
   }
 
+  const showLoadingState = productsFetching && isPlaceholderData;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">Tous les produits</h2>
-          <p className="text-sm text-muted-foreground">{filteredProducts.length} références</p>
+          <p className="text-sm text-muted-foreground">{totalCount} références</p>
         </div>
         <div className="flex items-center gap-2">
           <ImportExportDropdowns
@@ -272,96 +333,109 @@ export function ProductsPage() {
         </div>
 
         {/* Table */}
-        <table className="w-full border-collapse">
-          <thead>
-            <tr>
-              <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Produit</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Fournisseur</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Label</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Format</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">État</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Prix</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Stock</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Emplacement</th>
-              {canWrite() && (
-                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border"></th>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {filteredProducts.map((product) => (
-              <tr 
-                key={product.id} 
-                className="border-b border-border last:border-b-0 hover:bg-secondary/50 cursor-pointer transition-colors"
-                onClick={() => handleRowClick(product)}
-              >
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    {product.image_url ? (
-                      <img
-                        src={product.image_url}
-                        alt={product.title}
-                        className="w-12 h-12 rounded-lg object-cover"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-sidebar to-foreground flex items-center justify-center">
-                        <span className="text-[0.6rem] text-muted-foreground/50">VINYL</span>
-                      </div>
-                    )}
-                    <div>
-                      <div className="font-semibold">{product.title}</div>
-                      <div className="text-xs text-muted-foreground">{product.artist_name || '—'} · {product.sku}</div>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-sm">{product.supplier_name || '—'}</td>
-                <td className="px-6 py-4 text-sm">{product.label_name || '—'}</td>
-                <td className="px-6 py-4 text-sm">{formatLabels[product.format] || product.format.toUpperCase()}</td>
-                <td className="px-6 py-4">
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-secondary">
-                    {product.condition_media || 'M'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 font-semibold tabular-nums">{formatCurrency(product.selling_price)}</td>
-                <td className="px-6 py-4">
-                  <StockIndicator current={product.stock ?? 0} threshold={product.stock_threshold ?? 5} />
-                </td>
-                <td className="px-6 py-4 text-sm text-muted-foreground">{product.location || '—'}</td>
+        <div className={showLoadingState ? 'opacity-60' : ''}>
+          <table className="w-full border-collapse">
+            <thead>
+              <tr>
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Produit</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Fournisseur</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Label</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Format</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">État</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Prix</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Stock</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Emplacement</th>
                 {canWrite() && (
-                  <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEdit(product)}>
-                          <Pencil className="w-4 h-4 mr-2" />
-                          Modifier
-                        </DropdownMenuItem>
-                        {canDelete() && (
-                          <DropdownMenuItem 
-                            onClick={() => handleDelete(product)}
-                            className="text-destructive focus:text-destructive"
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Supprimer
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </td>
+                  <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border"></th>
                 )}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredProducts.map((product) => (
+                <tr 
+                  key={product.id} 
+                  className="border-b border-border last:border-b-0 hover:bg-secondary/50 cursor-pointer transition-colors"
+                  onClick={() => handleRowClick(product)}
+                >
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      {product.image_url ? (
+                        <img
+                          src={product.image_url}
+                          alt={product.title}
+                          className="w-12 h-12 rounded-lg object-cover"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-sidebar to-foreground flex items-center justify-center">
+                          <span className="text-[0.6rem] text-muted-foreground/50">VINYL</span>
+                        </div>
+                      )}
+                      <div>
+                        <div className="font-semibold">{product.title}</div>
+                        <div className="text-xs text-muted-foreground">{product.artist_name || '—'} · {product.sku}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-sm">{product.supplier_name || '—'}</td>
+                  <td className="px-6 py-4 text-sm">{product.label_name || '—'}</td>
+                  <td className="px-6 py-4 text-sm">{formatLabels[product.format] || product.format.toUpperCase()}</td>
+                  <td className="px-6 py-4">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-secondary">
+                      {product.condition_media || 'M'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 font-semibold tabular-nums">{formatCurrency(product.selling_price)}</td>
+                  <td className="px-6 py-4">
+                    <StockIndicator current={product.stock ?? 0} threshold={product.stock_threshold ?? 5} />
+                  </td>
+                  <td className="px-6 py-4 text-sm text-muted-foreground">{product.location || '—'}</td>
+                  {canWrite() && (
+                    <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEdit(product)}>
+                            <Pencil className="w-4 h-4 mr-2" />
+                            Modifier
+                          </DropdownMenuItem>
+                          {canDelete() && (
+                            <DropdownMenuItem 
+                              onClick={() => handleDelete(product)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Supprimer
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-        {filteredProducts.length === 0 && (
+        {filteredProducts.length === 0 && !showLoadingState && (
           <div className="p-12 text-center text-muted-foreground">
             Aucun produit trouvé
           </div>
+        )}
+
+        {/* Pagination */}
+        {totalCount > PAGE_SIZE && (
+          <TablePagination
+            page={currentPage}
+            pageSize={PAGE_SIZE}
+            totalCount={totalCount}
+            onPageChange={handlePageChange}
+            isLoading={productsFetching}
+          />
         )}
       </div>
 
@@ -384,7 +458,7 @@ export function ProductsPage() {
         isOpen={showImportExport}
         onClose={() => setShowImportExport(false)}
         entityType="products"
-        data={products as unknown as Record<string, unknown>[]}
+        data={allProducts as unknown as Record<string, unknown>[]}
         onImportSuccess={() => queryClient.invalidateQueries({ queryKey: ['products'] })}
       />
     </div>

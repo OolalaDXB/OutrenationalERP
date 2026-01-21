@@ -1,4 +1,5 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ShoppingCart, Package, Truck, CheckCircle, Plus, Loader2, X, CreditCard, MoreHorizontal, Trash2, History } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { StatusBadge, orderStatusVariant, orderStatusLabel } from "@/components/ui/status-badge";
@@ -6,11 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ImportExportDropdowns } from "@/components/ui/import-export-dropdowns";
+import { TablePagination } from "@/components/ui/table-pagination";
 import { OrderDrawer } from "@/components/drawers/OrderDrawer";
 import { OrderFormModal } from "@/components/forms/OrderFormModal";
 import { OrderImportModal } from "@/components/orders/OrderImportModal";
 import { OrderImportHistoryModal } from "@/components/orders/OrderImportHistoryModal";
-import { useOrdersWithItems, useUpdateOrderStatus, useCancelOrder, useUpdateOrder, useDeleteOrder } from "@/hooks/useOrders";
+import { usePaginatedOrdersWithItems, useOrdersWithItems, useUpdateOrderStatus, useCancelOrder, useUpdateOrder, useDeleteOrder } from "@/hooks/useOrders";
 import { useSalesChannels } from "@/hooks/useSalesChannels";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
@@ -44,8 +46,18 @@ const ALL_STATUSES = [
   { value: "refunded", label: "Remboursée" },
 ];
 
+const PAGE_SIZE = 50;
+
 export function OrdersPage() {
-  const { data: orders = [], isLoading, error } = useOrdersWithItems();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentPage = parseInt(searchParams.get('page') || '1', 10);
+  
+  const { data: paginatedData, isLoading, isFetching, isPlaceholderData, error } = usePaginatedOrdersWithItems({ page: currentPage, pageSize: PAGE_SIZE });
+  const { data: allOrders = [] } = useOrdersWithItems();
+  
+  const orders = paginatedData?.data || [];
+  const totalCount = paginatedData?.count || 0;
+  
   const { enabledChannels } = useSalesChannels();
   const updateOrderStatus = useUpdateOrderStatus();
   const cancelOrder = useCancelOrder();
