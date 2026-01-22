@@ -483,14 +483,14 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
             {canWrite() && (
               <div className="bg-secondary rounded-lg p-4 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Statut commande</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground block">Statut commande</Label>
                     <Select 
                       value={order.status || "pending"} 
                       onValueChange={handleStatusChange}
                       disabled={isUpdating}
                     >
-                      <SelectTrigger className="mt-1.5">
+                      <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -502,9 +502,9 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                      <CreditCard className="w-3 h-3" />
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground block">
+                      <CreditCard className="w-3 h-3 inline-block mr-1" />
                       Statut paiement
                     </Label>
                     <Select 
@@ -512,7 +512,7 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
                       onValueChange={handlePaymentStatusChange}
                       disabled={isUpdating}
                     >
-                      <SelectTrigger className="mt-1.5">
+                      <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>

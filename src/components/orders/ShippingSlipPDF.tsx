@@ -60,7 +60,18 @@ export async function generateShippingSlipPDF({ order, settings }: GenerateShipp
   const boxWidth = 85;
   const boxX = pageWidth - 14 - boxWidth;
   const boxY = yPos - 5;
-  const boxHeight = 45;
+  
+  // Calculate dynamic box height based on content
+  const recipientAddress = [
+    order.shipping_address,
+    order.shipping_address_line_2,
+    `${order.shipping_postal_code || ''} ${order.shipping_city || ''}`.trim(),
+    order.shipping_country,
+  ].filter(Boolean) as string[];
+  
+  const hasPhone = !!order.shipping_phone;
+  const contentHeight = 24 + (recipientAddress.length * 5) + (hasPhone ? 8 : 0);
+  const boxHeight = Math.max(50, contentHeight + 6);
 
   doc.setDrawColor(0);
   doc.setLineWidth(0.5);
@@ -82,13 +93,6 @@ export async function generateShippingSlipPDF({ order, settings }: GenerateShipp
   
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
-  
-  const recipientAddress = [
-    order.shipping_address,
-    order.shipping_address_line_2,
-    `${order.shipping_postal_code || ''} ${order.shipping_city || ''}`.trim(),
-    order.shipping_country,
-  ].filter(Boolean) as string[];
 
   recipientAddress.forEach((line, i) => {
     doc.text(line, boxX + 5, boxY + 24 + i * 5);
@@ -96,7 +100,7 @@ export async function generateShippingSlipPDF({ order, settings }: GenerateShipp
 
   if (order.shipping_phone) {
     doc.setFontSize(9);
-    doc.text(`Tél : ${order.shipping_phone}`, boxX + 5, boxY + 24 + recipientAddress.length * 5 + 2);
+    doc.text(`Tél : ${order.shipping_phone}`, boxX + 5, boxY + 24 + recipientAddress.length * 5 + 4);
   }
 
   yPos += Math.max(senderInfo.length * 5, boxHeight) + 15;
