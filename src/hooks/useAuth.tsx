@@ -2,11 +2,13 @@ import { createContext, useContext, useEffect, useState, useRef, ReactNode } fro
 import { User, Session } from '@supabase/supabase-js';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export type AppRole = 'admin' | 'staff' | 'viewer';
 
 interface AuthUser extends User {
   role?: AppRole;
+  isProCustomer?: boolean;
 }
 
 interface AuthContextType {
@@ -43,6 +45,26 @@ async function fetchUserRole(userId: string): Promise<AppRole> {
   } catch (err) {
     console.error('Exception fetching role:', err);
     return 'viewer';
+  }
+}
+
+async function checkIsProCustomer(userId: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('auth_user_id', userId)
+      .maybeSingle();
+    
+    if (error) {
+      console.error('Error checking pro customer:', error);
+      return false;
+    }
+    
+    return !!data;
+  } catch (err) {
+    console.error('Exception checking pro customer:', err);
+    return false;
   }
 }
 
@@ -83,15 +105,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(newSession);
 
         if (newSession?.user) {
-          // Fetch role in a non-blocking way to avoid deadlocks
-          // Use setTimeout to defer the Supabase call
+          // Fetch role and check if pro customer in a non-blocking way
           setTimeout(async () => {
             if (!mountedRef.current) return;
-            const role = await fetchUserRole(newSession.user.id);
+            
+            const [role, isProCustomer] = await Promise.all([
+              fetchUserRole(newSession.user.id),
+              checkIsProCustomer(newSession.user.id)
+            ]);
+            
+            // SECURITY: Block Pro customers from accessing ERP backoffice
+            if (isProCustomer) {
+              console.warn('Pro customer attempted to access ERP backoffice');
+              toast.error('Accès réservé au personnel', {
+                description: 'Utilisez le portail Pro pour accéder à votre espace client.',
+              });
+              await supabase.auth.signOut();
+              // Redirect to Pro login
+              window.location.href = '/pro/login';
+              return;
+            }
+            
             if (mountedRef.current) {
               setUser({
                 ...newSession.user,
-                role
+                role,
+                isProCustomer: false
               });
               setLoading(false);
             }
