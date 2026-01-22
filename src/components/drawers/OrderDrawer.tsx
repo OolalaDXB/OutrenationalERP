@@ -22,8 +22,9 @@ import { OrderFormModal } from "@/components/forms/OrderFormModal";
 import { ProductDrawer } from "@/components/drawers/ProductDrawer";
 import { OrderDocumentsDialog } from "@/components/orders/OrderDocumentsDialog";
 import { useNavigate } from "react-router-dom";
-import { useSettings } from "@/hooks/useSettings";
+import { useSettings, getNextCreditNoteNumber } from "@/hooks/useSettings";
 import { generateProPurchaseOrderPDF, downloadProPurchaseOrder } from "@/components/pro/ProPurchaseOrderPDF";
+import { generateCreditNotePDF, downloadCreditNote } from "@/components/orders/CreditNotePDF";
 
 type OrderWithItems = Order & { order_items?: OrderItem[] };
 
@@ -158,14 +159,34 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   const handleRefund = async () => {
     if (!order) return;
     try {
+      // Generate credit note number
+      const creditNoteInfo = await getNextCreditNoteNumber();
+      
       await updateOrder.mutateAsync({ 
         id: order.id, 
         status: "refunded",
-        payment_status: "refunded"
+        payment_status: "refunded",
+        refunded_at: new Date().toISOString()
+      } as any);
+      
+      // Generate and download credit note PDF
+      if (settings) {
+        const doc = await generateCreditNotePDF({
+          order,
+          settings,
+          creditNoteNumber: creditNoteInfo.full,
+          originalInvoiceNumber: order.order_number
+        });
+        downloadCreditNote(doc, creditNoteInfo.full);
+      }
+      
+      toast({ 
+        title: "Commande remboursée", 
+        description: `Avoir ${creditNoteInfo.full} généré pour la commande ${order.order_number}.` 
       });
-      toast({ title: "Commande remboursée", description: `La commande ${order.order_number} a été remboursée.` });
       setShowRefundDialog(false);
     } catch (error) {
+      console.error('Refund error:', error);
       toast({ title: "Erreur", description: "Impossible de rembourser la commande.", variant: "destructive" });
     }
   };
@@ -397,14 +418,34 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
                         variant="default"
                         onClick={async () => {
                           try {
+                            // Generate credit note number
+                            const creditNoteInfo = await getNextCreditNoteNumber();
+                            
+                            // Update order status
                             await updateOrder.mutateAsync({
                               id: order.id,
                               status: 'refunded',
                               payment_status: 'refunded',
                               refunded_at: new Date().toISOString()
                             } as any);
-                            toast({ title: "Remboursement effectué", description: `La commande ${order.order_number} a été remboursée.` });
+                            
+                            // Generate and download credit note PDF
+                            if (settings) {
+                              const doc = await generateCreditNotePDF({
+                                order,
+                                settings,
+                                creditNoteNumber: creditNoteInfo.full,
+                                originalInvoiceNumber: order.order_number
+                              });
+                              downloadCreditNote(doc, creditNoteInfo.full);
+                            }
+                            
+                            toast({ 
+                              title: "Remboursement effectué", 
+                              description: `Avoir ${creditNoteInfo.full} généré pour la commande ${order.order_number}.` 
+                            });
                           } catch (error) {
+                            console.error('Refund error:', error);
                             toast({ title: "Erreur", description: "Impossible de traiter le remboursement.", variant: "destructive" });
                           }
                         }}

@@ -1266,6 +1266,8 @@ export type Database = {
           bic: string | null
           cgv: string | null
           created_at: string | null
+          credit_note_next_number: number | null
+          credit_note_prefix: string | null
           custom_marketplace_mappings: Json | null
           default_currency: string | null
           eori: string | null
@@ -1302,6 +1304,8 @@ export type Database = {
           bic?: string | null
           cgv?: string | null
           created_at?: string | null
+          credit_note_next_number?: number | null
+          credit_note_prefix?: string | null
           custom_marketplace_mappings?: Json | null
           default_currency?: string | null
           eori?: string | null
@@ -1338,6 +1342,8 @@ export type Database = {
           bic?: string | null
           cgv?: string | null
           created_at?: string | null
+          credit_note_next_number?: number | null
+          credit_note_prefix?: string | null
           custom_marketplace_mappings?: Json | null
           default_currency?: string | null
           eori?: string | null
