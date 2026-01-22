@@ -14,6 +14,11 @@ export interface ShippingRate {
   min_total: number;
   price: number;
   free_above: number | null;
+  rate_type: 'flat' | 'per_weight' | 'per_item' | 'combined';
+  per_kg_price: number | null;
+  per_item_price: number | null;
+  max_weight: number | null;
+  max_items: number | null;
   created_at: string;
 }
 
@@ -102,19 +107,24 @@ export function useUpdateShippingZone() {
   });
 }
 
+export interface UpdateShippingRateParams {
+  zoneId: string;
+  price: number;
+  freeAbove: number | null;
+  rateType?: 'flat' | 'per_weight' | 'per_item' | 'combined';
+  perKgPrice?: number | null;
+  perItemPrice?: number | null;
+  maxWeight?: number | null;
+  maxItems?: number | null;
+}
+
 export function useUpdateShippingRate() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ 
-      zoneId, 
-      price, 
-      freeAbove 
-    }: { 
-      zoneId: string; 
-      price: number; 
-      freeAbove: number | null;
-    }) => {
+    mutationFn: async (params: UpdateShippingRateParams) => {
+      const { zoneId, price, freeAbove, rateType = 'flat', perKgPrice, perItemPrice, maxWeight, maxItems } = params;
+      
       // Check if rate exists for this zone
       const { data: existingRate } = await fromTable('shipping_rates')
         .select('id')
@@ -122,13 +132,20 @@ export function useUpdateShippingRate() {
         .limit(1)
         .single();
 
+      const rateData = {
+        price,
+        free_above: freeAbove,
+        rate_type: rateType,
+        per_kg_price: perKgPrice ?? null,
+        per_item_price: perItemPrice ?? null,
+        max_weight: maxWeight ?? null,
+        max_items: maxItems ?? null
+      };
+
       if (existingRate) {
         // Update existing rate
         const { data, error } = await fromTable('shipping_rates')
-          .update({ 
-            price, 
-            free_above: freeAbove 
-          })
+          .update(rateData)
           .eq('id', (existingRate as any).id)
           .select()
           .single();
@@ -140,9 +157,8 @@ export function useUpdateShippingRate() {
         const { data, error } = await fromTable('shipping_rates')
           .insert({ 
             zone_id: zoneId,
-            price, 
-            free_above: freeAbove,
-            min_total: 0
+            min_total: 0,
+            ...rateData
           })
           .select()
           .single();
@@ -196,18 +212,34 @@ export function useDeleteShippingZone() {
   });
 }
 
-/**
- * Calculate shipping for a given country code and subtotal
- * Uses the database shipping zones and rates
- */
-export async function calculateDynamicShipping(countryCode: string | null | undefined, subtotalHT: number): Promise<{
+export interface ShippingCalculationParams {
+  countryCode: string | null | undefined;
+  subtotalHT: number;
+  totalWeight?: number; // in kg
+  itemCount?: number;
+}
+
+export interface ShippingCalculationResult {
   zone: string;
   zoneName: string;
   baseCost: number;
   freeThreshold: number | null;
   isFree: boolean;
   finalCost: number;
-}> {
+  rateType: string;
+  breakdown?: {
+    basePrice: number;
+    weightPrice?: number;
+    itemPrice?: number;
+  };
+}
+
+/**
+ * Calculate shipping for a given country code, subtotal, weight, and item count
+ * Uses the database shipping zones and rates
+ */
+export async function calculateDynamicShipping(params: ShippingCalculationParams): Promise<ShippingCalculationResult> {
+  const { countryCode, subtotalHT, totalWeight = 0, itemCount = 1 } = params;
   const normalizedCountry = (countryCode || '').trim().toUpperCase();
 
   // Fetch zones and rates
@@ -226,7 +258,8 @@ export async function calculateDynamicShipping(countryCode: string | null | unde
       baseCost: 25,
       freeThreshold: 350,
       isFree: subtotalHT >= 350,
-      finalCost: subtotalHT >= 350 ? 0 : 25
+      finalCost: subtotalHT >= 350 ? 0 : 25,
+      rateType: 'flat'
     };
   }
 
@@ -253,7 +286,8 @@ export async function calculateDynamicShipping(countryCode: string | null | unde
       baseCost: 25,
       freeThreshold: 350,
       isFree: subtotalHT >= 350,
-      finalCost: subtotalHT >= 350 ? 0 : 25
+      finalCost: subtotalHT >= 350 ? 0 : 25,
+      rateType: 'flat'
     };
   }
 
@@ -268,8 +302,36 @@ export async function calculateDynamicShipping(countryCode: string | null | unde
       baseCost: 0,
       freeThreshold: null,
       isFree: true,
-      finalCost: 0
+      finalCost: 0,
+      rateType: 'flat'
     };
+  }
+
+  // Calculate cost based on rate type
+  let calculatedCost = rate.price; // Base price
+  const breakdown: ShippingCalculationResult['breakdown'] = { basePrice: rate.price };
+  const rateType = rate.rate_type || 'flat';
+
+  if (rateType === 'per_weight' && rate.per_kg_price && totalWeight > 0) {
+    const weightPrice = totalWeight * rate.per_kg_price;
+    calculatedCost = rate.price + weightPrice;
+    breakdown.weightPrice = weightPrice;
+  } else if (rateType === 'per_item' && rate.per_item_price && itemCount > 1) {
+    const additionalItems = itemCount - 1;
+    const itemPrice = additionalItems * rate.per_item_price;
+    calculatedCost = rate.price + itemPrice;
+    breakdown.itemPrice = itemPrice;
+  } else if (rateType === 'combined') {
+    let extraCost = 0;
+    if (rate.per_kg_price && totalWeight > 0) {
+      breakdown.weightPrice = totalWeight * rate.per_kg_price;
+      extraCost += breakdown.weightPrice;
+    }
+    if (rate.per_item_price && itemCount > 1) {
+      breakdown.itemPrice = (itemCount - 1) * rate.per_item_price;
+      extraCost += breakdown.itemPrice;
+    }
+    calculatedCost = rate.price + extraCost;
   }
 
   const isFree = rate.free_above !== null && subtotalHT >= rate.free_above;
@@ -277,9 +339,11 @@ export async function calculateDynamicShipping(countryCode: string | null | unde
   return {
     zone: zone.name.toLowerCase(),
     zoneName: zone.name,
-    baseCost: rate.price,
+    baseCost: calculatedCost,
     freeThreshold: rate.free_above,
     isFree,
-    finalCost: isFree ? 0 : rate.price
+    finalCost: isFree ? 0 : calculatedCost,
+    rateType,
+    breakdown
   };
 }

@@ -1466,24 +1466,39 @@ export type Database = {
           created_at: string | null
           free_above: number | null
           id: string
+          max_items: number | null
+          max_weight: number | null
           min_total: number | null
+          per_item_price: number | null
+          per_kg_price: number | null
           price: number
+          rate_type: string
           zone_id: string | null
         }
         Insert: {
           created_at?: string | null
           free_above?: number | null
           id?: string
+          max_items?: number | null
+          max_weight?: number | null
           min_total?: number | null
+          per_item_price?: number | null
+          per_kg_price?: number | null
           price: number
+          rate_type?: string
           zone_id?: string | null
         }
         Update: {
           created_at?: string | null
           free_above?: number | null
           id?: string
+          max_items?: number | null
+          max_weight?: number | null
           min_total?: number | null
+          per_item_price?: number | null
+          per_kg_price?: number | null
           price?: number
+          rate_type?: string
           zone_id?: string | null
         }
         Relationships: [
