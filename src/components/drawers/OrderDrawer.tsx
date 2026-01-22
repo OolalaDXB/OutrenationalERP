@@ -368,7 +368,10 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
     <>
       <div className="fixed inset-0 z-50 flex">
         <div className="absolute inset-0 bg-foreground/50" onClick={onClose} />
-        <div className="absolute right-0 top-0 bottom-0 w-full max-w-xl bg-card shadow-lg animate-slide-in-right overflow-y-auto">
+        <div 
+          className="absolute right-0 top-0 bottom-0 w-full max-w-xl bg-card shadow-lg animate-slide-in-right overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
           {/* Header */}
           <div className="sticky top-0 bg-card flex items-center justify-between p-6 border-b border-border z-10">
             <div className="flex items-center gap-3">
