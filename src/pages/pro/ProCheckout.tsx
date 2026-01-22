@@ -98,6 +98,9 @@ export function ProCheckout() {
   const vatInfo = calculateVatInfo(customer?.country, customer?.vat_number);
   const vatAmount = subtotalHT * (vatInfo.rate / 100);
 
+  // Calculate total item count for shipping
+  const totalItemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+
   // Dynamic shipping calculation based on database zones
   const calculateShipping = () => {
     if (!shippingZones || shippingZones.length === 0) {
@@ -109,7 +112,9 @@ export function ProCheckout() {
         baseCost,
         freeThreshold,
         isFree: subtotalHT >= freeThreshold,
-        finalCost: subtotalHT >= freeThreshold ? 0 : baseCost
+        finalCost: subtotalHT >= freeThreshold ? 0 : baseCost,
+        rateType: 'flat' as const,
+        breakdown: { basePrice: baseCost }
       };
     }
 
@@ -136,18 +141,43 @@ export function ProCheckout() {
         baseCost: 0,
         freeThreshold: null,
         isFree: true,
-        finalCost: 0
+        finalCost: 0,
+        rateType: 'flat' as const,
+        breakdown: { basePrice: 0 }
       };
     }
 
-    const isFree = zone.rate.free_above !== null && subtotalHT >= zone.rate.free_above;
+    const rate = zone.rate;
+    const rateType = (rate.rate_type || 'flat') as 'flat' | 'per_weight' | 'per_item' | 'combined';
+    
+    // Calculate cost based on rate type
+    let calculatedCost = rate.price; // Base price
+    const breakdown: { basePrice: number; weightPrice?: number; itemPrice?: number } = { basePrice: rate.price };
+
+    if (rateType === 'per_item' && rate.per_item_price && totalItemCount > 1) {
+      const additionalItems = totalItemCount - 1;
+      const itemPrice = additionalItems * rate.per_item_price;
+      calculatedCost = rate.price + itemPrice;
+      breakdown.itemPrice = itemPrice;
+    } else if (rateType === 'combined') {
+      // For combined, we only use per_item for now (weight would need product weight data)
+      if (rate.per_item_price && totalItemCount > 1) {
+        breakdown.itemPrice = (totalItemCount - 1) * rate.per_item_price;
+        calculatedCost = rate.price + breakdown.itemPrice;
+      }
+    }
+    // Note: per_weight would need total weight from products, not implemented here
+
+    const isFree = rate.free_above !== null && subtotalHT >= rate.free_above;
 
     return {
       zoneName: zone.name,
-      baseCost: zone.rate.price,
-      freeThreshold: zone.rate.free_above,
+      baseCost: calculatedCost,
+      freeThreshold: rate.free_above,
       isFree,
-      finalCost: isFree ? 0 : zone.rate.price
+      finalCost: isFree ? 0 : calculatedCost,
+      rateType,
+      breakdown
     };
   };
 

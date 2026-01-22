@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Truck, Edit, Check, X, Plus, Trash2, Loader2, Globe } from "lucide-react";
+import { Truck, Edit, X, Plus, Trash2, Loader2, Globe, Scale, Package, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +22,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
   useShippingZonesWithRates,
@@ -58,6 +65,13 @@ const COMMON_COUNTRIES = [
   { code: 'AU', name: 'Australie' },
 ];
 
+const RATE_TYPE_OPTIONS = [
+  { value: 'flat', label: 'Forfaitaire', icon: Package, description: 'Prix fixe par commande' },
+  { value: 'per_weight', label: 'Par poids', icon: Scale, description: 'Prix de base + prix/kg' },
+  { value: 'per_item', label: 'Par article', icon: Layers, description: 'Prix de base + prix/article supplémentaire' },
+  { value: 'combined', label: 'Combiné', icon: Truck, description: 'Prix de base + poids + articles' },
+];
+
 function ZoneEditDialog({ 
   zone, 
   onClose 
@@ -71,6 +85,11 @@ function ZoneEditDialog({
   
   const [price, setPrice] = useState(zone.rate?.price?.toString() || '0');
   const [freeAbove, setFreeAbove] = useState(zone.rate?.free_above?.toString() || '');
+  const [rateType, setRateType] = useState<'flat' | 'per_weight' | 'per_item' | 'combined'>(
+    (zone.rate?.rate_type as any) || 'flat'
+  );
+  const [perKgPrice, setPerKgPrice] = useState(zone.rate?.per_kg_price?.toString() || '');
+  const [perItemPrice, setPerItemPrice] = useState(zone.rate?.per_item_price?.toString() || '');
   const [countries, setCountries] = useState<string[]>(zone.countries);
   const [newCountry, setNewCountry] = useState('');
 
@@ -80,7 +99,10 @@ function ZoneEditDialog({
       await updateRate.mutateAsync({
         zoneId: zone.id,
         price: parseFloat(price) || 0,
-        freeAbove: freeAbove ? parseFloat(freeAbove) : null
+        freeAbove: freeAbove ? parseFloat(freeAbove) : null,
+        rateType,
+        perKgPrice: perKgPrice ? parseFloat(perKgPrice) : null,
+        perItemPrice: perItemPrice ? parseFloat(perItemPrice) : null,
       });
 
       // Update countries if changed
@@ -110,18 +132,43 @@ function ZoneEditDialog({
   };
 
   const isWildcard = countries.includes('*');
+  const showPerKg = rateType === 'per_weight' || rateType === 'combined';
+  const showPerItem = rateType === 'per_item' || rateType === 'combined';
 
   return (
-    <DialogContent className="max-w-lg">
+    <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle>Modifier la zone "{zone.name}"</DialogTitle>
       </DialogHeader>
       
       <div className="space-y-6 py-4">
-        {/* Rate settings */}
+        {/* Rate Type */}
+        <div>
+          <Label className="text-sm text-muted-foreground mb-2 block">Type de tarification</Label>
+          <Select value={rateType} onValueChange={(v) => setRateType(v as any)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {RATE_TYPE_OPTIONS.map(opt => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  <div className="flex items-center gap-2">
+                    <opt.icon className="w-4 h-4" />
+                    <span>{opt.label}</span>
+                    <span className="text-xs text-muted-foreground ml-1">({opt.description})</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Base Rate settings */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label className="text-sm text-muted-foreground">Tarif de base (€)</Label>
+            <Label className="text-sm text-muted-foreground">
+              {rateType === 'flat' ? 'Tarif fixe (€)' : 'Tarif de base (€)'}
+            </Label>
             <Input
               type="number"
               step="0.01"
@@ -144,6 +191,53 @@ function ZoneEditDialog({
             />
           </div>
         </div>
+
+        {/* Per kg pricing */}
+        {showPerKg && (
+          <div className="p-3 bg-muted/50 rounded-lg">
+            <Label className="text-sm font-medium flex items-center gap-2 mb-2">
+              <Scale className="w-4 h-4" />
+              Tarification au poids
+            </Label>
+            <div>
+              <Label className="text-xs text-muted-foreground">Prix par kg (€)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={perKgPrice}
+                onChange={(e) => setPerKgPrice(e.target.value)}
+                placeholder="Ex: 2.50"
+                className="mt-1"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Per item pricing */}
+        {showPerItem && (
+          <div className="p-3 bg-muted/50 rounded-lg">
+            <Label className="text-sm font-medium flex items-center gap-2 mb-2">
+              <Layers className="w-4 h-4" />
+              Tarification par article
+            </Label>
+            <div>
+              <Label className="text-xs text-muted-foreground">Prix par article supplémentaire (€)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={perItemPrice}
+                onChange={(e) => setPerItemPrice(e.target.value)}
+                placeholder="Ex: 1.00"
+                className="mt-1"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Le premier article est inclus dans le tarif de base
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Countries */}
         {!isWildcard && (
@@ -447,11 +541,38 @@ export function ShippingSection() {
                 )}
 
                 {/* Rate info */}
-                <div className="flex items-center gap-4 text-sm">
+                <div className="flex flex-wrap items-center gap-4 text-sm">
+                  {/* Rate type badge */}
+                  {zone.rate?.rate_type && zone.rate.rate_type !== 'flat' && (
+                    <Badge variant="outline" className="text-xs">
+                      {zone.rate.rate_type === 'per_weight' && <Scale className="w-3 h-3 mr-1" />}
+                      {zone.rate.rate_type === 'per_item' && <Layers className="w-3 h-3 mr-1" />}
+                      {zone.rate.rate_type === 'combined' && <Truck className="w-3 h-3 mr-1" />}
+                      {zone.rate.rate_type === 'per_weight' && 'Poids'}
+                      {zone.rate.rate_type === 'per_item' && 'Articles'}
+                      {zone.rate.rate_type === 'combined' && 'Combiné'}
+                    </Badge>
+                  )}
+                  
                   <div>
-                    <span className="text-muted-foreground">Tarif: </span>
+                    <span className="text-muted-foreground">Base: </span>
                     <span className="font-medium">{zone.rate?.price || 0} €</span>
                   </div>
+                  
+                  {zone.rate?.per_kg_price && (
+                    <div>
+                      <span className="text-muted-foreground">+ </span>
+                      <span className="font-medium">{zone.rate.per_kg_price} €/kg</span>
+                    </div>
+                  )}
+                  
+                  {zone.rate?.per_item_price && (
+                    <div>
+                      <span className="text-muted-foreground">+ </span>
+                      <span className="font-medium">{zone.rate.per_item_price} €/art. suppl.</span>
+                    </div>
+                  )}
+                  
                   {zone.rate?.free_above && (
                     <div>
                       <span className="text-muted-foreground">Franco: </span>
@@ -532,11 +653,20 @@ export function ShippingSection() {
       </div>
 
       {/* Help text */}
-      <div className="p-4 bg-muted/50 rounded-lg text-sm text-muted-foreground">
+      <div className="p-4 bg-muted/50 rounded-lg text-sm text-muted-foreground space-y-2">
         <p>
           <strong>Comment ça marche :</strong> Lors du checkout, le pays du client est comparé aux zones dans l'ordre. 
           La première zone correspondante définit le tarif. La zone "Monde" (avec *) sert de fallback pour les pays non couverts.
         </p>
+        <p>
+          <strong>Types de tarification :</strong>
+        </p>
+        <ul className="list-disc list-inside space-y-1 ml-2">
+          <li><strong>Forfaitaire</strong> : Prix fixe par commande</li>
+          <li><strong>Par poids</strong> : Prix de base + prix par kg</li>
+          <li><strong>Par article</strong> : Prix de base + prix par article supplémentaire</li>
+          <li><strong>Combiné</strong> : Prix de base + poids + articles supplémentaires</li>
+        </ul>
       </div>
     </div>
   );
