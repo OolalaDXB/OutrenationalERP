@@ -1,104 +1,21 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Trash2, Minus, Plus, ShoppingBag, AlertCircle, Loader2, ArrowLeft } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Trash2, Minus, Plus, ShoppingBag, AlertCircle, ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useProAuth } from "@/hooks/useProAuth";
 import { useCart } from "@/hooks/useCart";
-import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/format";
-import { toast } from "@/hooks/use-toast";
 
 const MIN_ORDER_AMOUNT = 100;
 
 export function ProCart() {
-  const navigate = useNavigate();
   const { customer } = useProAuth();
   const { items, updateQuantity, removeItem, clearCart, getTotal, getSubtotal } = useCart();
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const discountRate = customer?.discount_rate || 0;
   const subtotal = getSubtotal();
   const discountAmount = subtotal * (discountRate / 100);
   const total = getTotal(discountRate);
   const canOrder = total >= MIN_ORDER_AMOUNT;
-
-  const handleSubmitOrder = async () => {
-    if (!customer || !canOrder) return;
-
-    setIsSubmitting(true);
-    try {
-      // Generate order number
-      const orderNumber = `PRO-${Date.now().toString(36).toUpperCase()}`;
-
-      // Create order
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          order_number: orderNumber,
-          customer_id: customer.id,
-          customer_email: customer.email,
-          customer_name: customer.company_name || `${customer.first_name || ''} ${customer.last_name || ''}`.trim(),
-          subtotal: subtotal,
-          discount_amount: discountAmount,
-          total: total,
-          status: 'pending',
-          payment_status: 'pending',
-          source: 'pro_portal',
-          shipping_address: customer.address,
-          shipping_address_line_2: customer.address_line_2,
-          shipping_city: customer.city,
-          shipping_postal_code: customer.postal_code,
-          shipping_country: customer.country,
-          shipping_phone: customer.phone,
-          internal_notes: `Commande Pro - Remise ${discountRate}%`
-        })
-        .select()
-        .single();
-
-      if (orderError) throw orderError;
-
-      // Create order items
-      const orderItems = items.map(item => ({
-        order_id: order.id,
-        product_id: item.product.id,
-        title: item.product.title,
-        artist_name: item.product.artist_name,
-        sku: item.product.sku,
-        format: item.product.format,
-        image_url: item.product.image_url,
-        quantity: item.quantity,
-        unit_price: item.product.selling_price * (1 - discountRate / 100),
-        total_price: item.product.selling_price * item.quantity * (1 - discountRate / 100),
-        supplier_id: item.product.supplier_id,
-        supplier_name: item.product.supplier_name
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems);
-
-      if (itemsError) throw itemsError;
-
-      // Clear cart
-      clearCart();
-
-      toast({
-        title: "Commande passée !",
-        description: `Votre commande ${orderNumber} a été enregistrée.`
-      });
-
-      navigate('/pro/orders');
-    } catch (error) {
-      console.error('Order error:', error);
-      toast({
-        title: "Erreur",
-        description: "Impossible de passer la commande. Veuillez réessayer.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   if (items.length === 0) {
     return (
@@ -237,19 +154,16 @@ export function ProCart() {
               </div>
             )}
 
-            <Button 
-              className="w-full" 
-              size="lg"
-              disabled={!canOrder || isSubmitting}
-              onClick={handleSubmitOrder}
-            >
-              {isSubmitting ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <ShoppingBag className="w-4 h-4 mr-2" />
-              )}
-              Passer commande
-            </Button>
+            <Link to="/pro/checkout">
+              <Button 
+                className="w-full" 
+                size="lg"
+                disabled={!canOrder}
+              >
+                <ArrowRight className="w-4 h-4 mr-2" />
+                Passer à la caisse
+              </Button>
+            </Link>
 
             <p className="text-xs text-muted-foreground text-center">
               Paiement à {customer?.payment_terms || 30} jours
