@@ -29,18 +29,38 @@ export function StatusBadge({ variant, children }: StatusBadgeProps) {
 // Utility maps for common statuses
 export const orderStatusVariant: Record<string, BadgeVariant> = {
   pending: "warning",
-  processing: "info",
-  shipped: "primary",
+  confirmed: "info",
+  processing: "primary",
+  shipped: "info",
   delivered: "success",
   cancelled: "danger",
+  refunded: "danger",
 };
 
 export const orderStatusLabel: Record<string, string> = {
   pending: "En attente",
+  confirmed: "Confirmée",
   processing: "Préparation",
-  shipped: "Expédié",
-  delivered: "Livré",
-  cancelled: "Annulé",
+  shipped: "Expédiée",
+  delivered: "Livrée",
+  cancelled: "Annulée",
+  refunded: "Remboursée",
+};
+
+export const paymentStatusVariant: Record<string, BadgeVariant> = {
+  pending: "warning",
+  paid: "success",
+  partial: "info",
+  refunded: "danger",
+  failed: "danger",
+};
+
+export const paymentStatusLabel: Record<string, string> = {
+  pending: "En attente",
+  paid: "Payé",
+  partial: "Partiel",
+  refunded: "Remboursé",
+  failed: "Échoué",
 };
 
 export const supplierTypeVariant: Record<string, BadgeVariant> = {

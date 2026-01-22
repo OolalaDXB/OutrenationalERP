@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { FileText, Package, Loader2, ChevronDown, ChevronUp, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { generateProPurchaseOrderPDF, downloadProPurchaseOrder } from "@/components/pro/ProPurchaseOrderPDF";
-import { StatusBadge, orderStatusVariant, orderStatusLabel } from "@/components/ui/status-badge";
+import { StatusBadge, orderStatusVariant, orderStatusLabel, paymentStatusVariant, paymentStatusLabel } from "@/components/ui/status-badge";
 import { OrderProgressTracker } from "@/components/pro/OrderProgressTracker";
 import { useProAuth } from "@/hooks/useProAuth";
 import { useSettings } from "@/hooks/useSettings";
@@ -139,13 +139,20 @@ export function ProOrders() {
                   </div>
 
                   <div className="flex items-center gap-4">
-                    <div className="text-right">
+                    <div className="text-right space-y-1">
                       <p className="font-semibold">{formatCurrency(order.total)}</p>
-                      {order.status && (
-                        <StatusBadge variant={orderStatusVariant[order.status]}>
-                          {orderStatusLabel[order.status]}
-                        </StatusBadge>
-                      )}
+                      <div className="flex items-center gap-2 justify-end flex-wrap">
+                        {order.status && (
+                          <StatusBadge variant={orderStatusVariant[order.status]}>
+                            {orderStatusLabel[order.status]}
+                          </StatusBadge>
+                        )}
+                        {order.payment_status && (
+                          <StatusBadge variant={paymentStatusVariant[order.payment_status]}>
+                            {paymentStatusLabel[order.payment_status]}
+                          </StatusBadge>
+                        )}
+                      </div>
                     </div>
                     <Button
                       variant="outline"
