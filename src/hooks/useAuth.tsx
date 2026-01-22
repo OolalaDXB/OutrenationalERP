@@ -109,21 +109,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setTimeout(async () => {
             if (!mountedRef.current) return;
             
-            const [role, isProCustomer] = await Promise.all([
-              fetchUserRole(newSession.user.id),
-              checkIsProCustomer(newSession.user.id)
-            ]);
+            const role = await fetchUserRole(newSession.user.id);
             
-            // SECURITY: Block Pro customers from accessing ERP backoffice
-            if (isProCustomer) {
-              console.warn('Pro customer attempted to access ERP backoffice');
-              toast.error('Accès réservé au personnel', {
-                description: 'Utilisez le portail Pro pour accéder à votre espace client.',
-              });
-              await supabase.auth.signOut();
-              // Redirect to Pro login
-              window.location.href = '/pro/login';
-              return;
+            // SECURITY: If user has NO ERP role (viewer is the default/fallback),
+            // check if they're a Pro customer and block them
+            const hasErpRole = role === 'admin' || role === 'staff';
+            
+            if (!hasErpRole) {
+              // Only check for Pro customer if they don't have an explicit ERP role
+              const isProCustomer = await checkIsProCustomer(newSession.user.id);
+              
+              if (isProCustomer) {
+                console.warn('Pro customer attempted to access ERP backoffice');
+                toast.error('Accès réservé au personnel', {
+                  description: 'Utilisez le portail Pro pour accéder à votre espace client.',
+                });
+                await supabase.auth.signOut();
+                window.location.href = '/pro/login';
+                return;
+              }
             }
             
             if (mountedRef.current) {
