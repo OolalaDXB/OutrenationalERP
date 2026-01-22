@@ -80,6 +80,7 @@ export function CustomersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [countryFilter, setCountryFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [approvalFilter, setApprovalFilter] = useState("all");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   
@@ -125,10 +126,18 @@ export function CustomersPage() {
 
       const matchesCountry = countryFilter === "all" || customer.country === countryFilter;
       const matchesType = typeFilter === "all" || customer.customer_type === typeFilter;
+      
+      // Approval filter for professional customers
+      let matchesApproval = true;
+      if (approvalFilter === "pending") {
+        matchesApproval = customer.customer_type === 'professional' && customer.approved === false;
+      } else if (approvalFilter === "approved") {
+        matchesApproval = customer.customer_type === 'professional' && customer.approved === true;
+      }
 
-      return matchesSearch && matchesCountry && matchesType;
+      return matchesSearch && matchesCountry && matchesType && matchesApproval;
     });
-  }, [customers, searchTerm, countryFilter, typeFilter]);
+  }, [customers, searchTerm, countryFilter, typeFilter, approvalFilter]);
 
   // Filter deleted customers
   const filteredDeletedCustomers = useMemo(() => {
@@ -215,7 +224,15 @@ export function CustomersPage() {
         (customer.city && customer.city.toLowerCase().includes(searchTerm.toLowerCase()));
       const matchesCountry = countryFilter === "all" || customer.country === countryFilter;
       const matchesType = typeFilter === "all" || customer.customer_type === typeFilter;
-      return matchesSearch && matchesCountry && matchesType;
+      
+      let matchesApproval = true;
+      if (approvalFilter === "pending") {
+        matchesApproval = customer.customer_type === 'professional' && customer.approved === false;
+      } else if (approvalFilter === "approved") {
+        matchesApproval = customer.customer_type === 'professional' && customer.approved === true;
+      }
+      
+      return matchesSearch && matchesCountry && matchesType && matchesApproval;
     });
     
     if (dataToExport.length === 0) {
@@ -248,7 +265,7 @@ export function CustomersPage() {
     URL.revokeObjectURL(url);
 
     toast({ title: "Export réussi", description: `${dataToExport.length} client(s) exporté(s)` });
-  }, [allCustomers, searchTerm, countryFilter, typeFilter, toast]);
+  }, [allCustomers, searchTerm, countryFilter, typeFilter, approvalFilter, toast]);
 
   if (isLoading) {
     return (
@@ -337,6 +354,15 @@ export function CustomersPage() {
                 <option value="all">Tous les types</option>
                 <option value="particulier">Particuliers</option>
                 <option value="professionnel">Professionnels</option>
+              </select>
+              <select
+                className="px-3 py-2 rounded-md border border-border bg-card text-sm cursor-pointer"
+                value={approvalFilter}
+                onChange={(e) => setApprovalFilter(e.target.value)}
+              >
+                <option value="all">Tous statuts</option>
+                <option value="pending">⏳ En attente d'approbation</option>
+                <option value="approved">✅ Approuvés</option>
               </select>
               <select
                 className="px-3 py-2 rounded-md border border-border bg-card text-sm cursor-pointer"
