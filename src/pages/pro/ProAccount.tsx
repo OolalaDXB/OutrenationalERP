@@ -1,11 +1,15 @@
 import { useState, useEffect } from "react";
-import { User, Building2, MapPin, Lock, Loader2, Save, Check, Globe } from "lucide-react";
+import { Link } from "react-router-dom";
+import { User, Building2, MapPin, Lock, Loader2, Save, Check, Globe, Receipt, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { useProAuth } from "@/hooks/useProAuth";
+import { useRecentProInvoices } from "@/hooks/useProInvoices";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { formatCurrency, formatDate } from "@/lib/format";
 
 const CURRENCIES = [
   { code: 'EUR', label: 'Euro (€)', flag: '🇪🇺' },
@@ -15,6 +19,7 @@ const CURRENCIES = [
 
 export function ProAccount() {
   const { customer, refreshCustomer } = useProAuth();
+  const { data: recentInvoices = [], isLoading: invoicesLoading } = useRecentProInvoices(3);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isUpdatingPreferences, setIsUpdatingPreferences] = useState(false);
@@ -169,6 +174,56 @@ export function ProAccount() {
         <p className="text-xs text-muted-foreground mt-4">
           Pour modifier ces informations, contactez notre équipe commerciale.
         </p>
+      </div>
+
+      {/* Recent Invoices Summary */}
+      <div className="bg-card rounded-xl border border-border p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <Receipt className="w-5 h-5 text-muted-foreground" />
+            <h2 className="font-semibold">Factures récentes</h2>
+          </div>
+          <Link to="/pro/invoices">
+            <Button variant="ghost" size="sm" className="gap-1.5">
+              Voir tout
+              <ArrowRight className="w-4 h-4" />
+            </Button>
+          </Link>
+        </div>
+
+        {invoicesLoading ? (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : recentInvoices.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            Aucune facture disponible
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {recentInvoices.map(invoice => (
+              <div 
+                key={invoice.id}
+                className="flex items-center justify-between py-2 border-b border-border last:border-0"
+              >
+                <div>
+                  <p className="font-medium text-sm">{invoice.invoice_number}</p>
+                  <p className="text-xs text-muted-foreground">{formatDate(invoice.issue_date)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-medium text-sm tabular-nums">
+                    {formatCurrency(invoice.total, invoice.currency || 'EUR')}
+                  </p>
+                  {invoice.status === 'paid' ? (
+                    <Badge className="bg-success/10 text-success border-success text-xs">Payée</Badge>
+                  ) : (
+                    <Badge className="bg-warning/10 text-warning border-warning text-xs">En attente</Badge>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Preferences */}
