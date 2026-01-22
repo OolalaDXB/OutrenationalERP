@@ -269,6 +269,20 @@ export function useCancelOrder() {
         .select()
         .single();
       if (error) throw error;
+      
+      // Cancel any linked invoice (don't delete it, just mark as cancelled)
+      const { error: invoiceError } = await supabase
+        .from('invoices')
+        .update({
+          status: 'cancelled',
+          updated_at: new Date().toISOString()
+        })
+        .eq('order_id', id);
+      
+      if (invoiceError) {
+        console.warn('Could not cancel linked invoice:', invoiceError);
+      }
+      
       return data;
     },
     onSuccess: (_, variables) => {
@@ -276,6 +290,7 @@ export function useCancelOrder() {
       queryClient.invalidateQueries({ queryKey: ['orders', variables.id] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['stock_movements'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
     }
   });
 }
