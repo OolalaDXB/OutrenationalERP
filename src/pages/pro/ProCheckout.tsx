@@ -29,10 +29,11 @@ import { useCart } from "@/hooks/useCart";
 import { useSettings } from "@/hooks/useSettings";
 import { useActivePaymentMethodsForCurrency, type PaymentMethod } from "@/hooks/usePaymentMethods";
 import { useDefaultBankAccount } from "@/hooks/useBankAccounts";
+import { useShippingZonesWithRates } from "@/hooks/useShippingRates";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
-import { calculateVatInfo, calculateShippingInfo } from "@/lib/vat-shipping-utils";
+import { calculateVatInfo } from "@/lib/vat-shipping-utils";
 
 const MIN_ORDER_AMOUNT = 100;
 
@@ -57,6 +58,7 @@ export function ProCheckout() {
   const { customer } = useProAuth();
   const { items, clearCart, getSubtotal } = useCart();
   const { data: settings } = useSettings();
+  const { data: shippingZones } = useShippingZonesWithRates();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedAddress, setCopiedAddress] = useState(false);
   
@@ -96,8 +98,60 @@ export function ProCheckout() {
   const vatInfo = calculateVatInfo(customer?.country, customer?.vat_number);
   const vatAmount = subtotalHT * (vatInfo.rate / 100);
 
-  // Shipping calculation
-  const shippingInfo = calculateShippingInfo(customer?.country, subtotalHT);
+  // Dynamic shipping calculation based on database zones
+  const calculateShipping = () => {
+    if (!shippingZones || shippingZones.length === 0) {
+      // Fallback to hardcoded values
+      const baseCost = 15;
+      const freeThreshold = 250;
+      return {
+        zoneName: 'Standard',
+        baseCost,
+        freeThreshold,
+        isFree: subtotalHT >= freeThreshold,
+        finalCost: subtotalHT >= freeThreshold ? 0 : baseCost
+      };
+    }
+
+    const customerCountry = (customer?.country || '').trim().toUpperCase();
+    
+    // Find matching zone
+    let matchedZone = null;
+    let fallbackZone = null;
+
+    for (const zone of shippingZones) {
+      if (zone.countries.includes('*')) {
+        fallbackZone = zone;
+      } else if (zone.countries.some(c => c.toUpperCase() === customerCountry)) {
+        matchedZone = zone;
+        break;
+      }
+    }
+
+    const zone = matchedZone || fallbackZone;
+
+    if (!zone || !zone.rate) {
+      return {
+        zoneName: 'Standard',
+        baseCost: 0,
+        freeThreshold: null,
+        isFree: true,
+        finalCost: 0
+      };
+    }
+
+    const isFree = zone.rate.free_above !== null && subtotalHT >= zone.rate.free_above;
+
+    return {
+      zoneName: zone.name,
+      baseCost: zone.rate.price,
+      freeThreshold: zone.rate.free_above,
+      isFree,
+      finalCost: isFree ? 0 : zone.rate.price
+    };
+  };
+
+  const shippingInfo = calculateShipping();
   const shippingCost = shippingInfo.finalCost;
 
   // Totals
@@ -330,9 +384,7 @@ export function ProCheckout() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-medium">
-                    {shippingInfo.zone === 'france' && 'Livraison France'}
-                    {shippingInfo.zone === 'eu' && 'Livraison Europe'}
-                    {shippingInfo.zone === 'world' && 'Livraison internationale'}
+                    Livraison {shippingInfo.zoneName}
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {customer?.city}, {customer?.country}
@@ -349,9 +401,11 @@ export function ProCheckout() {
                   ) : (
                     <div>
                       <span className="font-medium">{formatCurrency(shippingCost)}</span>
-                      <p className="text-xs text-muted-foreground">
-                        Gratuit dès {formatCurrency(shippingInfo.freeThreshold)} HT
-                      </p>
+                      {shippingInfo.freeThreshold && (
+                        <p className="text-xs text-muted-foreground">
+                          Gratuit dès {formatCurrency(shippingInfo.freeThreshold)} HT
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
