@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Plus, Loader2, Building2, MoreHorizontal, Pencil, Trash2, RotateCcw } from "lucide-react";
+import { Plus, Loader2, Building2, MoreHorizontal, Pencil, Trash2, RotateCcw, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,6 +16,7 @@ import {
   useDeletedCustomers,
   useRestoreCustomer,
   usePermanentDeleteCustomer,
+  useUpdateCustomer,
   type Customer 
 } from "@/hooks/useCustomers";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -73,6 +74,7 @@ export function CustomersPage() {
   const deleteCustomer = useDeleteCustomer();
   const restoreCustomer = useRestoreCustomer();
   const permanentDeleteCustomer = usePermanentDeleteCustomer();
+  const updateCustomer = useUpdateCustomer();
   
   const [showForm, setShowForm] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -230,6 +232,16 @@ export function CustomersPage() {
       toast({ title: "Erreur", description: "Impossible de supprimer le client", variant: "destructive" });
     } finally {
       setPermanentDeleteDialog(null);
+    }
+  };
+
+  const handleQuickApprove = async (customer: Customer) => {
+    try {
+      await updateCustomer.mutateAsync({ id: customer.id, approved: true });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      toast({ title: "Succès", description: `${customer.company_name || customer.email} approuvé` });
+    } catch (error) {
+      toast({ title: "Erreur", description: "Impossible d'approuver le client", variant: "destructive" });
     }
   };
 
@@ -537,6 +549,15 @@ export function CustomersPage() {
                               </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="bg-popover">
+                              {isPendingApproval && (
+                                <DropdownMenuItem 
+                                  onClick={() => handleQuickApprove(customer)}
+                                  className="text-success focus:text-success"
+                                >
+                                  <CheckCircle className="w-4 h-4 mr-2" />
+                                  Approuver
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem onClick={() => handleEdit(customer)}>
                                 <Pencil className="w-4 h-4 mr-2" />
                                 Modifier
