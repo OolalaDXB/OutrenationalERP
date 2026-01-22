@@ -1,10 +1,10 @@
 // Utility functions for formatting
 
-export function formatCurrency(amount: number | null | undefined): string {
+export function formatCurrency(amount: number | null | undefined, currency: string = 'EUR'): string {
   if (amount === null || amount === undefined) return '—';
   return new Intl.NumberFormat('fr-FR', { 
     style: 'currency', 
-    currency: 'EUR' 
+    currency: currency 
   }).format(amount);
 }
 

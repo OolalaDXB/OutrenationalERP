@@ -29,19 +29,12 @@ interface OrderDocumentsDialogProps {
 export function OrderDocumentsDialog({ order, isOpen, onClose }: OrderDocumentsDialogProps) {
   const { data: settings } = useSettings();
   const isProOrder = useMemo(() => order.source === "pro_portal", [order.source]);
-  const [activeTab, setActiveTab] = useState<"invoice" | "purchase_order" | "shipping">(
-    isProOrder ? "purchase_order" : "invoice"
-  );
+  const [activeTab, setActiveTab] = useState<"invoice" | "purchase_order" | "shipping">("invoice");
   const [isGenerating, setIsGenerating] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // Keep active tab consistent when switching between pro/non-pro orders
-  // (e.g., user opens a different order without unmounting the dialog)
+  // Reset tab when switching between orders - always start on invoice
   useEffect(() => {
-    if (isProOrder && activeTab === "invoice") {
-      setActiveTab("purchase_order");
-      setPreviewUrl(null);
-    }
     if (!isProOrder && activeTab === "purchase_order") {
       setActiveTab("invoice");
       setPreviewUrl(null);
@@ -198,16 +191,15 @@ export function OrderDocumentsDialog({ order, isOpen, onClose }: OrderDocumentsD
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 flex flex-col min-h-0">
-          <TabsList className={isProOrder ? "grid w-full grid-cols-2" : "grid w-full grid-cols-2"}>
-            {isProOrder ? (
+          <TabsList className={isProOrder ? "grid w-full grid-cols-3" : "grid w-full grid-cols-2"}>
+            <TabsTrigger value="invoice" className="gap-2">
+              <FileText className="w-4 h-4" />
+              Facture
+            </TabsTrigger>
+            {isProOrder && (
               <TabsTrigger value="purchase_order" className="gap-2">
                 <FileText className="w-4 h-4" />
                 Bon de commande
-              </TabsTrigger>
-            ) : (
-              <TabsTrigger value="invoice" className="gap-2">
-                <FileText className="w-4 h-4" />
-                Facture
               </TabsTrigger>
             )}
             <TabsTrigger value="shipping" className="gap-2">
@@ -217,39 +209,37 @@ export function OrderDocumentsDialog({ order, isOpen, onClose }: OrderDocumentsD
           </TabsList>
 
           <div className="flex-1 flex flex-col min-h-0 mt-4">
-            {!isProOrder && (
-              <TabsContent value="invoice" className="flex-1 flex flex-col min-h-0 m-0">
-                <div className="flex items-center justify-between mb-4">
-                  <p className="text-sm text-muted-foreground">
-                    Générez et téléchargez la facture de cette commande avec votre logo et vos informations.
-                  </p>
-                  <div className="flex gap-2">
-                    <Button variant="outline" onClick={handlePreview} disabled={isGenerating}>
-                      {isGenerating ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <Eye className="w-4 h-4 mr-2" />
-                      )}
-                      Aperçu
-                    </Button>
-                    <Button onClick={handleDownload} disabled={isGenerating}>
-                      {isGenerating ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <Download className="w-4 h-4 mr-2" />
-                      )}
-                      Télécharger
-                    </Button>
-                  </div>
+            <TabsContent value="invoice" className="flex-1 flex flex-col min-h-0 m-0">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm text-muted-foreground">
+                  Générez et téléchargez la facture de cette commande avec votre logo et vos informations.
+                </p>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={handlePreview} disabled={isGenerating}>
+                    {isGenerating ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Eye className="w-4 h-4 mr-2" />
+                    )}
+                    Aperçu
+                  </Button>
+                  <Button onClick={handleDownload} disabled={isGenerating}>
+                    {isGenerating ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Download className="w-4 h-4 mr-2" />
+                    )}
+                    Télécharger
+                  </Button>
                 </div>
-              </TabsContent>
-            )}
+              </div>
+            </TabsContent>
 
             {isProOrder && (
               <TabsContent value="purchase_order" className="flex-1 flex flex-col min-h-0 m-0">
                 <div className="flex items-center justify-between mb-4">
                   <p className="text-sm text-muted-foreground">
-                    Générez et téléchargez le bon de commande de cette commande.
+                    Bon de commande du client Pro (document non-facturable).
                   </p>
                   <div className="flex gap-2">
                     <Button variant="outline" onClick={handlePreview} disabled={isGenerating}>
