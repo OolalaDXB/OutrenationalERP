@@ -1461,6 +1461,62 @@ export type Database = {
         }
         Relationships: []
       }
+      shipping_rates: {
+        Row: {
+          created_at: string | null
+          free_above: number | null
+          id: string
+          min_total: number | null
+          price: number
+          zone_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          free_above?: number | null
+          id?: string
+          min_total?: number | null
+          price: number
+          zone_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          free_above?: number | null
+          id?: string
+          min_total?: number | null
+          price?: number
+          zone_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shipping_rates_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "shipping_zones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shipping_zones: {
+        Row: {
+          countries: string[]
+          created_at: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          countries: string[]
+          created_at?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          countries?: string[]
+          created_at?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       stock_movements: {
         Row: {
           created_at: string | null

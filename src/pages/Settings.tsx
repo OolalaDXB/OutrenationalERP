@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Settings, Save, Loader2, Upload, Image, X, Building, FileText, CreditCard, Receipt, Palette, ToggleLeft, Database, BarChart3, Store, History, Wallet } from "lucide-react";
+import { Settings, Save, Loader2, Upload, Image, X, Building, FileText, CreditCard, Receipt, Palette, ToggleLeft, Database, BarChart3, Store, History, Wallet, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,7 @@ import { SalesChannelsSection } from "@/components/settings/SalesChannelsSection
 import { MarketplaceMappingsSection } from "@/components/settings/MarketplaceMappingsSection";
 import { ImportHistorySection } from "@/components/settings/ImportHistorySection";
 import { PaymentsSection } from "@/components/settings/PaymentsSection";
+import { ShippingSection } from "@/components/settings/ShippingSection";
 
 export function SettingsPage() {
   const { toast } = useToast();
@@ -227,6 +228,10 @@ export function SettingsPage() {
           <TabsTrigger value="payments" className="gap-2">
             <Wallet className="w-4 h-4" />
             Paiements
+          </TabsTrigger>
+          <TabsTrigger value="shipping" className="gap-2">
+            <Truck className="w-4 h-4" />
+            Livraison
           </TabsTrigger>
           <TabsTrigger value="channels" className="gap-2">
             <Store className="w-4 h-4" />
@@ -567,6 +572,11 @@ Les prix de nos produits sont indiqués en euros..."
         {/* Payments Tab */}
         <TabsContent value="payments" className="space-y-6">
           <PaymentsSection />
+        </TabsContent>
+
+        {/* Shipping Tab */}
+        <TabsContent value="shipping" className="space-y-6">
+          <ShippingSection />
         </TabsContent>
 
         {/* Sales Channels Tab */}
