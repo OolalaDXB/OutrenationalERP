@@ -179,3 +179,43 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+/* Status change animations */
+@keyframes status-pulse-success {
+  0%, 100% {
+    box-shadow: 0 0 0 0 hsl(var(--success) / 0);
+  }
+  50% {
+    box-shadow: 0 0 0 8px hsl(var(--success) / 0.3);
+  }
+}
+
+@keyframes status-pulse-warning {
+  0%, 100% {
+    box-shadow: 0 0 0 0 hsl(var(--warning) / 0);
+  }
+  50% {
+    box-shadow: 0 0 0 8px hsl(var(--warning) / 0.3);
+  }
+}
+
+@keyframes status-pulse-primary {
+  0%, 100% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0);
+  }
+  50% {
+    box-shadow: 0 0 0 8px hsl(var(--primary) / 0.3);
+  }
+}
+
+.animate-status-pulse-success {
+  animation: status-pulse-success 0.6s ease-out;
+}
+
+.animate-status-pulse-warning {
+  animation: status-pulse-warning 0.6s ease-out;
+}
+
+.animate-status-pulse-primary {
+  animation: status-pulse-primary 0.6s ease-out;
+}

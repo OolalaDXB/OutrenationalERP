@@ -1,5 +1,5 @@
-import { useState, useMemo, useCallback } from "react";
-import { X, ShoppingCart, MapPin, Truck, Clock, Package, Pencil, Trash2, Loader2, CreditCard, Copy, FileText, ExternalLink, Printer, RotateCcw, Ban, Edit3, CheckCircle, AlertTriangle, RefreshCcw } from "lucide-react";
+import { useState, useMemo, useCallback, useEffect, useRef, memo } from "react";
+import { X, ShoppingCart, MapPin, Truck, Clock, Package, Pencil, Trash2, Loader2, CreditCard, Copy, FileText, ExternalLink, Printer, RotateCcw, Ban, Edit3, CheckCircle, AlertTriangle, RefreshCcw, Building2, Globe, User, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,6 +25,23 @@ import { useNavigate } from "react-router-dom";
 import { useSettings, getNextCreditNoteNumber } from "@/hooks/useSettings";
 import { generateProPurchaseOrderPDF, downloadProPurchaseOrder } from "@/components/pro/ProPurchaseOrderPDF";
 import { generateCreditNotePDF, downloadCreditNote } from "@/components/orders/CreditNotePDF";
+
+// Sales channel icon mapping
+const SALES_CHANNEL_CONFIG: Record<string, { icon: React.ElementType; label: string }> = {
+  pro_portal: { icon: Building2, label: "Portail Pro" },
+  web: { icon: Globe, label: "Site Web" },
+  website: { icon: Globe, label: "Site Web" },
+  manual: { icon: User, label: "Saisie manuelle" },
+  discogs: { icon: ShoppingBag, label: "Discogs" },
+  ebay: { icon: ShoppingBag, label: "eBay" },
+};
+
+function getSalesChannelDisplay(source: string | null | undefined) {
+  if (!source) return { icon: ShoppingBag, label: "Non défini" };
+  const config = SALES_CHANNEL_CONFIG[source.toLowerCase()];
+  if (config) return config;
+  return { icon: ShoppingBag, label: source };
+}
 
 type OrderWithItems = Order & { order_items?: OrderItem[] };
 
@@ -94,8 +111,79 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   const [itemToEdit, setItemToEdit] = useState<OrderItem | null>(null);
   const [editQuantity, setEditQuantity] = useState(1);
 
+  // Status change animation state
+  const [statusAnimating, setStatusAnimating] = useState(false);
+  const [paymentAnimating, setPaymentAnimating] = useState(false);
+  const prevStatusRef = useRef<string | null>(null);
+  const prevPaymentRef = useRef<string | null>(null);
+
+  // Track status changes for animation
+  useEffect(() => {
+    if (currentOrder?.status && prevStatusRef.current && prevStatusRef.current !== currentOrder.status) {
+      setStatusAnimating(true);
+      const timer = setTimeout(() => setStatusAnimating(false), 600);
+      return () => clearTimeout(timer);
+    }
+    prevStatusRef.current = currentOrder?.status || null;
+  }, [currentOrder?.status]);
+
+  useEffect(() => {
+    if (currentOrder?.payment_status && prevPaymentRef.current && prevPaymentRef.current !== currentOrder.payment_status) {
+      setPaymentAnimating(true);
+      const timer = setTimeout(() => setPaymentAnimating(false), 600);
+      return () => clearTimeout(timer);
+    }
+    prevPaymentRef.current = currentOrder?.payment_status || null;
+  }, [currentOrder?.payment_status]);
+
   // Check if this is a Pro order
   const isProOrder = useMemo(() => currentOrder?.source === "pro_portal", [currentOrder?.source]);
+
+  // Memoized computed values for performance (must be before early return)
+  const timeline = useMemo(() => {
+    if (!currentOrder) return [];
+    return [
+      { status: "pending", label: "Commande reçue", date: currentOrder.created_at, active: true },
+      { status: "processing", label: "En préparation", date: currentOrder.status !== "pending" ? currentOrder.created_at : null, active: currentOrder.status !== "pending" && currentOrder.status !== "cancelled" },
+      { status: "shipped", label: "Expédiée", date: currentOrder.shipped_at || (currentOrder.tracking_number ? currentOrder.created_at : null), active: currentOrder.status === "shipped" || currentOrder.status === "delivered" },
+      { status: "delivered", label: "Livrée", date: currentOrder.delivered_at || (currentOrder.status === "delivered" ? currentOrder.created_at : null), active: currentOrder.status === "delivered" },
+    ];
+  }, [currentOrder?.created_at, currentOrder?.status, currentOrder?.shipped_at, currentOrder?.tracking_number, currentOrder?.delivered_at, currentOrder]);
+
+  const customerInitials = useMemo(() => {
+    if (!currentOrder) return '';
+    return currentOrder.customer_name 
+      ? currentOrder.customer_name.split(' ').map(n => n[0]).join('')
+      : currentOrder.customer_email[0].toUpperCase();
+  }, [currentOrder?.customer_name, currentOrder?.customer_email, currentOrder]);
+
+  const shippingAddress = useMemo(() => {
+    if (!currentOrder) return '';
+    return [
+      currentOrder.shipping_address,
+      currentOrder.shipping_address_line_2,
+      currentOrder.shipping_city,
+      currentOrder.shipping_postal_code,
+      currentOrder.shipping_country
+    ].filter(Boolean).join(', ');
+  }, [currentOrder?.shipping_address, currentOrder?.shipping_address_line_2, currentOrder?.shipping_city, currentOrder?.shipping_postal_code, currentOrder?.shipping_country, currentOrder]);
+
+  const canModifyOrder = useMemo(() => 
+    currentOrder ? currentOrder.status !== "cancelled" && currentOrder.status !== "refunded" && currentOrder.status !== "delivered" : false
+  , [currentOrder?.status, currentOrder]);
+  
+  // Memoized order items calculations
+  const { activeItems, orderSubtotal, orderTotal } = useMemo(() => {
+    if (!currentOrder) return { activeItems: [], orderSubtotal: 0, orderTotal: 0 };
+    const items = currentOrder.order_items || [];
+    const active = items.filter(item => item.status === 'active');
+    const subtotal = active.reduce((sum, item) => sum + item.total_price, 0);
+    return {
+      activeItems: active,
+      orderSubtotal: subtotal,
+      orderTotal: currentOrder.total
+    };
+  }, [currentOrder?.order_items, currentOrder?.total, currentOrder]);
 
   const handleViewInvoice = () => {
     onClose();
@@ -429,26 +517,6 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
 
   if (!isOpen || !order) return null;
 
-  const timeline = [
-    { status: "pending", label: "Commande reçue", date: currentOrder.created_at, active: true },
-    { status: "processing", label: "En préparation", date: currentOrder.status !== "pending" ? currentOrder.created_at : null, active: currentOrder.status !== "pending" && currentOrder.status !== "cancelled" },
-    { status: "shipped", label: "Expédiée", date: currentOrder.shipped_at || (currentOrder.tracking_number ? currentOrder.created_at : null), active: currentOrder.status === "shipped" || currentOrder.status === "delivered" },
-    { status: "delivered", label: "Livrée", date: currentOrder.delivered_at || (currentOrder.status === "delivered" ? currentOrder.created_at : null), active: currentOrder.status === "delivered" },
-  ];
-
-  const customerInitials = currentOrder.customer_name 
-    ? currentOrder.customer_name.split(' ').map(n => n[0]).join('')
-    : currentOrder.customer_email[0].toUpperCase();
-
-  const shippingAddress = [
-    currentOrder.shipping_address,
-    currentOrder.shipping_address_line_2,
-    currentOrder.shipping_city,
-    currentOrder.shipping_postal_code,
-    currentOrder.shipping_country
-  ].filter(Boolean).join(', ');
-
-  const canModifyOrder = currentOrder.status !== "cancelled" && currentOrder.status !== "refunded" && currentOrder.status !== "delivered";
   const isUpdating = updateOrder.isPending || cancelOrder.isPending || isGeneratingInvoice;
   
   // Show quick actions only if order can be confirmed or marked as paid
@@ -479,7 +547,19 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-muted-foreground">{formatDateTime(currentOrder.created_at)}</p>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>{formatDateTime(currentOrder.created_at)}</span>
+                  {currentOrder.source && (() => {
+                    const channelDisplay = getSalesChannelDisplay(currentOrder.source);
+                    const ChannelIcon = channelDisplay.icon;
+                    return (
+                      <span className="inline-flex items-center gap-1 text-xs bg-secondary px-2 py-0.5 rounded">
+                        <ChannelIcon className="w-3 h-3" />
+                        {channelDisplay.label}
+                      </span>
+                    );
+                  })()}
+                </div>
               </div>
             </div>
             <button onClick={onClose} className="p-2 rounded-lg hover:bg-secondary transition-colors">
@@ -585,7 +665,11 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
                       onValueChange={handleStatusChange}
                       disabled={isUpdating}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className={statusAnimating ? (
+                        ['confirmed', 'shipped', 'delivered'].includes(currentOrder.status || '') 
+                          ? 'animate-status-pulse-success' 
+                          : 'animate-status-pulse-primary'
+                      ) : ''}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -607,7 +691,11 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
                       onValueChange={handlePaymentStatusChange}
                       disabled={isUpdating}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className={paymentAnimating ? (
+                        currentOrder.payment_status === 'paid' 
+                          ? 'animate-status-pulse-success' 
+                          : 'animate-status-pulse-warning'
+                      ) : ''}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>

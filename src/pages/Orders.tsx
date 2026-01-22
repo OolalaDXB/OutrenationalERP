@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ShoppingCart, Package, Truck, CheckCircle, Plus, Loader2, X, MoreHorizontal, Trash2, History, RotateCcw } from "lucide-react";
+import { ShoppingCart, Package, Truck, CheckCircle, Plus, Loader2, X, MoreHorizontal, Trash2, History, RotateCcw, Building2, Globe, User, ShoppingBag } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { StatusBadge, orderStatusVariant, orderStatusLabel, paymentStatusVariant, paymentStatusLabel } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
@@ -50,6 +50,17 @@ import {
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
+// Sales channel filter options
+const SALES_CHANNEL_FILTERS = [
+  { value: "", label: "Tous les canaux", icon: null },
+  { value: "pro_portal", label: "Portail Pro", icon: Building2 },
+  { value: "web", label: "Site Web", icon: Globe },
+  { value: "website", label: "Site Web", icon: Globe },
+  { value: "manual", label: "Saisie manuelle", icon: User },
+  { value: "discogs", label: "Discogs", icon: ShoppingBag },
+  { value: "ebay", label: "eBay", icon: ShoppingBag },
+];
+
 const ALL_STATUSES = [
   { value: "pending", label: "En attente" },
   { value: "confirmed", label: "Confirmée" },
@@ -94,7 +105,7 @@ export function OrdersPage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
-  const [selectedSource, setSelectedSource] = useState<string>("");
+  const [selectedChannel, setSelectedChannel] = useState<string>("");
   
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -141,12 +152,13 @@ export function OrdersPage() {
       const matchesStatus = selectedStatuses.length === 0 || 
         (order.status && selectedStatuses.includes(order.status));
 
-      const matchesSource = selectedSource === "" ||
-        (order.source && order.source.toLowerCase() === selectedSource.toLowerCase());
+      // Match by sales channel (source field)
+      const matchesChannel = selectedChannel === "" ||
+        (order.source && order.source.toLowerCase() === selectedChannel.toLowerCase());
 
-      return matchesSearch && matchesStatus && matchesSource;
+      return matchesSearch && matchesStatus && matchesChannel;
     });
-  }, [orders, searchTerm, selectedStatuses, selectedSource]);
+  }, [orders, searchTerm, selectedStatuses, selectedChannel]);
 
   // Filter deleted orders
   const filteredDeletedOrders = useMemo(() => {
@@ -390,16 +402,15 @@ export function OrdersPage() {
                   </PopoverContent>
                 </Popover>
 
-                {/* Source Filter */}
+                {/* Sales Channel Filter */}
                 <select
-                  value={selectedSource}
-                  onChange={(e) => setSelectedSource(e.target.value)}
+                  value={selectedChannel}
+                  onChange={(e) => setSelectedChannel(e.target.value)}
                   className="px-3 py-2 rounded-md border border-border bg-card text-sm"
                 >
-                  <option value="">Toutes les sources</option>
-                  {enabledChannels.map(channel => (
-                    <option key={channel.id} value={channel.name}>
-                      {channel.name}
+                  {SALES_CHANNEL_FILTERS.map(channel => (
+                    <option key={channel.value} value={channel.value}>
+                      {channel.label}
                     </option>
                   ))}
                 </select>
