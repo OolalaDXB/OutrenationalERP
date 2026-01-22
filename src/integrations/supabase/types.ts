@@ -1257,6 +1257,7 @@ export type Database = {
           payment_terms_text: string | null
           payout_invoice_next_number: number | null
           payout_invoice_prefix: string | null
+          paypal_email: string | null
           primary_color: string | null
           sales_channels: Json | null
           shop_address: string | null
@@ -1292,6 +1293,7 @@ export type Database = {
           payment_terms_text?: string | null
           payout_invoice_next_number?: number | null
           payout_invoice_prefix?: string | null
+          paypal_email?: string | null
           primary_color?: string | null
           sales_channels?: Json | null
           shop_address?: string | null
@@ -1327,6 +1329,7 @@ export type Database = {
           payment_terms_text?: string | null
           payout_invoice_next_number?: number | null
           payout_invoice_prefix?: string | null
+          paypal_email?: string | null
           primary_color?: string | null
           sales_channels?: Json | null
           shop_address?: string | null
