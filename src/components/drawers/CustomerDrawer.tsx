@@ -1,10 +1,10 @@
 import { useState, useMemo } from "react";
-import { X, Mail, Phone, MapPin, ShoppingCart, Euro, Calendar, Pencil, Trash2, Building2, Globe, FileText, UserCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { X, Mail, Phone, MapPin, ShoppingCart, Euro, Calendar, Pencil, Trash2, Building2, Globe, FileText, UserCircle, ChevronDown, ChevronUp, CheckCircle, Clock, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, orderStatusVariant, orderStatusLabel } from "@/components/ui/status-badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import type { Customer } from "@/hooks/useCustomers";
-import { useDeleteCustomer } from "@/hooks/useCustomers";
+import { useDeleteCustomer, useUpdateCustomer } from "@/hooks/useCustomers";
 import { useOrdersWithItems } from "@/hooks/useOrders";
 import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/format";
@@ -12,6 +12,7 @@ import { toast } from "@/hooks/use-toast";
 import { CustomerFormModal } from "@/components/forms/CustomerFormModal";
 import { CustomerStatsWidget } from "@/components/customers/CustomerStatsWidget";
 import { getVatStatusLabel, isValidVatNumberFormat, type CustomerType } from "@/lib/vat-utils";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface CustomerDrawerProps {
   customer: Customer | null;
@@ -23,10 +24,13 @@ export function CustomerDrawer({ customer, isOpen, onClose }: CustomerDrawerProp
   const { data: allOrders = [] } = useOrdersWithItems();
   const { canWrite, canDelete } = useAuth();
   const deleteCustomer = useDeleteCustomer();
+  const updateCustomer = useUpdateCustomer();
+  const queryClient = useQueryClient();
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showStats, setShowStats] = useState(true);
   const [showHistory, setShowHistory] = useState(true);
+  const [isApproving, setIsApproving] = useState(false);
 
   // Commandes du client
   const customerOrders = useMemo(() => {
@@ -45,6 +49,20 @@ export function CustomerDrawer({ customer, isOpen, onClose }: CustomerDrawerProp
       onClose();
     } catch (error) {
       toast({ title: "Erreur", description: "Impossible de supprimer le client.", variant: "destructive" });
+    }
+  };
+
+  const handleApprove = async () => {
+    if (!customer) return;
+    setIsApproving(true);
+    try {
+      await updateCustomer.mutateAsync({ id: customer.id, approved: true });
+      await queryClient.invalidateQueries({ queryKey: ['customers'] });
+      toast({ title: "Client approuvé", description: `${customer.company_name || customer.email} est maintenant approuvé.` });
+    } catch (error) {
+      toast({ title: "Erreur", description: "Impossible d'approuver le client.", variant: "destructive" });
+    } finally {
+      setIsApproving(false);
     }
   };
 
@@ -103,6 +121,44 @@ export function CustomerDrawer({ customer, isOpen, onClose }: CustomerDrawerProp
           </div>
 
           <div className="p-6 space-y-6">
+            {/* Professional Approval Section */}
+            {customer.customer_type === 'professional' && !customer.approved && (
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <Clock className="w-5 h-5 text-amber-600" />
+                    <div>
+                      <p className="font-medium text-amber-800 dark:text-amber-200">⏳ En attente d'approbation</p>
+                      <p className="text-sm text-amber-600 dark:text-amber-400">Ce client professionnel doit être approuvé pour accéder à l'espace pro.</p>
+                    </div>
+                  </div>
+                  {canWrite() && (
+                    <Button 
+                      onClick={handleApprove} 
+                      disabled={isApproving}
+                      className="bg-green-600 hover:bg-green-700 text-white shrink-0"
+                    >
+                      {isApproving ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                      )}
+                      Approuver ce client
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {customer.customer_type === 'professional' && customer.approved && (
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  <span className="font-medium text-green-700 dark:text-green-300">✅ Client Pro Approuvé</span>
+                </div>
+              </div>
+            )}
+
             {/* TVA Status Banner */}
             <div className={`rounded-lg p-3 flex items-center justify-between ${
               vatStatus.includes('0%') 
