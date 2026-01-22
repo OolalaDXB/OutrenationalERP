@@ -34,6 +34,8 @@ export interface Settings {
   invoice_next_number: number | null;
   payout_invoice_prefix: string | null;
   payout_invoice_next_number: number | null;
+  credit_note_prefix: string | null;
+  credit_note_next_number: number | null;
   primary_color: string | null;
   shop_logo_url: string | null;
   // Invoice customization fields
@@ -68,12 +70,18 @@ export function useSettings() {
         .single();
       
       if (error) throw error;
+      
+      // Cast to handle new columns that may not be in generated types yet
+      const rawData = data as Record<string, unknown>;
+      
       return {
         ...data,
+        credit_note_prefix: rawData.credit_note_prefix as string | null ?? 'AV',
+        credit_note_next_number: rawData.credit_note_next_number as number | null ?? 1,
         visible_widgets: data.visible_widgets as unknown as WidgetVisibility | null,
         widget_order: data.widget_order as unknown as WidgetOrder | null,
         sales_channels: data.sales_channels as unknown as SalesChannel[] | null,
-        custom_marketplace_mappings: (data as unknown as Record<string, unknown>).custom_marketplace_mappings as Record<string, CustomMarketplaceMapping[]> | null,
+        custom_marketplace_mappings: rawData.custom_marketplace_mappings as Record<string, CustomMarketplaceMapping[]> | null,
       } as Settings;
     }
   });
@@ -144,6 +152,32 @@ export async function getNextPayoutInvoiceNumber(): Promise<{ prefix: string; nu
   await supabase
     .from('settings')
     .update({ payout_invoice_next_number: number + 1 })
+    .eq('id', data.id);
+  
+  return { prefix, number, full };
+}
+
+// Function to get and increment credit note number
+export async function getNextCreditNoteNumber(): Promise<{ prefix: string; number: number; full: string }> {
+  // Select all to avoid type issues with new columns
+  const { data, error } = await supabase
+    .from('settings')
+    .select('*')
+    .limit(1)
+    .single();
+  
+  if (error) throw error;
+  
+  // Handle potentially missing columns with defaults
+  const rawData = data as unknown as Record<string, unknown>;
+  const prefix = (rawData.credit_note_prefix as string) || 'AV';
+  const number = (rawData.credit_note_next_number as number) || 1;
+  const full = `${prefix}-${String(number).padStart(5, '0')}`;
+  
+  // Increment the next number
+  await supabase
+    .from('settings')
+    .update({ credit_note_next_number: number + 1 } as unknown as Record<string, never>)
     .eq('id', data.id);
   
   return { prefix, number, full };
