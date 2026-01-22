@@ -1,15 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FileText, Package, Loader2, ChevronDown, ChevronUp, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { generateProInvoicePDF } from "@/components/pro/ProInvoicePDF";
 import { StatusBadge, orderStatusVariant, orderStatusLabel } from "@/components/ui/status-badge";
 import { useProAuth } from "@/hooks/useProAuth";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 
 export function ProOrders() {
   const { customer } = useProAuth();
+  const queryClient = useQueryClient();
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
   // Fetch customer's orders
@@ -30,6 +31,32 @@ export function ProOrders() {
     },
     enabled: !!customer?.id
   });
+
+  // Real-time subscription for order updates
+  useEffect(() => {
+    if (!customer?.id) return;
+
+    const channel = supabase
+      .channel('pro-orders-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: `customer_id=eq.${customer.id}`
+        },
+        () => {
+          // Refetch orders when any change occurs
+          queryClient.invalidateQueries({ queryKey: ['pro_orders_full', customer.id] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [customer?.id, queryClient]);
 
   if (isLoading) {
     return (
