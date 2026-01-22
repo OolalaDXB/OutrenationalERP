@@ -204,12 +204,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     try {
-      await supabase.auth.signOut();
-    } catch (err) {
-      console.error('Error signing out:', err);
-      // Force clear local state even if signOut fails
+      // Clear local state first to ensure UI updates immediately
       setSession(null);
       setUser(null);
+      queryClient.clear();
+      
+      // Then attempt to sign out from Supabase (may fail if session already expired)
+      const { error } = await supabase.auth.signOut();
+      
+      // Ignore "session_not_found" errors - session is already gone server-side
+      if (error && !error.message?.includes('session_not_found') && error.message !== 'Session not found') {
+        console.error('Error signing out:', error);
+      }
+    } catch (err) {
+      console.error('Exception signing out:', err);
+      // Local state already cleared above, so user is effectively logged out
     }
   };
 
