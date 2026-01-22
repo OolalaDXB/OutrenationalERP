@@ -125,7 +125,20 @@ export function ProCheckout() {
         description: `Votre commande ${orderNumber} a été enregistrée.`
       });
 
-      navigate('/pro/orders');
+      // Navigate to success page with order data
+      navigate('/pro/order-success', { 
+        state: { 
+          order: {
+            ...order,
+            order_items: orderItems.map((item, idx) => ({
+              ...item,
+              id: `temp-${idx}`
+            }))
+          },
+          vatLabel: vatInfo.label,
+          paymentTerms: customer?.payment_terms?.toString() || '30'
+        }
+      });
     } catch (error) {
       console.error('Order error:', error);
       toast({
@@ -334,7 +347,7 @@ export function ProCheckout() {
                 <div className="mt-4 p-4 bg-secondary/50 rounded-lg space-y-2 text-sm">
                   <p className="font-medium">Paiement PayPal</p>
                   <p className="text-muted-foreground">
-                    Paiement à effectuer sur: <span className="font-medium text-foreground">{settings?.shop_email || '—'}</span>
+                    Paiement à effectuer sur: <span className="font-medium text-foreground">{settings?.paypal_email || settings?.shop_email || '—'}</span>
                   </p>
                 </div>
               )}

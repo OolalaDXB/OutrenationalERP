@@ -48,6 +48,8 @@ export function SettingsPage() {
     bic: "",
     eori: "",
     cgv: "",
+    // Payment
+    paypal_email: "",
     // Feature toggles
     show_artists_section: false,
     // Widget visibility and order
@@ -83,6 +85,7 @@ export function SettingsPage() {
         bic: settings.bic || "",
         eori: settings.eori || "",
         cgv: settings.cgv || "",
+        paypal_email: settings.paypal_email || "",
         show_artists_section: settings.show_artists_section || false,
         visible_widgets: settings.visible_widgets || defaultWidgetVisibility,
         widget_order: settings.widget_order || defaultWidgetOrder,
@@ -117,6 +120,7 @@ export function SettingsPage() {
       bic: settings.bic || "",
       eori: settings.eori || "",
       cgv: settings.cgv || "",
+      paypal_email: settings.paypal_email || "",
       show_artists_section: settings.show_artists_section || false,
       visible_widgets: settings.visible_widgets || defaultWidgetVisibility,
       widget_order: settings.widget_order || defaultWidgetOrder,
@@ -606,6 +610,27 @@ Les prix de nos produits sont indiqués en euros..."
                 </p>
               </div>
             )}
+          </div>
+
+          {/* PayPal Section */}
+          <div className="bg-card rounded-xl border border-border p-6">
+            <h2 className="text-lg font-semibold mb-4">Paiement PayPal</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Adresse PayPal pour les paiements des clients professionnels.
+            </p>
+            <div>
+              <Label className="text-sm text-muted-foreground">Adresse PayPal pour les paiements</Label>
+              <Input
+                type="email"
+                value={formData.paypal_email}
+                onChange={(e) => setFormData({ ...formData, paypal_email: e.target.value })}
+                className="mt-1"
+                placeholder="paiements@votreboutique.com"
+              />
+              <p className="text-xs text-muted-foreground mt-2">
+                Cette adresse sera affichée aux clients Pro qui choisissent PayPal comme mode de paiement.
+              </p>
+            </div>
           </div>
         </TabsContent>
 

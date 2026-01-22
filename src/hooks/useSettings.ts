@@ -44,6 +44,8 @@ export interface Settings {
   bic: string | null;
   eori: string | null;
   cgv: string | null;
+  // Payment
+  paypal_email: string | null;
   // Feature toggles
   show_artists_section: boolean | null;
   // Widget visibility and order
