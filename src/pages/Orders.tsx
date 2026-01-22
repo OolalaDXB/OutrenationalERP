@@ -499,11 +499,18 @@ export function OrdersPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          {order.status && (
-                            <StatusBadge variant={orderStatusVariant[order.status]}>
-                              {orderStatusLabel[order.status]}
-                            </StatusBadge>
-                          )}
+                          <div className="flex items-center gap-1.5">
+                            {order.source === "pro_portal" && (
+                              <Badge variant="outline" className="bg-violet-100 text-violet-700 border-violet-300 text-[10px] px-1.5 py-0 font-semibold">
+                                PRO
+                              </Badge>
+                            )}
+                            {order.status && (
+                              <StatusBadge variant={orderStatusVariant[order.status]}>
+                                {orderStatusLabel[order.status]}
+                              </StatusBadge>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4">
                           {order.payment_status && (

@@ -355,7 +355,14 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
                 <ShoppingCart className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold">Commande {order.order_number}</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-semibold">Commande {order.order_number}</h2>
+                  {isProOrder && (
+                    <span className="inline-flex items-center bg-violet-100 text-violet-700 border border-violet-300 text-[10px] px-1.5 py-0.5 rounded font-semibold">
+                      PRO
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm text-muted-foreground">{formatDateTime(order.created_at)}</p>
               </div>
             </div>
