@@ -1,5 +1,5 @@
 import { Link, useLocation, Outlet, Navigate } from "react-router-dom";
-import { ShoppingCart, Package, FileText, User, LogOut, Loader2 } from "lucide-react";
+import { ShoppingCart, Package, FileText, User, LogOut, Loader2, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useProAuth } from "@/hooks/useProAuth";
 import { useCart } from "@/hooks/useCart";
@@ -9,6 +9,7 @@ import outreNationalLogo from "@/assets/outre-national-logo.png";
 const NAV_ITEMS = [
   { to: "/pro/catalog", label: "Catalogue", icon: Package },
   { to: "/pro/orders", label: "Mes commandes", icon: FileText },
+  { to: "/pro/invoices", label: "Factures", icon: Receipt },
   { to: "/pro/account", label: "Mon compte", icon: User },
 ];
 

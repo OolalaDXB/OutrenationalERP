@@ -36,6 +36,7 @@ import { ProCart } from "@/pages/pro/ProCart";
 import { ProCheckout } from "@/pages/pro/ProCheckout";
 import { ProOrderSuccess } from "@/pages/pro/ProOrderSuccess";
 import { ProOrders } from "@/pages/pro/ProOrders";
+import { ProInvoices } from "@/pages/pro/ProInvoices";
 import { ProAccount } from "@/pages/pro/ProAccount";
 import { Loader2 } from "lucide-react";
 import "@fontsource/inter/400.css";
@@ -191,6 +192,7 @@ function AppRouter() {
               <Route path="checkout" element={<ProCheckout />} />
               <Route path="order-success" element={<ProOrderSuccess />} />
               <Route path="orders" element={<ProOrders />} />
+              <Route path="invoices" element={<ProInvoices />} />
               <Route path="account" element={<ProAccount />} />
             </Route>
           </Routes>
