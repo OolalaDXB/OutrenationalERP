@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ShoppingCart, Package, Truck, CheckCircle, Plus, Loader2, X, CreditCard, MoreHorizontal, Trash2, History, RotateCcw } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
-import { StatusBadge, orderStatusVariant, orderStatusLabel } from "@/components/ui/status-badge";
+import { StatusBadge, orderStatusVariant, orderStatusLabel, paymentStatusVariant, paymentStatusLabel } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -506,15 +506,10 @@ export function OrdersPage() {
                           )}
                         </td>
                         <td className="px-6 py-4">
-                          {order.payment_status === 'paid' ? (
-                            <span className="inline-flex items-center gap-1 text-xs font-medium text-success">
-                              <CheckCircle className="w-3 h-3" />
-                              Payé
-                            </span>
-                          ) : order.payment_status === 'refunded' ? (
-                            <span className="text-xs font-medium text-danger">Remboursé</span>
-                          ) : (
-                            <span className="text-xs font-medium text-warning">En attente</span>
+                          {order.payment_status && (
+                            <StatusBadge variant={paymentStatusVariant[order.payment_status]}>
+                              {paymentStatusLabel[order.payment_status]}
+                            </StatusBadge>
                           )}
                         </td>
                         <td className="px-6 py-4 text-sm text-muted-foreground">{itemsCount} article{itemsCount > 1 ? 's' : ''}</td>
