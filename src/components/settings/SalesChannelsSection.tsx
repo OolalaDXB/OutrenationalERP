@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Store, Plus, Trash2, Globe, Disc, ShoppingBag, Phone, Mail, Loader2, GripVertical } from 'lucide-react';
+import { Store, Plus, Trash2, Globe, Disc, ShoppingBag, Phone, Mail, Loader2, GripVertical, Briefcase } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +14,7 @@ const iconMap: Record<string, React.ElementType> = {
   phone: Phone,
   mail: Mail,
   store: Store,
+  briefcase: Briefcase,
 };
 
 function ChannelIcon({ icon }: { icon?: string }) {

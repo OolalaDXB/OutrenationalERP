@@ -13,6 +13,7 @@ export const DEFAULT_SALES_CHANNELS: SalesChannel[] = [
   { id: 'discogs', name: 'Discogs', url: '', enabled: true, icon: 'disc' },
   { id: 'ebay', name: 'eBay', url: '', enabled: false, icon: 'shopping-bag' },
   { id: 'website', name: 'Site web', url: '', enabled: true, icon: 'globe' },
+  { id: 'pro_portal', name: 'Portail Sillon Pro', url: null, enabled: true, icon: 'briefcase', builtin: true },
   { id: 'phone', name: 'Téléphone', url: null, enabled: true, icon: 'phone', builtin: true },
   { id: 'email', name: 'Email', url: null, enabled: true, icon: 'mail', builtin: true },
   { id: 'instore', name: 'En boutique', url: null, enabled: true, icon: 'store', builtin: true },
