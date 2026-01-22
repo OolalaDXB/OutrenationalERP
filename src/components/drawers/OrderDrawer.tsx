@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { X, ShoppingCart, MapPin, Truck, Clock, Package, Pencil, Trash2, Loader2, CreditCard, Copy, FileText, ExternalLink, Printer, RotateCcw, Ban, Edit3 } from "lucide-react";
+import { useState, useMemo } from "react";
+import { X, ShoppingCart, MapPin, Truck, Clock, Package, Pencil, Trash2, Loader2, CreditCard, Copy, FileText, ExternalLink, Printer, RotateCcw, Ban, Edit3, CheckCircle, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,6 +22,8 @@ import { OrderFormModal } from "@/components/forms/OrderFormModal";
 import { ProductDrawer } from "@/components/drawers/ProductDrawer";
 import { OrderDocumentsDialog } from "@/components/orders/OrderDocumentsDialog";
 import { useNavigate } from "react-router-dom";
+import { useSettings } from "@/hooks/useSettings";
+import { generateProPurchaseOrderPDF, downloadProPurchaseOrder } from "@/components/pro/ProPurchaseOrderPDF";
 
 type OrderWithItems = Order & { order_items?: OrderItem[] };
 
@@ -52,6 +54,7 @@ const PAYMENT_STATUSES = [
 export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   const { canWrite, canDelete } = useAuth();
   const navigate = useNavigate();
+  const { data: settings } = useSettings();
   const cancelOrder = useCancelOrder();
   const updateOrder = useUpdateOrder();
   const cancelOrderItem = useCancelOrderItem();
@@ -68,6 +71,7 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   const [trackingUrl, setTrackingUrl] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isProductDrawerOpen, setIsProductDrawerOpen] = useState(false);
+  const [isDownloadingPurchaseOrder, setIsDownloadingPurchaseOrder] = useState(false);
   
   // Item action dialogs
   const [itemToCancel, setItemToCancel] = useState<OrderItem | null>(null);
@@ -75,6 +79,9 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   const [returnReason, setReturnReason] = useState("");
   const [itemToEdit, setItemToEdit] = useState<OrderItem | null>(null);
   const [editQuantity, setEditQuantity] = useState(1);
+
+  // Check if this is a Pro order
+  const isProOrder = useMemo(() => order?.source === "pro_portal", [order?.source]);
 
   const handleViewInvoice = () => {
     onClose();
@@ -233,6 +240,81 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
     }
   };
 
+  // Quick action: Validate order (set to confirmed)
+  const handleQuickConfirm = async () => {
+    if (!order) return;
+    try {
+      await updateOrder.mutateAsync({ id: order.id, status: "confirmed" } as Parameters<typeof updateOrder.mutateAsync>[0]);
+      toast({ title: "Commande validée", description: `La commande ${order.order_number} a été confirmée.` });
+    } catch (error) {
+      toast({ title: "Erreur", description: "Impossible de valider la commande.", variant: "destructive" });
+    }
+  };
+
+  // Quick action: Mark as paid
+  const handleQuickMarkPaid = async () => {
+    if (!order) return;
+    try {
+      await updateOrder.mutateAsync({ 
+        id: order.id, 
+        payment_status: "paid", 
+        paid_at: new Date().toISOString() 
+      } as Parameters<typeof updateOrder.mutateAsync>[0]);
+      toast({ title: "Paiement confirmé", description: `La commande ${order.order_number} a été marquée comme payée.` });
+    } catch (error) {
+      toast({ title: "Erreur", description: "Impossible de mettre à jour le paiement.", variant: "destructive" });
+    }
+  };
+
+  // Download Pro Purchase Order PDF
+  const handleDownloadPurchaseOrder = async () => {
+    if (!order || !settings) return;
+    
+    setIsDownloadingPurchaseOrder(true);
+    try {
+      const orderData = {
+        id: order.id,
+        order_number: order.order_number,
+        created_at: order.created_at,
+        customer_name: order.customer_name,
+        customer_email: order.customer_email,
+        shipping_address: order.shipping_address,
+        shipping_address_line_2: order.shipping_address_line_2,
+        shipping_city: order.shipping_city,
+        shipping_postal_code: order.shipping_postal_code,
+        shipping_country: order.shipping_country,
+        subtotal: order.subtotal,
+        discount_amount: order.discount_amount,
+        tax_amount: order.tax_amount,
+        shipping_amount: order.shipping_amount,
+        total: order.total,
+        payment_method: order.payment_method,
+        order_items: (order.order_items || []).map((item) => ({
+          title: item.title,
+          artist_name: item.artist_name,
+          sku: item.sku,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          total_price: item.total_price,
+        })),
+      };
+
+      const doc = await generateProPurchaseOrderPDF({
+        order: orderData,
+        settings,
+        vatLabel: "TVA (20%)",
+        paymentTerms: "30",
+      });
+      downloadProPurchaseOrder(doc, order.order_number);
+      toast({ title: "Téléchargé", description: `bon-de-commande-${order.order_number}.pdf` });
+    } catch (error) {
+      console.error("Error generating purchase order:", error);
+      toast({ title: "Erreur", description: "Impossible de générer le bon de commande.", variant: "destructive" });
+    } finally {
+      setIsDownloadingPurchaseOrder(false);
+    }
+  };
+
   if (!isOpen || !order) return null;
 
   const timeline = [
@@ -256,6 +338,10 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
 
   const canModifyOrder = order.status !== "cancelled" && order.status !== "refunded" && order.status !== "delivered";
   const isUpdating = updateOrder.isPending || cancelOrder.isPending;
+  
+  // Show quick actions only if order can be confirmed or marked as paid
+  const canQuickConfirm = order.status === "pending" && canModifyOrder;
+  const canQuickMarkPaid = order.payment_status === "pending" && canModifyOrder;
 
   return (
     <>
@@ -329,6 +415,36 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Mise à jour en cours...
+                  </div>
+                )}
+                
+                {/* Quick Actions */}
+                {(canQuickConfirm || canQuickMarkPaid) && (
+                  <div className="flex gap-2 pt-2 border-t border-border">
+                    {canQuickConfirm && (
+                      <Button 
+                        size="sm" 
+                        variant="default"
+                        onClick={handleQuickConfirm}
+                        disabled={isUpdating}
+                        className="flex-1"
+                      >
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                        Valider commande
+                      </Button>
+                    )}
+                    {canQuickMarkPaid && (
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={handleQuickMarkPaid}
+                        disabled={isUpdating}
+                        className="flex-1"
+                      >
+                        <CreditCard className="w-4 h-4 mr-1" />
+                        Marquer payé
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
@@ -524,15 +640,33 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
 
             {/* Invoice & Documents Link */}
             <div className="pt-4 border-t border-border space-y-2">
-              <Button variant="default" className="w-full" onClick={() => setShowDocumentsDialog(true)}>
+              {/* Direct Purchase Order download for Pro orders */}
+              {isProOrder && (
+                <Button 
+                  variant="default" 
+                  className="w-full" 
+                  onClick={handleDownloadPurchaseOrder}
+                  disabled={!settings || isDownloadingPurchaseOrder}
+                >
+                  {isDownloadingPurchaseOrder ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4 mr-2" />
+                  )}
+                  Télécharger le bon de commande
+                </Button>
+              )}
+              <Button variant={isProOrder ? "outline" : "default"} className="w-full" onClick={() => setShowDocumentsDialog(true)}>
                 <Printer className="w-4 h-4 mr-2" />
-                Facture & Bordereau
+                {isProOrder ? "Documents (Bordereau)" : "Facture & Bordereau"}
               </Button>
-              <Button variant="secondary" className="w-full" onClick={handleViewInvoice}>
-                <FileText className="w-4 h-4 mr-2" />
-                Voir facture dans la liste
-                <ExternalLink className="w-3 h-3 ml-auto" />
-              </Button>
+              {!isProOrder && (
+                <Button variant="secondary" className="w-full" onClick={handleViewInvoice}>
+                  <FileText className="w-4 h-4 mr-2" />
+                  Voir facture dans la liste
+                  <ExternalLink className="w-3 h-3 ml-auto" />
+                </Button>
+              )}
             </div>
 
             {/* Edit/Duplicate/Cancel Actions */}
