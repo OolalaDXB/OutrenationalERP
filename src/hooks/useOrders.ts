@@ -244,13 +244,27 @@ export function useCancelOrder() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason?: string }) => {
+      // First, cancel all active order items (triggers stock restoration via DB trigger)
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .update({
+          status: 'cancelled',
+          cancelled_at: new Date().toISOString()
+        })
+        .eq('order_id', id)
+        .eq('status', 'active');
+      
+      if (itemsError) throw itemsError;
+      
+      // Then cancel the order itself
       const { data, error } = await supabase
         .from('orders')
         .update({
           status: 'cancelled' as const,
           cancelled_at: new Date().toISOString(),
-          cancel_reason: reason || null
-        })
+          cancel_reason: reason || null,
+          cancellation_reason: reason || null
+        } as any)
         .eq('id', id)
         .select()
         .single();
@@ -260,6 +274,8 @@ export function useCancelOrder() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['orders', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['stock_movements'] });
     }
   });
 }

@@ -1,22 +1,51 @@
-import { useState, useEffect, useRef } from "react";
-import { FileText, Package, Loader2, ChevronDown, ChevronUp, Download } from "lucide-react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { FileText, Package, Loader2, ChevronDown, ChevronUp, Download, XCircle, RefreshCcw, Clock, Mail, Truck, CheckCircle, Ban, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { generateProPurchaseOrderPDF, downloadProPurchaseOrder } from "@/components/pro/ProPurchaseOrderPDF";
 import { StatusBadge, orderStatusVariant, orderStatusLabel, paymentStatusVariant, paymentStatusLabel } from "@/components/ui/status-badge";
 import { OrderProgressTracker } from "@/components/pro/OrderProgressTracker";
 import { useProAuth } from "@/hooks/useProAuth";
 import { useSettings } from "@/hooks/useSettings";
+import { useCancelProOrder, useRequestRefund } from "@/hooks/useProOrders";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency, formatDateTime } from "@/lib/format";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export function ProOrders() {
   const { customer } = useProAuth();
   const { data: settings } = useSettings();
   const queryClient = useQueryClient();
+  const cancelOrder = useCancelProOrder();
+  const requestRefund = useRequestRefund();
+  
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [downloadingOrderId, setDownloadingOrderId] = useState<string | null>(null);
+  const [cancelDialogOrder, setCancelDialogOrder] = useState<any | null>(null);
+  const [refundDialogOrder, setRefundDialogOrder] = useState<any | null>(null);
+  const [refundReason, setRefundReason] = useState("");
   const isInitialMount = useRef(true);
 
   // Fetch customer's orders
@@ -53,13 +82,11 @@ export function ProOrders() {
           filter: `customer_id=eq.${customer.id}`
         },
         (payload) => {
-          // Skip toast on initial mount
           if (isInitialMount.current) {
             isInitialMount.current = false;
             return;
           }
           
-          // Show toast notification for status changes
           const newStatus = payload.new?.status;
           const orderNumber = payload.new?.order_number;
           
@@ -70,13 +97,11 @@ export function ProOrders() {
             });
           }
           
-          // Refetch orders when any change occurs
           queryClient.invalidateQueries({ queryKey: ['pro_orders_full', customer.id] });
         }
       )
       .subscribe();
 
-    // Reset initial mount flag after a short delay
     const timer = setTimeout(() => {
       isInitialMount.current = false;
     }, 1000);
@@ -86,6 +111,54 @@ export function ProOrders() {
       supabase.removeChannel(channel);
     };
   }, [customer?.id, queryClient]);
+
+  // Handle cancel order
+  const handleCancelOrder = async () => {
+    if (!cancelDialogOrder || !customer?.id) return;
+    
+    try {
+      await cancelOrder.mutateAsync({ 
+        orderId: cancelDialogOrder.id, 
+        customerId: customer.id 
+      });
+      toast.success("Commande annulée");
+      setCancelDialogOrder(null);
+    } catch (error: any) {
+      toast.error("Erreur", { description: error.message });
+    }
+  };
+
+  // Handle refund request
+  const handleRequestRefund = async () => {
+    if (!refundDialogOrder || !customer?.id || !refundReason.trim()) return;
+    
+    try {
+      await requestRefund.mutateAsync({ 
+        orderId: refundDialogOrder.id, 
+        customerId: customer.id,
+        reason: refundReason.trim()
+      });
+      toast.success("Demande envoyée", {
+        description: "Notre équipe vous contactera sous 48h."
+      });
+      setRefundDialogOrder(null);
+      setRefundReason("");
+    } catch (error: any) {
+      toast.error("Erreur", { description: error.message });
+    }
+  };
+
+  // Check if refund can be requested (within 14 days of delivery)
+  const canRequestRefund = (order: any) => {
+    if (order.status !== 'delivered' || order.refund_requested) return false;
+    if (!order.delivered_at) return false;
+    
+    const deliveredDate = new Date(order.delivered_at);
+    const fourteenDaysAgo = new Date();
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+    
+    return deliveredDate >= fourteenDaysAgo;
+  };
 
   if (isLoading) {
     return (
@@ -115,6 +188,9 @@ export function ProOrders() {
           {orders.map(order => {
             const isExpanded = expandedOrderId === order.id;
             const items = order.order_items || [];
+            const canCancel = order.status === 'pending';
+            const canRefund = canRequestRefund(order);
+            const needsContact = order.status === 'confirmed' || order.status === 'processing';
 
             return (
               <div 
@@ -152,6 +228,11 @@ export function ProOrders() {
                             {paymentStatusLabel[order.payment_status]}
                           </StatusBadge>
                         )}
+                        {(order as any).refund_requested && order.status !== 'refunded' && (
+                          <StatusBadge variant="warning">
+                            Remboursement demandé
+                          </StatusBadge>
+                        )}
                       </div>
                     </div>
                     <Button
@@ -165,7 +246,6 @@ export function ProOrders() {
                         
                         setDownloadingOrderId(order.id);
                         try {
-                          // Prepare order data for PDF
                           const orderData = {
                             id: order.id,
                             order_number: order.order_number,
@@ -226,14 +306,51 @@ export function ProOrders() {
                 {/* Order details */}
                 {isExpanded && (
                   <div className="border-t border-border p-4 bg-secondary/30 space-y-6">
-                    {/* Progress tracker */}
+                    {/* Timeline */}
                     <div className="pb-4 border-b border-border">
-                      <h4 className="text-sm font-semibold mb-4">Suivi de commande</h4>
-                      <OrderProgressTracker 
-                        status={order.status as any} 
-                        shippedAt={order.shipped_at}
-                        deliveredAt={order.delivered_at}
-                      />
+                      <h4 className="text-sm font-semibold mb-4">Historique de la commande</h4>
+                      <OrderTimeline order={order} />
+                    </div>
+
+                    {/* Actions for Pro customer */}
+                    <div className="flex flex-wrap gap-3">
+                      {canCancel && (
+                        <Button
+                          variant="outline"
+                          className="gap-2 text-destructive border-destructive/30 hover:bg-destructive/10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCancelDialogOrder(order);
+                          }}
+                        >
+                          <XCircle className="w-4 h-4" />
+                          Annuler la commande
+                        </Button>
+                      )}
+                      
+                      {canRefund && (
+                        <Button
+                          variant="outline"
+                          className="gap-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setRefundDialogOrder(order);
+                          }}
+                        >
+                          <RefreshCcw className="w-4 h-4" />
+                          Demander un remboursement
+                        </Button>
+                      )}
+                      
+                      {needsContact && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded-md">
+                          <Mail className="w-4 h-4" />
+                          Pour annuler, contactez-nous à{" "}
+                          <a href="mailto:pro@outre-national.com" className="text-primary hover:underline">
+                            pro@outre-national.com
+                          </a>
+                        </div>
+                      )}
                     </div>
 
                     <div className="grid md:grid-cols-2 gap-6">
@@ -333,6 +450,195 @@ export function ProOrders() {
           })}
         </div>
       )}
+
+      {/* Cancel Order Dialog */}
+      <AlertDialog open={!!cancelDialogOrder} onOpenChange={() => setCancelDialogOrder(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Annuler cette commande ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir annuler la commande {cancelDialogOrder?.order_number} ? 
+              Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Non, garder</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancelOrder}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={cancelOrder.isPending}
+            >
+              {cancelOrder.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : null}
+              Oui, annuler
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Refund Request Dialog */}
+      <Dialog open={!!refundDialogOrder} onOpenChange={() => {
+        setRefundDialogOrder(null);
+        setRefundReason("");
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Demander un remboursement</DialogTitle>
+            <DialogDescription>
+              Commande {refundDialogOrder?.order_number}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="refund-reason">Motif de la demande *</Label>
+              <Textarea
+                id="refund-reason"
+                placeholder="Expliquez la raison de votre demande de remboursement..."
+                value={refundReason}
+                onChange={(e) => setRefundReason(e.target.value)}
+                rows={4}
+              />
+            </div>
+            
+            <p className="text-sm text-muted-foreground">
+              Notre équipe examinera votre demande et vous contactera sous 48h.
+            </p>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setRefundDialogOrder(null);
+              setRefundReason("");
+            }}>
+              Annuler
+            </Button>
+            <Button
+              onClick={handleRequestRefund}
+              disabled={!refundReason.trim() || requestRefund.isPending}
+            >
+              {requestRefund.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : null}
+              Envoyer la demande
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// Timeline component for order history
+function OrderTimeline({ order }: { order: any }) {
+  const events = useMemo(() => {
+    const timeline: { label: string; date: string | null; icon: any; active: boolean }[] = [];
+    
+    // Created
+    timeline.push({
+      label: "Commande créée",
+      date: order.created_at,
+      icon: Clock,
+      active: true
+    });
+    
+    // Confirmed
+    if (order.confirmed_at || (order.status !== 'pending' && order.status !== 'cancelled')) {
+      timeline.push({
+        label: "Commande confirmée",
+        date: order.confirmed_at || order.created_at,
+        icon: CheckCircle,
+        active: true
+      });
+    }
+    
+    // Processing
+    if (order.processing_at || ['processing', 'shipped', 'delivered'].includes(order.status)) {
+      timeline.push({
+        label: "Commande en préparation",
+        date: order.processing_at,
+        icon: Package,
+        active: true
+      });
+    }
+    
+    // Shipped
+    if (order.shipped_at || ['shipped', 'delivered'].includes(order.status)) {
+      timeline.push({
+        label: order.tracking_number 
+          ? `Expédiée - ${order.tracking_number}` 
+          : "Commande expédiée",
+        date: order.shipped_at,
+        icon: Truck,
+        active: true
+      });
+    }
+    
+    // Delivered
+    if (order.delivered_at || order.status === 'delivered') {
+      timeline.push({
+        label: "Commande livrée",
+        date: order.delivered_at,
+        icon: CheckCircle,
+        active: true
+      });
+    }
+    
+    // Cancelled
+    if (order.cancelled_at || order.status === 'cancelled') {
+      timeline.push({
+        label: "Commande annulée",
+        date: order.cancelled_at,
+        icon: Ban,
+        active: true
+      });
+    }
+    
+    // Refund requested
+    if (order.refund_requested_at) {
+      timeline.push({
+        label: "Remboursement demandé",
+        date: order.refund_requested_at,
+        icon: AlertTriangle,
+        active: true
+      });
+    }
+    
+    // Refunded
+    if (order.refunded_at || order.status === 'refunded') {
+      timeline.push({
+        label: "Remboursement effectué",
+        date: order.refunded_at,
+        icon: RefreshCcw,
+        active: true
+      });
+    }
+    
+    return timeline;
+  }, [order]);
+
+  return (
+    <div className="space-y-3">
+      {events.map((event, index) => (
+        <div key={index} className="flex items-start gap-3">
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+            event.active ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+          }`}>
+            <event.icon className="w-4 h-4" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className={`text-sm font-medium ${event.active ? '' : 'text-muted-foreground'}`}>
+              {event.label}
+            </p>
+            {event.date && (
+              <p className="text-xs text-muted-foreground">
+                {format(new Date(event.date), "d MMMM yyyy 'à' HH:mm", { locale: fr })}
+              </p>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
