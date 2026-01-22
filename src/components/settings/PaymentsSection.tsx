@@ -533,9 +533,12 @@ function PaymentMethodsSection() {
                             placeholder="0x..."
                             className="font-mono text-sm"
                           />
+                          <p className="text-xs text-muted-foreground">
+                            Vous pouvez utiliser une adresse Binance, Ledger, ou tout wallet compatible avec le réseau sélectionné.
+                          </p>
                         </div>
                         <div className="space-y-2">
-                          <Label>Réseau</Label>
+                          <Label>Réseau préféré</Label>
                           <select
                             value={getConfigValue(method, 'network')}
                             onChange={(e) => handleConfigChange(method.id, 'network', e.target.value)}
@@ -546,11 +549,6 @@ function PaymentMethodsSection() {
                             <option value="polygon">Polygon</option>
                             <option value="arbitrum">Arbitrum</option>
                             <option value="base">Base</option>
-                            <option value="optimism">Optimism</option>
-                            <option value="solana">Solana</option>
-                            <option value="tron">Tron (TRC-20)</option>
-                            <option value="avalanche">Avalanche (C-Chain)</option>
-                            <option value="bsc">BNB Chain (BEP-20)</option>
                           </select>
                         </div>
                         {hasConfigChanges(method.id) && (
