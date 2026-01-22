@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { X, ShoppingCart, MapPin, Truck, Clock, Package, Pencil, Trash2, Loader2, CreditCard, Copy, FileText, ExternalLink, Printer, RotateCcw, Ban, Edit3, CheckCircle, Download, AlertTriangle, RefreshCcw } from "lucide-react";
+import { useState, useMemo, useCallback } from "react";
+import { X, ShoppingCart, MapPin, Truck, Clock, Package, Pencil, Trash2, Loader2, CreditCard, Copy, FileText, ExternalLink, Printer, RotateCcw, Ban, Edit3, CheckCircle, Download, AlertTriangle, RefreshCcw, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,10 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { Order, OrderItem } from "@/hooks/useOrders";
 import { useCancelOrder, useUpdateOrder } from "@/hooks/useOrders";
 import { useCancelOrderItem, useReturnOrderItem, useUpdateOrderItemQuantity } from "@/hooks/useOrderItemMutations";
+import { useInvoiceForOrder, useCreateInvoiceFromOrder, useCreateInvoiceItems } from "@/hooks/useInvoices";
 import { useAuth } from "@/hooks/useAuth";
 import { useProducts, Product } from "@/hooks/useProducts";
 import { formatCurrency, formatDateTime } from "@/lib/format";
@@ -62,6 +62,12 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   const returnOrderItem = useReturnOrderItem();
   const updateItemQuantity = useUpdateOrderItemQuantity();
   const { data: products = [] } = useProducts();
+  
+  // Invoice hooks
+  const { data: existingInvoice, isLoading: isLoadingInvoice } = useInvoiceForOrder(order?.id);
+  const createInvoice = useCreateInvoiceFromOrder();
+  const createInvoiceItems = useCreateInvoiceItems();
+  
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
@@ -73,6 +79,7 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isProductDrawerOpen, setIsProductDrawerOpen] = useState(false);
   const [isDownloadingPurchaseOrder, setIsDownloadingPurchaseOrder] = useState(false);
+  const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
   
   // Item action dialogs
   const [itemToCancel, setItemToCancel] = useState<OrderItem | null>(null);
@@ -123,6 +130,21 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
       await cancelOrderItem.mutateAsync({ itemId: itemToCancel.id, orderId: order.id });
       toast({ title: "Article annulé", description: `${itemToCancel.title} a été annulé. Le stock a été restauré.` });
       setItemToCancel(null);
+      
+      // Check if all items are now cancelled - if so, cancel the entire order
+      const remainingItems = order.order_items?.filter(
+        item => item.id !== itemToCancel.id && item.status === 'active'
+      );
+      
+      if (remainingItems?.length === 0) {
+        // All items are cancelled, cancel the order too
+        await updateOrder.mutateAsync({
+          id: order.id,
+          status: 'cancelled',
+          cancelled_at: new Date().toISOString()
+        } as Parameters<typeof updateOrder.mutateAsync>[0]);
+        toast({ title: "Commande annulée", description: "Tous les articles ont été annulés, la commande a été annulée automatiquement." });
+      }
     } catch (error) {
       toast(getErrorToast(error));
     }
@@ -214,8 +236,12 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
     try {
       const updateData: Record<string, unknown> = { id: order.id, status: newStatus };
       
-      // Add timestamps
-      if (newStatus === "delivered") {
+      // Add timestamps based on status
+      if (newStatus === "confirmed") {
+        updateData.confirmed_at = new Date().toISOString();
+      } else if (newStatus === "processing") {
+        updateData.processing_at = new Date().toISOString();
+      } else if (newStatus === "delivered") {
         updateData.delivered_at = new Date().toISOString();
       }
 
@@ -265,7 +291,11 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   const handleQuickConfirm = async () => {
     if (!order) return;
     try {
-      await updateOrder.mutateAsync({ id: order.id, status: "confirmed" } as Parameters<typeof updateOrder.mutateAsync>[0]);
+      await updateOrder.mutateAsync({ 
+        id: order.id, 
+        status: "confirmed",
+        confirmed_at: new Date().toISOString()
+      } as Parameters<typeof updateOrder.mutateAsync>[0]);
       toast({ title: "Commande validée", description: `La commande ${order.order_number} a été confirmée.` });
     } catch (error) {
       toast({ title: "Erreur", description: "Impossible de valider la commande.", variant: "destructive" });
@@ -336,6 +366,61 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
     }
   };
 
+  // Generate invoice from order
+  const handleGenerateInvoice = async () => {
+    if (!order) return;
+    
+    setIsGeneratingInvoice(true);
+    try {
+      // Build shipping address
+      const addressParts = [
+        order.shipping_address,
+        order.shipping_address_line_2,
+        order.shipping_postal_code,
+        order.shipping_city,
+        order.shipping_country
+      ].filter(Boolean);
+      
+      // Create the invoice
+      const invoice = await createInvoice.mutateAsync({
+        orderId: order.id,
+        customerId: order.customer_id,
+        recipientName: order.customer_name || order.customer_email,
+        recipientEmail: order.customer_email,
+        recipientAddress: addressParts.join(', '),
+        subtotal: order.subtotal,
+        taxAmount: order.tax_amount,
+        total: order.total,
+        currency: order.currency
+      });
+      
+      // Create invoice items from active order items
+      const activeItems = (order.order_items || []).filter(item => item.status === 'active');
+      if (activeItems.length > 0) {
+        await createInvoiceItems.mutateAsync({
+          invoiceId: invoice.id,
+          items: activeItems.map(item => ({
+            description: `${item.title}${item.artist_name ? ` - ${item.artist_name}` : ''}`,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            total_price: item.total_price,
+            product_id: item.product_id
+          }))
+        });
+      }
+      
+      toast({ 
+        title: "Facture créée", 
+        description: `Facture ${invoice.invoice_number} créée avec succès.` 
+      });
+    } catch (error) {
+      console.error("Error generating invoice:", error);
+      toast({ title: "Erreur", description: "Impossible de générer la facture.", variant: "destructive" });
+    } finally {
+      setIsGeneratingInvoice(false);
+    }
+  };
+
   if (!isOpen || !order) return null;
 
   const timeline = [
@@ -358,11 +443,12 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   ].filter(Boolean).join(', ');
 
   const canModifyOrder = order.status !== "cancelled" && order.status !== "refunded" && order.status !== "delivered";
-  const isUpdating = updateOrder.isPending || cancelOrder.isPending;
+  const isUpdating = updateOrder.isPending || cancelOrder.isPending || isGeneratingInvoice;
   
   // Show quick actions only if order can be confirmed or marked as paid
-  const canQuickConfirm = order.status === "pending" && canModifyOrder;
-  const canQuickMarkPaid = order.payment_status === "pending" && canModifyOrder;
+  const canQuickConfirm = order.status === "pending";
+  const canQuickMarkPaid = order.payment_status === "pending" && order.status !== "cancelled" && order.status !== "refunded";
+  const canGenerateInvoice = !existingInvoice && !isLoadingInvoice && order.status !== "cancelled";
 
   return (
     <>
@@ -536,15 +622,15 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
                 )}
                 
                 {/* Quick Actions */}
-                {(canQuickConfirm || canQuickMarkPaid) && (
-                  <div className="flex gap-2 pt-2 border-t border-border">
+                {(canQuickConfirm || canQuickMarkPaid || canGenerateInvoice) && (
+                  <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
                     {canQuickConfirm && (
                       <Button 
                         size="sm" 
                         variant="default"
                         onClick={handleQuickConfirm}
                         disabled={isUpdating}
-                        className="flex-1"
+                        className="flex-1 min-w-[120px]"
                       >
                         <CheckCircle className="w-4 h-4 mr-1" />
                         Valider commande
@@ -556,12 +642,34 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
                         variant="outline"
                         onClick={handleQuickMarkPaid}
                         disabled={isUpdating}
-                        className="flex-1"
+                        className="flex-1 min-w-[120px]"
                       >
                         <CreditCard className="w-4 h-4 mr-1" />
                         Marquer payé
                       </Button>
                     )}
+                    {canGenerateInvoice && (
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={handleGenerateInvoice}
+                        disabled={isUpdating || isGeneratingInvoice}
+                        className="flex-1 min-w-[120px]"
+                      >
+                        {isGeneratingInvoice ? (
+                          <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                        ) : (
+                          <Receipt className="w-4 h-4 mr-1" />
+                        )}
+                        Générer facture
+                      </Button>
+                    )}
+                  </div>
+                )}
+                {existingInvoice && (
+                  <div className="flex items-center gap-2 pt-2 border-t border-border text-sm text-muted-foreground">
+                    <Receipt className="w-4 h-4" />
+                    <span>Facture: <button onClick={handleViewInvoice} className="text-primary hover:underline font-medium">{existingInvoice.invoice_number}</button></span>
                   </div>
                 )}
               </div>
