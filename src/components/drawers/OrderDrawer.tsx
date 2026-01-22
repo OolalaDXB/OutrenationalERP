@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { X, ShoppingCart, MapPin, Truck, Clock, Package, Pencil, Trash2, Loader2, CreditCard, Copy, FileText, ExternalLink, Printer, RotateCcw, Ban, Edit3, CheckCircle, Download, AlertTriangle, RefreshCcw, Receipt } from "lucide-react";
+import { X, ShoppingCart, MapPin, Truck, Clock, Package, Pencil, Trash2, Loader2, CreditCard, Copy, FileText, ExternalLink, Printer, RotateCcw, Ban, Edit3, CheckCircle, AlertTriangle, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -665,7 +665,7 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
                         {isGeneratingInvoice ? (
                           <Loader2 className="w-4 h-4 mr-1 animate-spin" />
                         ) : (
-                          <Receipt className="w-4 h-4 mr-1" />
+                          <FileText className="w-4 h-4 mr-1" />
                         )}
                         Générer facture
                       </Button>
@@ -674,7 +674,7 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
                 )}
                 {existingInvoice && (
                   <div className="flex items-center gap-2 pt-2 border-t border-border text-sm text-muted-foreground">
-                    <Receipt className="w-4 h-4" />
+                    <FileText className="w-4 h-4" />
                     <span>Facture: <button onClick={handleViewInvoice} className="text-primary hover:underline font-medium">{existingInvoice.invoice_number}</button></span>
                   </div>
                 )}
@@ -869,29 +869,13 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
               </div>
             </div>
 
-            {/* Invoice & Documents Link */}
+            {/* Documents Link */}
             <div className="pt-4 border-t border-border space-y-2">
-              {/* Direct Purchase Order download for Pro orders */}
-              {isProOrder && (
-                <Button 
-                  variant="default" 
-                  className="w-full" 
-                  onClick={handleDownloadPurchaseOrder}
-                  disabled={!settings || isDownloadingPurchaseOrder}
-                >
-                  {isDownloadingPurchaseOrder ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Download className="w-4 h-4 mr-2" />
-                  )}
-                  Télécharger le bon de commande
-                </Button>
-              )}
-              <Button variant={isProOrder ? "outline" : "default"} className="w-full" onClick={() => setShowDocumentsDialog(true)}>
+              <Button variant="default" className="w-full" onClick={() => setShowDocumentsDialog(true)}>
                 <Printer className="w-4 h-4 mr-2" />
-                {isProOrder ? "Documents (Bordereau)" : "Facture & Bordereau"}
+                Documents (Bordereau)
               </Button>
-              {!isProOrder && (
+              {!isProOrder && existingInvoice && (
                 <Button variant="secondary" className="w-full" onClick={handleViewInvoice}>
                   <FileText className="w-4 h-4 mr-2" />
                   Voir facture dans la liste
