@@ -3,6 +3,7 @@ import { FileText, Package, Loader2, ChevronDown, ChevronUp, Download } from "lu
 import { Button } from "@/components/ui/button";
 import { generateProInvoicePDF } from "@/components/pro/ProInvoicePDF";
 import { StatusBadge, orderStatusVariant, orderStatusLabel } from "@/components/ui/status-badge";
+import { OrderProgressTracker } from "@/components/pro/OrderProgressTracker";
 import { useProAuth } from "@/hooks/useProAuth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -167,7 +168,17 @@ export function ProOrders() {
 
                 {/* Order details */}
                 {isExpanded && (
-                  <div className="border-t border-border p-4 bg-secondary/30">
+                  <div className="border-t border-border p-4 bg-secondary/30 space-y-6">
+                    {/* Progress tracker */}
+                    <div className="pb-4 border-b border-border">
+                      <h4 className="text-sm font-semibold mb-4">Suivi de commande</h4>
+                      <OrderProgressTracker 
+                        status={order.status as any} 
+                        shippedAt={order.shipped_at}
+                        deliveredAt={order.delivered_at}
+                      />
+                    </div>
+
                     <div className="grid md:grid-cols-2 gap-6">
                       {/* Items */}
                       <div>
@@ -241,8 +252,19 @@ export function ProOrders() {
                         {/* Tracking */}
                         {order.tracking_number && (
                           <div className="mt-4 pt-4 border-t border-border">
-                            <h4 className="text-sm font-semibold mb-2">Suivi</h4>
-                            <p className="text-sm font-mono text-primary">{order.tracking_number}</p>
+                            <h4 className="text-sm font-semibold mb-2">N° de suivi</h4>
+                            {order.tracking_url ? (
+                              <a 
+                                href={order.tracking_url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-sm font-mono text-primary hover:underline"
+                              >
+                                {order.tracking_number}
+                              </a>
+                            ) : (
+                              <p className="text-sm font-mono text-primary">{order.tracking_number}</p>
+                            )}
                           </div>
                         )}
                       </div>
