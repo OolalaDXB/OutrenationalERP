@@ -113,13 +113,14 @@ export function CustomersPage() {
   // Filtrage on current page's customers
   const filteredCustomers = useMemo(() => {
     return customers.filter((customer) => {
+      if (!customer) return false;
       const fullName = `${customer.first_name || ''} ${customer.last_name || ''}`.toLowerCase();
       const companyName = (customer.company_name || '').toLowerCase();
       const matchesSearch =
         searchTerm === "" ||
         fullName.includes(searchTerm.toLowerCase()) ||
         companyName.includes(searchTerm.toLowerCase()) ||
-        customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (customer.email?.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (customer.city && customer.city.toLowerCase().includes(searchTerm.toLowerCase()));
 
       const matchesCountry = countryFilter === "all" || customer.country === countryFilter;
@@ -132,13 +133,14 @@ export function CustomersPage() {
   // Filter deleted customers
   const filteredDeletedCustomers = useMemo(() => {
     return deletedCustomers.filter((customer) => {
+      if (!customer) return false;
       const fullName = `${customer.first_name || ''} ${customer.last_name || ''}`.toLowerCase();
       const companyName = (customer.company_name || '').toLowerCase();
       const matchesSearch =
         searchTerm === "" ||
         fullName.includes(searchTerm.toLowerCase()) ||
         companyName.includes(searchTerm.toLowerCase()) ||
-        customer.email.toLowerCase().includes(searchTerm.toLowerCase());
+        (customer.email?.toLowerCase().includes(searchTerm.toLowerCase()));
       return matchesSearch;
     });
   }, [deletedCustomers, searchTerm]);
@@ -267,11 +269,12 @@ export function CustomersPage() {
   const showLoadingState = isFetching && isPlaceholderData;
   const trashCount = deletedCustomers.length;
 
-  const getCustomerDisplayName = (customer: Customer) => {
+  const getCustomerDisplayName = (customer: Customer | null | undefined) => {
+    if (!customer) return '—';
     if (customer.customer_type === 'professionnel' && customer.company_name) {
       return customer.company_name;
     }
-    return `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || customer.email;
+    return `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || customer.email || '—';
   };
 
   return (
