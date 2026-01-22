@@ -260,18 +260,24 @@ export async function generateProPurchaseOrderPDF({
 
   // Footer
   const addFooter = () => {
-    const footerY = doc.internal.pageSize.getHeight() - 15;
+    const footerY = doc.internal.pageSize.getHeight() - 25;
     doc.setFontSize(8);
     doc.setTextColor(120);
     doc.setFont("helvetica", "normal");
     
+    // Disclaimer
+    doc.setFont("helvetica", "italic");
+    doc.text("Ceci est un bon de commande, pas une facture. La facture sera émise après validation.", pageWidth / 2, footerY, { align: 'center' });
+    
+    // Company info
+    doc.setFont("helvetica", "normal");
     const footerText = [
       settings.legal_name || settings.shop_name,
       settings.siret ? `SIRET : ${settings.siret}` : null,
       settings.vat_number ? `TVA : ${settings.vat_number}` : null,
     ].filter(Boolean).join(' - ');
     
-    doc.text(footerText, pageWidth / 2, footerY, { align: 'center' });
+    doc.text(footerText, pageWidth / 2, footerY + 6, { align: 'center' });
   };
 
   addFooter();
@@ -280,5 +286,5 @@ export async function generateProPurchaseOrderPDF({
 }
 
 export function downloadProPurchaseOrder(doc: jsPDF, orderNumber: string): void {
-  doc.save(`BonDeCommande-${orderNumber}.pdf`);
+  doc.save(`bon-de-commande-${orderNumber}.pdf`);
 }
