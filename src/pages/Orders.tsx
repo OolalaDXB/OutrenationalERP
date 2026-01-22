@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ShoppingCart, Package, Truck, CheckCircle, Plus, Loader2, X, CreditCard, MoreHorizontal, Trash2, History, RotateCcw } from "lucide-react";
+import { ShoppingCart, Package, Truck, CheckCircle, Plus, Loader2, X, MoreHorizontal, Trash2, History, RotateCcw } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { StatusBadge, orderStatusVariant, orderStatusLabel, paymentStatusVariant, paymentStatusLabel } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
@@ -84,7 +84,6 @@ export function OrdersPage() {
   const { canWrite, canDelete, hasRole } = useAuth();
   
   const [viewMode, setViewMode] = useState<'active' | 'trash'>('active');
-  const [markingPaidId, setMarkingPaidId] = useState<string | null>(null);
   
   // Confirmation dialogs
   const [softDeleteDialog, setSoftDeleteDialog] = useState<typeof orders[0] | null>(null);
@@ -182,23 +181,6 @@ export function OrdersPage() {
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
-  };
-
-  const handleMarkAsPaid = async (e: React.MouseEvent, orderId: string) => {
-    e.stopPropagation();
-    setMarkingPaidId(orderId);
-    try {
-      await updateOrder.mutateAsync({
-        id: orderId,
-        payment_status: 'paid',
-        paid_at: new Date().toISOString()
-      });
-      toast({ title: "Paiement confirmé", description: "La commande a été marquée comme payée." });
-    } catch (error) {
-      toast({ title: "Erreur", description: "Impossible de mettre à jour le paiement.", variant: "destructive" });
-    } finally {
-      setMarkingPaidId(null);
-    }
   };
 
   const handleSoftDelete = async () => {
@@ -525,22 +507,6 @@ export function OrdersPage() {
                         {canWrite() && (
                           <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center gap-2">
-                              {order.payment_status !== 'paid' && order.payment_status !== 'refunded' && order.status !== 'cancelled' && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="gap-1"
-                                  onClick={(e) => handleMarkAsPaid(e, order.id)}
-                                  disabled={markingPaidId === order.id}
-                                >
-                                  {markingPaidId === order.id ? (
-                                    <Loader2 className="w-3 h-3 animate-spin" />
-                                  ) : (
-                                    <CreditCard className="w-3 h-3" />
-                                  )}
-                                  Payé
-                                </Button>
-                              )}
                               {canDelete() && canDeleteOrder(order) && (
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
