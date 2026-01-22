@@ -147,54 +147,58 @@ export function ProRegister() {
     setIsSubmitting(true);
 
     try {
-      // Call Edge Function - it creates both auth user and customer server-side
-      const { data, error } = await supabase.functions.invoke("create-pro-customer", {
-        body: {
-          email: formData.email,
-          password: formData.password,
-          companyName: formData.companyName,
-          vatNumber: formData.vatNumber,
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          phone: formData.phone,
-          address: formData.address,
-          addressLine2: formData.addressLine2,
-          city: formData.city,
-          state: formData.state,
-          postalCode: formData.postalCode,
-          country: formData.country,
-          notes: formData.notes,
-        },
+      // Step 1: Create auth user directly
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
       });
 
-      // Handle network/invoke errors
-      if (error) {
-        console.error("Registration invoke error:", error);
-        setError("Erreur lors de la création du compte");
-        return;
-      }
-
-      // Handle application-level errors from the Edge Function
-      if (data?.error) {
-        console.error("Registration error:", data.error);
-        if (data.error === "EMAIL_ALREADY_USED") {
+      if (signUpError) {
+        console.error("SignUp error:", signUpError);
+        if (signUpError.message?.toLowerCase().includes("already registered")) {
           setError("Cet email est déjà utilisé");
-        } else if (data.error === "PASSWORD_TOO_SHORT") {
-          setError("Mot de passe trop court (8 caractères min.)");
-        } else if (data.error === "COMPANY_REQUIRED") {
-          setError("Le nom de l'entreprise est requis");
         } else {
           setError("Erreur lors de la création du compte");
         }
         return;
       }
 
-      // Success
-      if (data?.success) {
-        setIsSuccess(true);
-      } else {
-        setError("Erreur inattendue lors de la création du compte");
+      const user = signUpData?.user;
+      if (!user) {
+        setError("Erreur lors de la création du compte");
+        return;
       }
+
+      // Step 2: Insert customer profile directly (relies on RLS INSERT policy)
+      const { error: insertError } = await supabase.from("customers").insert({
+        auth_user_id: user.id,
+        email: formData.email,
+        company_name: formData.companyName,
+        vat_number: formData.vatNumber || null,
+        first_name: formData.firstName || null,
+        last_name: formData.lastName || null,
+        phone: formData.phone || null,
+        address: formData.address || null,
+        address_line_2: formData.addressLine2 || null,
+        city: formData.city || null,
+        state: formData.state || null,
+        postal_code: formData.postalCode || null,
+        country: formData.country || null,
+        customer_type: "professional",
+        approved: false,
+        notes: formData.notes
+          ? `Demande d'inscription: ${formData.notes}`
+          : "Demande d'inscription via portail pro",
+      });
+
+      if (insertError) {
+        console.error("Customer insert error:", insertError);
+        setError("Erreur lors de la création du profil professionnel");
+        return;
+      }
+
+      // Success - redirect will happen via success state
+      setIsSuccess(true);
     } catch (err) {
       console.error("Unexpected error:", err);
       setError("Une erreur est survenue");
