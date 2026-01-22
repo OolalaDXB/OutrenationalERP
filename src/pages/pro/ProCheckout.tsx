@@ -14,6 +14,7 @@ import {
   Bitcoin,
   Globe
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -494,18 +495,31 @@ export function ProCheckout() {
               )}
 
               {selectedMethodCode === 'crypto' && selectedMethod && (
-                <div className="mt-4 p-4 bg-secondary/50 rounded-lg space-y-2 text-sm">
+                <div className="mt-4 p-4 bg-secondary/50 rounded-lg space-y-3 text-sm">
                   <p className="font-medium flex items-center gap-2">
                     <Bitcoin className="w-4 h-4" />
                     Paiement en Stablecoins
                   </p>
                   {selectedMethod.config.wallet_address ? (
-                    <div className="space-y-2 text-muted-foreground">
+                    <div className="space-y-3 text-muted-foreground">
                       <p>Envoyer <span className="font-medium text-foreground">{formatCurrency(totalTTC, 'USD')}</span> en USDC ou USDT à:</p>
-                      <div className="p-2 bg-background rounded border border-border font-mono text-xs break-all">
+                      
+                      {/* QR Code */}
+                      <div className="flex justify-center p-4 bg-white rounded-lg">
+                        <QRCodeSVG 
+                          value={selectedMethod.config.wallet_address} 
+                          size={140}
+                          level="M"
+                          includeMargin={false}
+                        />
+                      </div>
+                      
+                      <div className="p-2 bg-background rounded border border-border font-mono text-xs break-all text-center">
                         {selectedMethod.config.wallet_address}
                       </div>
-                      <p>Réseau: <span className="font-medium text-foreground capitalize">{selectedMethod.config.network || 'Ethereum'}</span></p>
+                      <p className="text-center">
+                        Réseau: <span className="font-medium text-foreground capitalize">{selectedMethod.config.network || 'Ethereum'}</span>
+                      </p>
                     </div>
                   ) : (
                     <p className="text-muted-foreground">Adresse de wallet non configurée. Contactez-nous.</p>
