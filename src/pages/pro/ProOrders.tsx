@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { FileText, Package, Loader2, ChevronDown, ChevronUp, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { generateProInvoicePDF } from "@/components/pro/ProInvoicePDF";
@@ -7,11 +7,13 @@ import { useProAuth } from "@/hooks/useProAuth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency, formatDateTime } from "@/lib/format";
+import { toast } from "sonner";
 
 export function ProOrders() {
   const { customer } = useProAuth();
   const queryClient = useQueryClient();
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const isInitialMount = useRef(true);
 
   // Fetch customer's orders
   const { data: orders = [], isLoading } = useQuery({
@@ -41,19 +43,42 @@ export function ProOrders() {
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'UPDATE',
           schema: 'public',
           table: 'orders',
           filter: `customer_id=eq.${customer.id}`
         },
-        () => {
+        (payload) => {
+          // Skip toast on initial mount
+          if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+          }
+          
+          // Show toast notification for status changes
+          const newStatus = payload.new?.status;
+          const orderNumber = payload.new?.order_number;
+          
+          if (newStatus && orderNumber) {
+            const statusLabel = orderStatusLabel[newStatus as keyof typeof orderStatusLabel] || newStatus;
+            toast.success(`Commande ${orderNumber}`, {
+              description: `Statut mis à jour : ${statusLabel}`,
+            });
+          }
+          
           // Refetch orders when any change occurs
           queryClient.invalidateQueries({ queryKey: ['pro_orders_full', customer.id] });
         }
       )
       .subscribe();
 
+    // Reset initial mount flag after a short delay
+    const timer = setTimeout(() => {
+      isInitialMount.current = false;
+    }, 1000);
+
     return () => {
+      clearTimeout(timer);
       supabase.removeChannel(channel);
     };
   }, [customer?.id, queryClient]);
