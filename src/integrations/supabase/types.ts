@@ -725,7 +725,9 @@ export type Database = {
       orders: {
         Row: {
           cancel_reason: string | null
+          cancellation_reason: string | null
           cancelled_at: string | null
+          confirmed_at: string | null
           created_at: string | null
           created_by: string | null
           currency: string | null
@@ -743,6 +745,11 @@ export type Database = {
           payment_method: string | null
           payment_reference: string | null
           payment_status: Database["public"]["Enums"]["payment_status"] | null
+          processing_at: string | null
+          refund_reason: string | null
+          refund_requested: boolean | null
+          refund_requested_at: string | null
+          refunded_at: string | null
           shipped_at: string | null
           shipping_address: string | null
           shipping_address_line_2: string | null
@@ -766,7 +773,9 @@ export type Database = {
         }
         Insert: {
           cancel_reason?: string | null
+          cancellation_reason?: string | null
           cancelled_at?: string | null
+          confirmed_at?: string | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
@@ -784,6 +793,11 @@ export type Database = {
           payment_method?: string | null
           payment_reference?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"] | null
+          processing_at?: string | null
+          refund_reason?: string | null
+          refund_requested?: boolean | null
+          refund_requested_at?: string | null
+          refunded_at?: string | null
           shipped_at?: string | null
           shipping_address?: string | null
           shipping_address_line_2?: string | null
@@ -807,7 +821,9 @@ export type Database = {
         }
         Update: {
           cancel_reason?: string | null
+          cancellation_reason?: string | null
           cancelled_at?: string | null
+          confirmed_at?: string | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
@@ -825,6 +841,11 @@ export type Database = {
           payment_method?: string | null
           payment_reference?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"] | null
+          processing_at?: string | null
+          refund_reason?: string | null
+          refund_requested?: boolean | null
+          refund_requested_at?: string | null
+          refunded_at?: string | null
           shipped_at?: string | null
           shipping_address?: string | null
           shipping_address_line_2?: string | null

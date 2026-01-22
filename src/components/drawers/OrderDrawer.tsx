@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { X, ShoppingCart, MapPin, Truck, Clock, Package, Pencil, Trash2, Loader2, CreditCard, Copy, FileText, ExternalLink, Printer, RotateCcw, Ban, Edit3, CheckCircle, Download } from "lucide-react";
+import { X, ShoppingCart, MapPin, Truck, Clock, Package, Pencil, Trash2, Loader2, CreditCard, Copy, FileText, ExternalLink, Printer, RotateCcw, Ban, Edit3, CheckCircle, Download, AlertTriangle, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -372,6 +372,72 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
           </div>
 
           <div className="p-6 space-y-6">
+            {/* Refund Request Alert */}
+            {(order as any).refund_requested && order.status !== 'refunded' && canWrite() && (
+              <div className="bg-warning/10 border border-warning/30 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <h4 className="font-medium text-warning-foreground">
+                      Demande de remboursement reçue
+                    </h4>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {(order as any).refund_requested_at && (
+                        <>Le {new Date((order as any).refund_requested_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</>
+                      )}
+                    </p>
+                    {(order as any).refund_reason && (
+                      <p className="text-sm mt-2 bg-background/50 rounded p-2 italic">
+                        "{(order as any).refund_reason}"
+                      </p>
+                    )}
+                    <div className="flex gap-2 mt-3">
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={async () => {
+                          try {
+                            await updateOrder.mutateAsync({
+                              id: order.id,
+                              status: 'refunded',
+                              payment_status: 'refunded',
+                              refunded_at: new Date().toISOString()
+                            } as any);
+                            toast({ title: "Remboursement effectué", description: `La commande ${order.order_number} a été remboursée.` });
+                          } catch (error) {
+                            toast({ title: "Erreur", description: "Impossible de traiter le remboursement.", variant: "destructive" });
+                          }
+                        }}
+                        disabled={isUpdating}
+                      >
+                        <RefreshCcw className="w-4 h-4 mr-1" />
+                        Accepter le remboursement
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={async () => {
+                          try {
+                            await updateOrder.mutateAsync({
+                              id: order.id,
+                              refund_requested: false,
+                              refund_reason: null
+                            } as any);
+                            toast({ title: "Demande refusée", description: "La demande de remboursement a été refusée." });
+                          } catch (error) {
+                            toast({ title: "Erreur", description: "Impossible de refuser la demande.", variant: "destructive" });
+                          }
+                        }}
+                        disabled={isUpdating}
+                      >
+                        Refuser
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Status Management */}
             {canWrite() && (
               <div className="bg-secondary rounded-lg p-4 space-y-4">
