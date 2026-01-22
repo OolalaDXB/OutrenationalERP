@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileText, Euro, Clock, CheckCircle, XCircle, Download, Plus, Pencil, Copy, Trash2, Check } from "lucide-react";
+import { FileText, Euro, Clock, CheckCircle, XCircle, Download, Plus, Pencil, Copy, Trash2, Check, X, Search } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -40,7 +40,7 @@ const statusVariant: Record<string, "success" | "warning" | "danger" | "info" | 
   sent: "info",
   paid: "success",
   overdue: "danger",
-  cancelled: "primary",
+  cancelled: "danger",
 };
 
 const statusLabel: Record<string, string> = {
@@ -376,14 +376,27 @@ export function InvoicesPage() {
             <option value="sent">Envoyée</option>
             <option value="paid">Payée</option>
             <option value="overdue">En retard</option>
+            <option value="cancelled">Annulée</option>
           </select>
-          <input
-            type="text"
-            placeholder="Rechercher facture..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 min-w-[200px] max-w-[300px] px-3 py-2 rounded-md border border-border bg-card text-sm"
-          />
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Rechercher facture..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="min-w-[200px] max-w-[300px] pl-9 pr-8 py-2 rounded-md border border-border bg-card text-sm"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-secondary transition-colors"
+                title="Effacer la recherche"
+              >
+                <X className="w-4 h-4 text-muted-foreground" />
+              </button>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <ImportExportDropdowns
