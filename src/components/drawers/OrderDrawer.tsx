@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { Order, OrderItem } from "@/hooks/useOrders";
-import { useCancelOrder, useUpdateOrder } from "@/hooks/useOrders";
+import { useCancelOrder, useUpdateOrder, useOrder } from "@/hooks/useOrders";
 import { useCancelOrderItem, useReturnOrderItem, useUpdateOrderItemQuantity } from "@/hooks/useOrderItemMutations";
 import { useInvoiceForOrder, useCreateInvoiceFromOrder, useCreateInvoiceItems } from "@/hooks/useInvoices";
 import { useAuth } from "@/hooks/useAuth";
@@ -63,6 +63,12 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   const updateItemQuantity = useUpdateOrderItemQuantity();
   const { data: products = [] } = useProducts();
   
+  // Fetch fresh order data to ensure we have latest status after mutations
+  const { data: freshOrder } = useOrder(order?.id || '');
+  
+  // Use fresh data if available, fallback to prop
+  const currentOrder = freshOrder || order;
+  
   // Invoice hooks
   const { data: existingInvoice, isLoading: isLoadingInvoice } = useInvoiceForOrder(order?.id);
   const createInvoice = useCreateInvoiceFromOrder();
@@ -89,11 +95,11 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   const [editQuantity, setEditQuantity] = useState(1);
 
   // Check if this is a Pro order
-  const isProOrder = useMemo(() => order?.source === "pro_portal", [order?.source]);
+  const isProOrder = useMemo(() => currentOrder?.source === "pro_portal", [currentOrder?.source]);
 
   const handleViewInvoice = () => {
     onClose();
-    navigate(`/invoices?search=${order?.order_number}`);
+    navigate(`/invoices?search=${currentOrder?.order_number}`);
   };
 
   const handleProductClick = (productId: string | null) => {
@@ -111,12 +117,12 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   };
 
   const handleCancel = async () => {
-    if (!order) return;
+    if (!currentOrder) return;
     try {
       // Stock restoration is now handled automatically by the database trigger
       // when we cancel the order - the trigger will create sale_reversal movements
-      await cancelOrder.mutateAsync({ id: order.id, reason: "Annulation par l'utilisateur" });
-      toast({ title: "Commande annulée", description: `La commande ${order.order_number} a été annulée. Le stock a été restauré automatiquement.` });
+      await cancelOrder.mutateAsync({ id: currentOrder.id, reason: "Annulation par l'utilisateur" });
+      toast({ title: "Commande annulée", description: `La commande ${currentOrder.order_number} a été annulée. Le stock a été restauré automatiquement.` });
       setShowCancelDialog(false);
     } catch (error) {
       toast(getErrorToast(error));
@@ -125,21 +131,21 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
 
   // Item-level actions
   const handleCancelItem = async () => {
-    if (!itemToCancel || !order) return;
+    if (!itemToCancel || !currentOrder) return;
     try {
-      await cancelOrderItem.mutateAsync({ itemId: itemToCancel.id, orderId: order.id });
+      await cancelOrderItem.mutateAsync({ itemId: itemToCancel.id, orderId: currentOrder.id });
       toast({ title: "Article annulé", description: `${itemToCancel.title} a été annulé. Le stock a été restauré.` });
       setItemToCancel(null);
       
       // Check if all items are now cancelled - if so, cancel the entire order
-      const remainingItems = order.order_items?.filter(
+      const remainingItems = currentOrder.order_items?.filter(
         item => item.id !== itemToCancel.id && item.status === 'active'
       );
       
       if (remainingItems?.length === 0) {
         // All items are cancelled, cancel the order too
         await updateOrder.mutateAsync({
-          id: order.id,
+          id: currentOrder.id,
           status: 'cancelled',
           cancelled_at: new Date().toISOString()
         } as Parameters<typeof updateOrder.mutateAsync>[0]);
@@ -151,9 +157,9 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   };
 
   const handleReturnItem = async () => {
-    if (!itemToReturn || !order || !returnReason.trim()) return;
+    if (!itemToReturn || !currentOrder || !returnReason.trim()) return;
     try {
-      await returnOrderItem.mutateAsync({ itemId: itemToReturn.id, orderId: order.id, returnReason });
+      await returnOrderItem.mutateAsync({ itemId: itemToReturn.id, orderId: currentOrder.id, returnReason });
       toast({ title: "Retour enregistré", description: `${itemToReturn.title} a été marqué comme retourné. Le stock a été restauré.` });
       setItemToReturn(null);
       setReturnReason("");
@@ -163,11 +169,11 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   };
 
   const handleUpdateQuantity = async () => {
-    if (!itemToEdit || !order || editQuantity <= 0) return;
+    if (!itemToEdit || !currentOrder || editQuantity <= 0) return;
     try {
       await updateItemQuantity.mutateAsync({ 
         itemId: itemToEdit.id, 
-        orderId: order.id, 
+        orderId: currentOrder.id, 
         newQuantity: editQuantity,
         unitPrice: itemToEdit.unit_price
       });
@@ -179,13 +185,13 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   };
 
   const handleRefund = async () => {
-    if (!order) return;
+    if (!currentOrder) return;
     try {
       // Generate credit note number
       const creditNoteInfo = await getNextCreditNoteNumber();
       
       await updateOrder.mutateAsync({ 
-        id: order.id, 
+        id: currentOrder.id, 
         status: "refunded",
         payment_status: "refunded",
         refunded_at: new Date().toISOString()
@@ -194,17 +200,17 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
       // Generate and download credit note PDF
       if (settings) {
         const doc = await generateCreditNotePDF({
-          order,
+          order: currentOrder,
           settings,
           creditNoteNumber: creditNoteInfo.full,
-          originalInvoiceNumber: order.order_number
+          originalInvoiceNumber: currentOrder.order_number
         });
         downloadCreditNote(doc, creditNoteInfo.full);
       }
       
       toast({ 
         title: "Commande remboursée", 
-        description: `Avoir ${creditNoteInfo.full} généré pour la commande ${order.order_number}.` 
+        description: `Avoir ${creditNoteInfo.full} généré pour la commande ${currentOrder.order_number}.` 
       });
       setShowRefundDialog(false);
     } catch (error) {
@@ -214,7 +220,7 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   };
 
   const handleStatusChange = async (newStatus: string) => {
-    if (!order) return;
+    if (!currentOrder) return;
     
     // Show confirmation for cancelled/refunded
     if (newStatus === "cancelled") {
@@ -227,14 +233,14 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
     }
     // Show tracking input dialog for shipped
     if (newStatus === "shipped") {
-      setTrackingNumber(order.tracking_number || "");
-      setTrackingUrl(order.tracking_url || "");
+      setTrackingNumber(currentOrder.tracking_number || "");
+      setTrackingUrl(currentOrder.tracking_url || "");
       setShowShippedDialog(true);
       return;
     }
 
     try {
-      const updateData: Record<string, unknown> = { id: order.id, status: newStatus };
+      const updateData: Record<string, unknown> = { id: currentOrder.id, status: newStatus };
       
       // Add timestamps based on status
       if (newStatus === "confirmed") {
@@ -253,16 +259,16 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   };
 
   const handleShipOrder = async () => {
-    if (!order) return;
+    if (!currentOrder) return;
     try {
       await updateOrder.mutateAsync({
-        id: order.id,
+        id: currentOrder.id,
         status: "shipped",
         shipped_at: new Date().toISOString(),
         tracking_number: trackingNumber || null,
         tracking_url: trackingUrl || null
       } as Parameters<typeof updateOrder.mutateAsync>[0]);
-      toast({ title: "Commande expédiée", description: `La commande ${order.order_number} a été marquée comme expédiée.` });
+      toast({ title: "Commande expédiée", description: `La commande ${currentOrder.order_number} a été marquée comme expédiée.` });
       setShowShippedDialog(false);
       setTrackingNumber("");
       setTrackingUrl("");
@@ -272,9 +278,9 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   };
 
   const handlePaymentStatusChange = async (newStatus: string) => {
-    if (!order) return;
+    if (!currentOrder) return;
     try {
-      const updateData: Record<string, unknown> = { id: order.id, payment_status: newStatus };
+      const updateData: Record<string, unknown> = { id: currentOrder.id, payment_status: newStatus };
       
       if (newStatus === "paid") {
         updateData.paid_at = new Date().toISOString();
@@ -289,14 +295,14 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
 
   // Quick action: Validate order (set to confirmed)
   const handleQuickConfirm = async () => {
-    if (!order) return;
+    if (!currentOrder) return;
     try {
       await updateOrder.mutateAsync({ 
-        id: order.id, 
+        id: currentOrder.id, 
         status: "confirmed",
         confirmed_at: new Date().toISOString()
       } as Parameters<typeof updateOrder.mutateAsync>[0]);
-      toast({ title: "Commande validée", description: `La commande ${order.order_number} a été confirmée.` });
+      toast({ title: "Commande validée", description: `La commande ${currentOrder.order_number} a été confirmée.` });
     } catch (error) {
       toast({ title: "Erreur", description: "Impossible de valider la commande.", variant: "destructive" });
     }
@@ -304,14 +310,14 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
 
   // Quick action: Mark as paid
   const handleQuickMarkPaid = async () => {
-    if (!order) return;
+    if (!currentOrder) return;
     try {
       await updateOrder.mutateAsync({ 
-        id: order.id, 
+        id: currentOrder.id, 
         payment_status: "paid", 
         paid_at: new Date().toISOString() 
       } as Parameters<typeof updateOrder.mutateAsync>[0]);
-      toast({ title: "Paiement confirmé", description: `La commande ${order.order_number} a été marquée comme payée.` });
+      toast({ title: "Paiement confirmé", description: `La commande ${currentOrder.order_number} a été marquée comme payée.` });
     } catch (error) {
       toast({ title: "Erreur", description: "Impossible de mettre à jour le paiement.", variant: "destructive" });
     }
@@ -319,28 +325,28 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
 
   // Download Pro Purchase Order PDF
   const handleDownloadPurchaseOrder = async () => {
-    if (!order || !settings) return;
+    if (!currentOrder || !settings) return;
     
     setIsDownloadingPurchaseOrder(true);
     try {
       const orderData = {
-        id: order.id,
-        order_number: order.order_number,
-        created_at: order.created_at,
-        customer_name: order.customer_name,
-        customer_email: order.customer_email,
-        shipping_address: order.shipping_address,
-        shipping_address_line_2: order.shipping_address_line_2,
-        shipping_city: order.shipping_city,
-        shipping_postal_code: order.shipping_postal_code,
-        shipping_country: order.shipping_country,
-        subtotal: order.subtotal,
-        discount_amount: order.discount_amount,
-        tax_amount: order.tax_amount,
-        shipping_amount: order.shipping_amount,
-        total: order.total,
-        payment_method: order.payment_method,
-        order_items: (order.order_items || []).map((item) => ({
+        id: currentOrder.id,
+        order_number: currentOrder.order_number,
+        created_at: currentOrder.created_at,
+        customer_name: currentOrder.customer_name,
+        customer_email: currentOrder.customer_email,
+        shipping_address: currentOrder.shipping_address,
+        shipping_address_line_2: currentOrder.shipping_address_line_2,
+        shipping_city: currentOrder.shipping_city,
+        shipping_postal_code: currentOrder.shipping_postal_code,
+        shipping_country: currentOrder.shipping_country,
+        subtotal: currentOrder.subtotal,
+        discount_amount: currentOrder.discount_amount,
+        tax_amount: currentOrder.tax_amount,
+        shipping_amount: currentOrder.shipping_amount,
+        total: currentOrder.total,
+        payment_method: currentOrder.payment_method,
+        order_items: (currentOrder.order_items || []).map((item) => ({
           title: item.title,
           artist_name: item.artist_name,
           sku: item.sku,
@@ -356,8 +362,8 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
         vatLabel: "TVA (20%)",
         paymentTerms: "30",
       });
-      downloadProPurchaseOrder(doc, order.order_number);
-      toast({ title: "Téléchargé", description: `bon-de-commande-${order.order_number}.pdf` });
+      downloadProPurchaseOrder(doc, currentOrder.order_number);
+      toast({ title: "Téléchargé", description: `bon-de-commande-${currentOrder.order_number}.pdf` });
     } catch (error) {
       console.error("Error generating purchase order:", error);
       toast({ title: "Erreur", description: "Impossible de générer le bon de commande.", variant: "destructive" });
@@ -368,34 +374,34 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
 
   // Generate invoice from order
   const handleGenerateInvoice = async () => {
-    if (!order) return;
+    if (!currentOrder) return;
     
     setIsGeneratingInvoice(true);
     try {
       // Build shipping address
       const addressParts = [
-        order.shipping_address,
-        order.shipping_address_line_2,
-        order.shipping_postal_code,
-        order.shipping_city,
-        order.shipping_country
+        currentOrder.shipping_address,
+        currentOrder.shipping_address_line_2,
+        currentOrder.shipping_postal_code,
+        currentOrder.shipping_city,
+        currentOrder.shipping_country
       ].filter(Boolean);
       
       // Create the invoice
       const invoice = await createInvoice.mutateAsync({
-        orderId: order.id,
-        customerId: order.customer_id,
-        recipientName: order.customer_name || order.customer_email,
-        recipientEmail: order.customer_email,
+        orderId: currentOrder.id,
+        customerId: currentOrder.customer_id,
+        recipientName: currentOrder.customer_name || currentOrder.customer_email,
+        recipientEmail: currentOrder.customer_email,
         recipientAddress: addressParts.join(', '),
-        subtotal: order.subtotal,
-        taxAmount: order.tax_amount,
-        total: order.total,
-        currency: order.currency
+        subtotal: currentOrder.subtotal,
+        taxAmount: currentOrder.tax_amount,
+        total: currentOrder.total,
+        currency: currentOrder.currency
       });
       
       // Create invoice items from active order items
-      const activeItems = (order.order_items || []).filter(item => item.status === 'active');
+      const activeItems = (currentOrder.order_items || []).filter(item => item.status === 'active');
       if (activeItems.length > 0) {
         await createInvoiceItems.mutateAsync({
           invoiceId: invoice.id,
@@ -424,31 +430,31 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
   if (!isOpen || !order) return null;
 
   const timeline = [
-    { status: "pending", label: "Commande reçue", date: order.created_at, active: true },
-    { status: "processing", label: "En préparation", date: order.status !== "pending" ? order.created_at : null, active: order.status !== "pending" && order.status !== "cancelled" },
-    { status: "shipped", label: "Expédiée", date: order.shipped_at || (order.tracking_number ? order.created_at : null), active: order.status === "shipped" || order.status === "delivered" },
-    { status: "delivered", label: "Livrée", date: order.delivered_at || (order.status === "delivered" ? order.created_at : null), active: order.status === "delivered" },
+    { status: "pending", label: "Commande reçue", date: currentOrder.created_at, active: true },
+    { status: "processing", label: "En préparation", date: currentOrder.status !== "pending" ? currentOrder.created_at : null, active: currentOrder.status !== "pending" && currentOrder.status !== "cancelled" },
+    { status: "shipped", label: "Expédiée", date: currentOrder.shipped_at || (currentOrder.tracking_number ? currentOrder.created_at : null), active: currentOrder.status === "shipped" || currentOrder.status === "delivered" },
+    { status: "delivered", label: "Livrée", date: currentOrder.delivered_at || (currentOrder.status === "delivered" ? currentOrder.created_at : null), active: currentOrder.status === "delivered" },
   ];
 
-  const customerInitials = order.customer_name 
-    ? order.customer_name.split(' ').map(n => n[0]).join('')
-    : order.customer_email[0].toUpperCase();
+  const customerInitials = currentOrder.customer_name 
+    ? currentOrder.customer_name.split(' ').map(n => n[0]).join('')
+    : currentOrder.customer_email[0].toUpperCase();
 
   const shippingAddress = [
-    order.shipping_address,
-    order.shipping_address_line_2,
-    order.shipping_city,
-    order.shipping_postal_code,
-    order.shipping_country
+    currentOrder.shipping_address,
+    currentOrder.shipping_address_line_2,
+    currentOrder.shipping_city,
+    currentOrder.shipping_postal_code,
+    currentOrder.shipping_country
   ].filter(Boolean).join(', ');
 
-  const canModifyOrder = order.status !== "cancelled" && order.status !== "refunded" && order.status !== "delivered";
+  const canModifyOrder = currentOrder.status !== "cancelled" && currentOrder.status !== "refunded" && currentOrder.status !== "delivered";
   const isUpdating = updateOrder.isPending || cancelOrder.isPending || isGeneratingInvoice;
   
   // Show quick actions only if order can be confirmed or marked as paid
-  const canQuickConfirm = order.status === "pending";
-  const canQuickMarkPaid = order.payment_status === "pending" && order.status !== "cancelled" && order.status !== "refunded";
-  const canGenerateInvoice = !existingInvoice && !isLoadingInvoice && order.status !== "cancelled";
+  const canQuickConfirm = currentOrder.status === "pending";
+  const canQuickMarkPaid = currentOrder.payment_status === "pending" && currentOrder.status !== "cancelled" && currentOrder.status !== "refunded";
+  const canGenerateInvoice = !existingInvoice && !isLoadingInvoice && currentOrder.status !== "cancelled";
 
   return (
     <>
@@ -466,14 +472,14 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-lg font-semibold">Commande {order.order_number}</h2>
+                  <h2 className="text-lg font-semibold">Commande {currentOrder.order_number}</h2>
                   {isProOrder && (
                     <span className="inline-flex items-center bg-violet-100 text-violet-700 border border-violet-300 text-[10px] px-1.5 py-0.5 rounded font-semibold">
                       PRO
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-muted-foreground">{formatDateTime(order.created_at)}</p>
+                <p className="text-sm text-muted-foreground">{formatDateTime(currentOrder.created_at)}</p>
               </div>
             </div>
             <button onClick={onClose} className="p-2 rounded-lg hover:bg-secondary transition-colors">
@@ -483,7 +489,7 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
 
           <div className="p-6 space-y-6">
             {/* Refund Request Alert */}
-            {(order as any).refund_requested && order.status !== 'refunded' && canWrite() && (
+            {(currentOrder as any).refund_requested && currentOrder.status !== 'refunded' && canWrite() && (
               <div className="bg-warning/10 border border-warning/30 rounded-lg p-4">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
@@ -492,13 +498,13 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
                       Demande de remboursement reçue
                     </h4>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {(order as any).refund_requested_at && (
-                        <>Le {new Date((order as any).refund_requested_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</>
+                      {(currentOrder as any).refund_requested_at && (
+                        <>Le {new Date((currentOrder as any).refund_requested_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</>
                       )}
                     </p>
-                    {(order as any).refund_reason && (
+                    {(currentOrder as any).refund_reason && (
                       <p className="text-sm mt-2 bg-background/50 rounded p-2 italic">
-                        "{(order as any).refund_reason}"
+                        "{(currentOrder as any).refund_reason}"
                       </p>
                     )}
                     <div className="flex gap-2 mt-3">
@@ -512,7 +518,7 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
                             
                             // Update order status
                             await updateOrder.mutateAsync({
-                              id: order.id,
+                              id: currentOrder.id,
                               status: 'refunded',
                               payment_status: 'refunded',
                               refunded_at: new Date().toISOString()
@@ -521,17 +527,17 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
                             // Generate and download credit note PDF
                             if (settings) {
                               const doc = await generateCreditNotePDF({
-                                order,
+                                order: currentOrder,
                                 settings,
                                 creditNoteNumber: creditNoteInfo.full,
-                                originalInvoiceNumber: order.order_number
+                                originalInvoiceNumber: currentOrder.order_number
                               });
                               downloadCreditNote(doc, creditNoteInfo.full);
                             }
                             
                             toast({ 
                               title: "Remboursement effectué", 
-                              description: `Avoir ${creditNoteInfo.full} généré pour la commande ${order.order_number}.` 
+                              description: `Avoir ${creditNoteInfo.full} généré pour la commande ${currentOrder.order_number}.` 
                             });
                           } catch (error) {
                             console.error('Refund error:', error);
@@ -549,7 +555,7 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
                         onClick={async () => {
                           try {
                             await updateOrder.mutateAsync({
-                              id: order.id,
+                              id: currentOrder.id,
                               refund_requested: false,
                               refund_reason: null
                             } as any);
@@ -575,7 +581,7 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
                   <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground block">Statut commande</Label>
                     <Select 
-                      value={order.status || "pending"} 
+                      value={currentOrder.status || "pending"} 
                       onValueChange={handleStatusChange}
                       disabled={isUpdating}
                     >
@@ -597,7 +603,7 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
                       Statut paiement
                     </Label>
                     <Select 
-                      value={order.payment_status || "pending"} 
+                      value={currentOrder.payment_status || "pending"}
                       onValueChange={handlePaymentStatusChange}
                       disabled={isUpdating}
                     >
@@ -678,15 +684,15 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
             {/* Current Status Display (for read-only users) */}
             {!canWrite() && (
               <div className="flex items-center justify-between">
-                {order.status && (
-                  <StatusBadge variant={orderStatusVariant[order.status]}>
-                    {orderStatusLabel[order.status]}
+                {currentOrder.status && (
+                  <StatusBadge variant={orderStatusVariant[currentOrder.status]}>
+                    {orderStatusLabel[currentOrder.status]}
                   </StatusBadge>
                 )}
-                {order.payment_status === "paid" && (
+                {currentOrder.payment_status === "paid" && (
                   <span className="text-sm text-success font-medium">Payé</span>
                 )}
-                {order.payment_status === "refunded" && (
+                {currentOrder.payment_status === "refunded" && (
                   <span className="text-sm text-danger font-medium">Remboursé</span>
                 )}
               </div>
@@ -699,8 +705,8 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
                   {customerInitials}
                 </div>
                 <div>
-                  <div className="font-medium">{order.customer_name || '—'}</div>
-                  <div className="text-sm text-muted-foreground">{order.customer_email}</div>
+                  <div className="font-medium">{currentOrder.customer_name || '—'}</div>
+                  <div className="text-sm text-muted-foreground">{currentOrder.customer_email}</div>
                 </div>
               </div>
               {shippingAddress && (
@@ -732,11 +738,11 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
                   </div>
                 ))}
               </div>
-              {order.tracking_number && (
+              {currentOrder.tracking_number && (
                 <div className="mt-3 flex items-center gap-2 text-sm">
                   <Truck className="w-4 h-4 text-muted-foreground" />
                   <span className="text-muted-foreground">Suivi :</span>
-                  <span className="font-mono text-primary">{order.tracking_number}</span>
+                  <span className="font-mono text-primary">{currentOrder.tracking_number}</span>
                 </div>
               )}
             </div>
@@ -745,10 +751,10 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
             <div>
               <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
                 <Package className="w-4 h-4" />
-                Articles ({order.order_items?.length || 0})
+                Articles ({currentOrder.order_items?.length || 0})
               </h3>
               <div className="space-y-3">
-                {order.order_items?.map((item) => {
+                {currentOrder.order_items?.map((item) => {
                   const isItemActive = item.status === 'active';
                   const isItemCancelled = item.status === 'cancelled';
                   const isItemReturned = item.status === 'returned';
@@ -845,21 +851,21 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
             <div className="border-t border-border pt-4 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Sous-total</span>
-                <span>{formatCurrency(order.subtotal)}</span>
+                <span>{formatCurrency(currentOrder.subtotal)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Livraison</span>
-                <span>{formatCurrency(order.shipping_amount)}</span>
+                <span>{formatCurrency(currentOrder.shipping_amount)}</span>
               </div>
-              {(order.discount_amount ?? 0) > 0 && (
+              {(currentOrder.discount_amount ?? 0) > 0 && (
                 <div className="flex justify-between text-sm text-success">
                   <span>Remise</span>
-                  <span>-{formatCurrency(order.discount_amount)}</span>
+                  <span>-{formatCurrency(currentOrder.discount_amount)}</span>
                 </div>
               )}
               <div className="flex justify-between font-semibold text-lg pt-2 border-t border-border">
                 <span>Total</span>
-                <span>{formatCurrency(order.total)}</span>
+                <span>{formatCurrency(currentOrder.total)}</span>
               </div>
             </div>
 
@@ -925,7 +931,7 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Annuler la commande ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Cette action annulera la commande "{order.order_number}". Le stock sera restauré.
+              Cette action annulera la commande "{currentOrder.order_number}". Le stock sera restauré.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -943,7 +949,7 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Rembourser la commande ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Cette action marquera la commande "{order.order_number}" comme remboursée.
+              Cette action marquera la commande "{currentOrder.order_number}" comme remboursée.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -964,7 +970,7 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
               Marquer comme expédiée
             </DialogTitle>
             <DialogDescription>
-              Ajoutez les informations de suivi pour la commande "{order.order_number}"
+              Ajoutez les informations de suivi pour la commande "{currentOrder.order_number}"
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -1002,7 +1008,7 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
         <OrderEditModal
           isOpen={showEditModal}
           onClose={() => setShowEditModal(false)}
-          order={order}
+          order={currentOrder}
         />
       )}
 
@@ -1011,7 +1017,7 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
         <OrderFormModal
           isOpen={showDuplicateModal}
           onClose={() => setShowDuplicateModal(false)}
-          duplicateFrom={order}
+          duplicateFrom={currentOrder}
         />
       )}
 
@@ -1025,7 +1031,7 @@ export function OrderDrawer({ order, isOpen, onClose }: OrderDrawerProps) {
       {/* Order Documents Dialog */}
       {showDocumentsDialog && (
         <OrderDocumentsDialog
-          order={order}
+          order={currentOrder}
           isOpen={showDocumentsDialog}
           onClose={() => setShowDocumentsDialog(false)}
         />
