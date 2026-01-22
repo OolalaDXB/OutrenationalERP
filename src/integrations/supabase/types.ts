@@ -95,6 +95,42 @@ export type Database = {
         }
         Relationships: []
       }
+      bank_accounts: {
+        Row: {
+          active: boolean | null
+          bank_name: string
+          bic: string
+          created_at: string | null
+          currency: string
+          iban: string
+          id: string
+          is_default: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          bank_name: string
+          bic: string
+          created_at?: string | null
+          currency?: string
+          iban: string
+          id?: string
+          is_default?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          bank_name?: string
+          bic?: string
+          created_at?: string | null
+          currency?: string
+          iban?: string
+          id?: string
+          is_default?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           accepts_marketing: boolean | null
@@ -122,6 +158,7 @@ export type Database = {
           payment_terms: number | null
           phone: string | null
           postal_code: string | null
+          preferred_currency: string | null
           state: string | null
           tags: string[] | null
           total_spent: number | null
@@ -156,6 +193,7 @@ export type Database = {
           payment_terms?: number | null
           phone?: string | null
           postal_code?: string | null
+          preferred_currency?: string | null
           state?: string | null
           tags?: string[] | null
           total_spent?: number | null
@@ -190,6 +228,7 @@ export type Database = {
           payment_terms?: number | null
           phone?: string | null
           postal_code?: string | null
+          preferred_currency?: string | null
           state?: string | null
           tags?: string[] | null
           total_spent?: number | null
@@ -743,6 +782,7 @@ export type Database = {
           order_number: string
           paid_at: string | null
           payment_method: string | null
+          payment_method_code: string | null
           payment_reference: string | null
           payment_status: Database["public"]["Enums"]["payment_status"] | null
           processing_at: string | null
@@ -791,6 +831,7 @@ export type Database = {
           order_number: string
           paid_at?: string | null
           payment_method?: string | null
+          payment_method_code?: string | null
           payment_reference?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"] | null
           processing_at?: string | null
@@ -839,6 +880,7 @@ export type Database = {
           order_number?: string
           paid_at?: string | null
           payment_method?: string | null
+          payment_method_code?: string | null
           payment_reference?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"] | null
           processing_at?: string | null
@@ -876,6 +918,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      payment_methods: {
+        Row: {
+          active: boolean | null
+          code: string
+          config: Json | null
+          created_at: string | null
+          currencies: string[] | null
+          description: string | null
+          display_order: number | null
+          icon: string | null
+          id: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          code: string
+          config?: Json | null
+          created_at?: string | null
+          currencies?: string[] | null
+          description?: string | null
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          code?: string
+          config?: Json | null
+          created_at?: string | null
+          currencies?: string[] | null
+          description?: string | null
+          display_order?: number | null
+          icon?: string | null
+          id?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       product_genres: {
         Row: {
