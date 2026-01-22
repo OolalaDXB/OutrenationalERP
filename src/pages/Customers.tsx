@@ -113,7 +113,7 @@ export function CustomersPage() {
 
   // Filtrage on current page's customers
   const filteredCustomers = useMemo(() => {
-    return customers.filter((customer) => {
+    const filtered = customers.filter((customer) => {
       if (!customer) return false;
       const fullName = `${customer.first_name || ''} ${customer.last_name || ''}`.toLowerCase();
       const companyName = (customer.company_name || '').toLowerCase();
@@ -125,17 +125,40 @@ export function CustomersPage() {
         (customer.city && customer.city.toLowerCase().includes(searchTerm.toLowerCase()));
 
       const matchesCountry = countryFilter === "all" || customer.country === countryFilter;
-      const matchesType = typeFilter === "all" || customer.customer_type === typeFilter;
+      const isPro = customer.customer_type === 'professional' || customer.customer_type === 'professionnel';
+      const matchesType = typeFilter === "all" || 
+        customer.customer_type === typeFilter ||
+        (typeFilter === 'professional' && customer.customer_type === 'professionnel') ||
+        (typeFilter === 'professionnel' && customer.customer_type === 'professional');
       
       // Approval filter for professional customers
       let matchesApproval = true;
       if (approvalFilter === "pending") {
-        matchesApproval = customer.customer_type === 'professional' && customer.approved === false;
+        matchesApproval = isPro && customer.approved === false;
       } else if (approvalFilter === "approved") {
-        matchesApproval = customer.customer_type === 'professional' && customer.approved === true;
+        matchesApproval = isPro && customer.approved === true;
       }
 
       return matchesSearch && matchesCountry && matchesType && matchesApproval;
+    });
+    
+    // Sort: Pro customers first, then by created_at desc
+    return filtered.sort((a, b) => {
+      const aIsPro = a.customer_type === 'professional' || a.customer_type === 'professionnel';
+      const bIsPro = b.customer_type === 'professional' || b.customer_type === 'professionnel';
+      
+      if (aIsPro && !bIsPro) return -1;
+      if (!aIsPro && bIsPro) return 1;
+      
+      // Within same type, sort by pending approval first for pro
+      if (aIsPro && bIsPro) {
+        const aIsPending = a.approved === false;
+        const bIsPending = b.approved === false;
+        if (aIsPending && !bIsPending) return -1;
+        if (!aIsPending && bIsPending) return 1;
+      }
+      
+      return 0;
     });
   }, [customers, searchTerm, countryFilter, typeFilter, approvalFilter]);
 
@@ -223,13 +246,17 @@ export function CustomersPage() {
         customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (customer.city && customer.city.toLowerCase().includes(searchTerm.toLowerCase()));
       const matchesCountry = countryFilter === "all" || customer.country === countryFilter;
-      const matchesType = typeFilter === "all" || customer.customer_type === typeFilter;
+      const isPro = customer.customer_type === 'professional' || customer.customer_type === 'professionnel';
+      const matchesType = typeFilter === "all" || 
+        customer.customer_type === typeFilter ||
+        (typeFilter === 'professional' && customer.customer_type === 'professionnel') ||
+        (typeFilter === 'professionnel' && customer.customer_type === 'professional');
       
       let matchesApproval = true;
       if (approvalFilter === "pending") {
-        matchesApproval = customer.customer_type === 'professional' && customer.approved === false;
+        matchesApproval = isPro && customer.approved === false;
       } else if (approvalFilter === "approved") {
-        matchesApproval = customer.customer_type === 'professional' && customer.approved === true;
+        matchesApproval = isPro && customer.approved === true;
       }
       
       return matchesSearch && matchesCountry && matchesType && matchesApproval;
@@ -353,7 +380,8 @@ export function CustomersPage() {
               >
                 <option value="all">Tous les types</option>
                 <option value="particulier">Particuliers</option>
-                <option value="professionnel">Professionnels</option>
+                <option value="professional">Professionnels</option>
+                <option value="professionnel">Professionnels (legacy)</option>
               </select>
               <select
                 className="px-3 py-2 rounded-md border border-border bg-card text-sm cursor-pointer"
@@ -391,85 +419,144 @@ export function CustomersPage() {
             <table className="w-full border-collapse">
               <thead>
                 <tr>
-                  <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Client</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Localisation</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Commandes</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">CA Total</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Dernière commande</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Type</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Nom / Entreprise</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border hidden lg:table-cell">Contact</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border hidden md:table-cell">Localisation</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Statut</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border hidden sm:table-cell">Commandes</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border hidden sm:table-cell">CA Total</th>
                   {canWrite() && (
-                    <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border"></th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border"></th>
                   )}
                 </tr>
               </thead>
               <tbody>
-                {filteredCustomers.map((customer) => (
-                  <tr
-                    key={customer.id}
-                    className="border-b border-border last:border-b-0 hover:bg-secondary/50 cursor-pointer transition-colors"
-                    onClick={() => handleRowClick(customer)}
-                  >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold ${
-                          customer.customer_type === 'professionnel' 
-                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' 
-                            : 'bg-primary/10 text-primary'
-                        }`}>
-                          {customer.customer_type === 'professionnel' ? (
-                            <Building2 className="w-5 h-5" />
-                          ) : (
-                            <>{(customer.first_name?.[0] || '?')}{(customer.last_name?.[0] || '')}</>
-                          )}
-                        </div>
-                        <div>
-                          {customer.customer_type === 'professionnel' && customer.company_name ? (
-                            <>
-                              <div className="font-semibold">{customer.company_name}</div>
-                              <div className="text-xs text-muted-foreground">{customer.first_name} {customer.last_name} • {customer.email}</div>
-                            </>
-                          ) : (
-                            <>
-                              <div className="font-semibold">{customer.first_name} {customer.last_name}</div>
-                              <div className="text-xs text-muted-foreground">{customer.email}</div>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-muted-foreground">
-                      {customer.city ? `${customer.city}, ${customer.country || ''}` : customer.country || '—'}
-                    </td>
-                    <td className="px-6 py-4 text-sm tabular-nums">{customer.orders_count || 0}</td>
-                    <td className="px-6 py-4 font-semibold tabular-nums">{formatCurrency(customer.total_spent)}</td>
-                    <td className="px-6 py-4 text-sm text-muted-foreground">{formatDate(customer.last_order_at)}</td>
-                    {canWrite() && (
-                      <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <button className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground">
-                              <MoreHorizontal className="w-4 h-4" />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleEdit(customer)}>
-                              <Pencil className="w-4 h-4 mr-2" />
-                              Modifier
-                            </DropdownMenuItem>
-                            {canDelete() && (
-                              <DropdownMenuItem 
-                                onClick={() => setSoftDeleteDialog(customer)}
-                                className="text-destructive focus:text-destructive"
-                              >
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                Archiver
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                {filteredCustomers.map((customer) => {
+                  const isPro = customer.customer_type === 'professional' || customer.customer_type === 'professionnel';
+                  const isPendingApproval = isPro && customer.approved === false;
+                  const isApproved = isPro && customer.approved === true;
+                  
+                  return (
+                    <tr
+                      key={customer.id}
+                      className="border-b border-border last:border-b-0 hover:bg-secondary/50 cursor-pointer transition-colors"
+                      onClick={() => handleRowClick(customer)}
+                    >
+                      {/* Type Badge */}
+                      <td className="px-4 py-4">
+                        {isPro ? (
+                          <Badge variant="default" className="bg-primary/90 text-primary-foreground">
+                            PRO
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-muted-foreground">
+                            Particulier
+                          </Badge>
+                        )}
                       </td>
-                    )}
-                  </tr>
-                ))}
+                      
+                      {/* Name / Company */}
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 ${
+                            isPro 
+                              ? 'bg-primary/10 text-primary' 
+                              : 'bg-muted text-muted-foreground'
+                          }`}>
+                            {isPro ? (
+                              <Building2 className="w-5 h-5" />
+                            ) : (
+                              <>{(customer.first_name?.[0] || '?')}{(customer.last_name?.[0] || '')}</>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            {isPro && customer.company_name ? (
+                              <>
+                                <div className="font-semibold truncate">{customer.company_name}</div>
+                                <div className="text-xs text-muted-foreground truncate">{customer.email}</div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="font-semibold truncate">
+                                  {`${customer.first_name || ''} ${customer.last_name || ''}`.trim() || '—'}
+                                </div>
+                                <div className="text-xs text-muted-foreground truncate">{customer.email}</div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      
+                      {/* Contact (for Pro customers) */}
+                      <td className="px-4 py-4 text-sm text-muted-foreground hidden lg:table-cell">
+                        {isPro ? (
+                          <span>{`${customer.first_name || ''} ${customer.last_name || ''}`.trim() || '—'}</span>
+                        ) : (
+                          <span className="text-muted-foreground/50">—</span>
+                        )}
+                      </td>
+                      
+                      {/* Location */}
+                      <td className="px-4 py-4 text-sm text-muted-foreground hidden md:table-cell">
+                        {customer.city ? `${customer.city}, ${customer.country || ''}` : customer.country || '—'}
+                      </td>
+                      
+                      {/* Approval Status */}
+                      <td className="px-4 py-4">
+                        {isPro ? (
+                          isPendingApproval ? (
+                            <Badge variant="outline" className="border-warning text-warning bg-warning/10">
+                              En attente
+                            </Badge>
+                          ) : isApproved ? (
+                            <Badge variant="outline" className="border-success text-success bg-success/10">
+                              Approuvé
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      
+                      {/* Orders count */}
+                      <td className="px-4 py-4 text-sm tabular-nums hidden sm:table-cell">{customer.orders_count || 0}</td>
+                      
+                      {/* Total spent */}
+                      <td className="px-4 py-4 font-semibold tabular-nums hidden sm:table-cell">{formatCurrency(customer.total_spent)}</td>
+                      
+                      {/* Actions */}
+                      {canWrite() && (
+                        <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button className="p-2 rounded-md hover:bg-secondary transition-colors text-muted-foreground">
+                                <MoreHorizontal className="w-4 h-4" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-popover">
+                              <DropdownMenuItem onClick={() => handleEdit(customer)}>
+                                <Pencil className="w-4 h-4 mr-2" />
+                                Modifier
+                              </DropdownMenuItem>
+                              {canDelete() && (
+                                <DropdownMenuItem 
+                                  onClick={() => setSoftDeleteDialog(customer)}
+                                  className="text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Archiver
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
 

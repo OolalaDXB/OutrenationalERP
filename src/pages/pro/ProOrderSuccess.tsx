@@ -7,7 +7,11 @@ import {
   Package, 
   CreditCard,
   Building2,
-  Loader2
+  Loader2,
+  Wallet,
+  Bitcoin,
+  Copy,
+  Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +19,8 @@ import { Separator } from "@/components/ui/separator";
 import { useSettings } from "@/hooks/useSettings";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { generateProPurchaseOrderPDF, downloadProPurchaseOrder } from "@/components/pro/ProPurchaseOrderPDF";
+import { QRCodeSVG } from "qrcode.react";
+import { type PaymentMethod } from "@/hooks/usePaymentMethods";
 
 interface OrderItem {
   title: string;
@@ -42,6 +48,7 @@ interface OrderData {
   shipping_amount?: number | null;
   total: number;
   payment_method?: string | null;
+  payment_method_code?: string | null;
   order_items?: OrderItem[];
 }
 
@@ -49,6 +56,8 @@ interface LocationState {
   order: OrderData;
   vatLabel: string;
   paymentTerms: string;
+  bankAccount?: { bank_name: string; iban: string; bic: string; currency: string } | null;
+  paymentMethod?: PaymentMethod;
 }
 
 export function ProOrderSuccess() {
@@ -56,11 +65,14 @@ export function ProOrderSuccess() {
   const navigate = useNavigate();
   const { data: settings } = useSettings();
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [copiedAddress, setCopiedAddress] = useState(false);
 
   const state = location.state as LocationState | undefined;
   const order = state?.order;
   const vatLabel = state?.vatLabel || 'TVA (20%)';
   const paymentTerms = state?.paymentTerms || '30';
+  const bankAccount = state?.bankAccount;
+  const paymentMethod = state?.paymentMethod;
 
   // Redirect if no order data
   useEffect(() => {
@@ -92,7 +104,18 @@ export function ProOrderSuccess() {
     }
   };
 
+  const handleCopyAddress = async (address: string) => {
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopiedAddress(true);
+      setTimeout(() => setCopiedAddress(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
   const shippingIsFree = (order.shipping_amount || 0) === 0;
+  const isCryptoPayment = order.payment_method_code === 'crypto' || order.payment_method === 'Stablecoins (USDC/USDT)';
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -193,11 +216,11 @@ export function ProOrderSuccess() {
                 </p>
                 <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-muted-foreground pl-6">
                   <span>Banque:</span>
-                  <span className="font-medium text-foreground">{settings?.bank_name || '—'}</span>
+                  <span className="font-medium text-foreground">{bankAccount?.bank_name || settings?.bank_name || '—'}</span>
                   <span>IBAN:</span>
-                  <span className="font-medium text-foreground font-mono text-xs">{settings?.iban || '—'}</span>
+                  <span className="font-medium text-foreground font-mono text-xs">{bankAccount?.iban || settings?.iban || '—'}</span>
                   <span>BIC:</span>
-                  <span className="font-medium text-foreground font-mono">{settings?.bic || '—'}</span>
+                  <span className="font-medium text-foreground font-mono">{bankAccount?.bic || settings?.bic || '—'}</span>
                   <span>Référence:</span>
                   <span className="font-medium text-foreground">{order.order_number}</span>
                 </div>
@@ -207,9 +230,57 @@ export function ProOrderSuccess() {
             {order.payment_method === 'PayPal' && (
               <div className="text-sm">
                 <p className="text-muted-foreground">
-                  Paiement à effectuer sur: <span className="font-medium text-foreground">{settings?.paypal_email || settings?.shop_email || '—'}</span>
+                  Paiement à effectuer sur: <span className="font-medium text-foreground">{paymentMethod?.config?.email || settings?.paypal_email || settings?.shop_email || '—'}</span>
                 </p>
                 <p className="text-muted-foreground mt-1">
+                  Référence: <span className="font-medium text-foreground">{order.order_number}</span>
+                </p>
+              </div>
+            )}
+
+            {isCryptoPayment && paymentMethod?.config?.wallet_address && (
+              <div className="space-y-3 text-sm">
+                <p className="font-medium flex items-center gap-2">
+                  <Bitcoin className="w-4 h-4" />
+                  Paiement en Stablecoins
+                </p>
+                <p className="text-muted-foreground">
+                  Envoyer <span className="font-medium text-foreground">{formatCurrency(order.total, 'USD')}</span> en USDC ou USDT à:
+                </p>
+                
+                {/* QR Code */}
+                <div className="flex justify-center p-4 bg-white rounded-lg">
+                  <QRCodeSVG 
+                    value={paymentMethod.config.wallet_address} 
+                    size={140}
+                    level="M"
+                    includeMargin={false}
+                  />
+                </div>
+                
+                {/* Address with copy button */}
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 p-2 bg-background rounded border border-border font-mono text-xs break-all">
+                    {paymentMethod.config.wallet_address}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleCopyAddress(paymentMethod.config.wallet_address!)}
+                    className="shrink-0"
+                  >
+                    {copiedAddress ? (
+                      <Check className="w-4 h-4 text-success" />
+                    ) : (
+                      <Copy className="w-4 h-4" />
+                    )}
+                  </Button>
+                </div>
+                
+                <p className="text-center text-muted-foreground">
+                  Réseau: <span className="font-medium text-foreground capitalize">{paymentMethod.config.network || 'Ethereum'}</span>
+                </p>
+                <p className="text-muted-foreground">
                   Référence: <span className="font-medium text-foreground">{order.order_number}</span>
                 </p>
               </div>

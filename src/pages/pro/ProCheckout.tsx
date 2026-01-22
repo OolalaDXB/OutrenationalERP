@@ -12,7 +12,9 @@ import {
   CheckCircle2,
   Wallet,
   Bitcoin,
-  Globe
+  Globe,
+  Copy,
+  Check
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
@@ -56,6 +58,7 @@ export function ProCheckout() {
   const { items, clearCart, getSubtotal } = useCart();
   const { data: settings } = useSettings();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [copiedAddress, setCopiedAddress] = useState(false);
   
   // Currency selection
   const isEurZone = customer?.country ? EUR_ZONE_COUNTRIES.includes(customer.country) : true;
@@ -103,6 +106,16 @@ export function ProCheckout() {
 
   // Generate order reference for bank transfer
   const generateOrderRef = () => `PRO-${Date.now().toString(36).toUpperCase()}`;
+
+  const handleCopyAddress = async (address: string) => {
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopiedAddress(true);
+      setTimeout(() => setCopiedAddress(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
 
   const getPaymentMethodLabel = (code: string) => {
     switch (code) {
@@ -514,9 +527,25 @@ export function ProCheckout() {
                         />
                       </div>
                       
-                      <div className="p-2 bg-background rounded border border-border font-mono text-xs break-all text-center">
-                        {selectedMethod.config.wallet_address}
+                      {/* Address with copy button */}
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 p-2 bg-background rounded border border-border font-mono text-xs break-all">
+                          {selectedMethod.config.wallet_address}
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleCopyAddress(selectedMethod.config.wallet_address!)}
+                          className="shrink-0"
+                        >
+                          {copiedAddress ? (
+                            <Check className="w-4 h-4 text-success" />
+                          ) : (
+                            <Copy className="w-4 h-4" />
+                          )}
+                        </Button>
                       </div>
+                      
                       <p className="text-center">
                         Réseau: <span className="font-medium text-foreground capitalize">{selectedMethod.config.network || 'Ethereum'}</span>
                       </p>
