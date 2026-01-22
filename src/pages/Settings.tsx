@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Settings, Save, Loader2, Upload, Image, X, Building, FileText, CreditCard, Receipt, Palette, ToggleLeft, Database, BarChart3, Store, History, Wallet, Truck } from "lucide-react";
+import { Settings, Save, Loader2, Upload, Image, X, Building, FileText, CreditCard, Receipt, Palette, ToggleLeft, Database, BarChart3, Store, History, Wallet, Truck, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,7 @@ import { MarketplaceMappingsSection } from "@/components/settings/MarketplaceMap
 import { ImportHistorySection } from "@/components/settings/ImportHistorySection";
 import { PaymentsSection } from "@/components/settings/PaymentsSection";
 import { ShippingSection } from "@/components/settings/ShippingSection";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 export function SettingsPage() {
   const { toast } = useToast();
@@ -41,6 +42,8 @@ export function SettingsPage() {
     invoice_next_number: 1001,
     payout_invoice_prefix: "REV",
     payout_invoice_next_number: 1,
+    credit_note_prefix: "AV",
+    credit_note_next_number: 1,
     shop_logo_url: "",
     // New invoice fields
     payment_terms_text: "",
@@ -58,6 +61,9 @@ export function SettingsPage() {
     visible_widgets: defaultWidgetVisibility,
     widget_order: defaultWidgetOrder,
   });
+  
+  // Reset confirmation dialog
+  const [showResetCreditNoteDialog, setShowResetCreditNoteDialog] = useState(false);
 
   // Initialize form when settings load
   useState(() => {
@@ -79,6 +85,8 @@ export function SettingsPage() {
         invoice_next_number: settings.invoice_next_number || 1001,
         payout_invoice_prefix: settings.payout_invoice_prefix || "REV",
         payout_invoice_next_number: settings.payout_invoice_next_number || 1,
+        credit_note_prefix: settings.credit_note_prefix || "AV",
+        credit_note_next_number: settings.credit_note_next_number || 1,
         shop_logo_url: settings.shop_logo_url || "",
         payment_terms_text: settings.payment_terms_text || "",
         legal_mentions: settings.legal_mentions || "",
@@ -114,6 +122,8 @@ export function SettingsPage() {
       invoice_next_number: settings.invoice_next_number || 1001,
       payout_invoice_prefix: settings.payout_invoice_prefix || "REV",
       payout_invoice_next_number: settings.payout_invoice_next_number || 1,
+      credit_note_prefix: settings.credit_note_prefix || "AV",
+      credit_note_next_number: settings.credit_note_next_number || 1,
       shop_logo_url: settings.shop_logo_url || "",
       payment_terms_text: settings.payment_terms_text || "",
       legal_mentions: settings.legal_mentions || "",
@@ -513,6 +523,50 @@ export function SettingsPage() {
             </div>
           </div>
 
+          {/* Credit Notes Section */}
+          <div className="bg-card rounded-xl border border-border p-6">
+            <h2 className="text-lg font-semibold mb-4">Avoirs (notes de crédit)</h2>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm text-muted-foreground">Préfixe</Label>
+                  <Input
+                    value={formData.credit_note_prefix}
+                    onChange={(e) => setFormData({ ...formData, credit_note_prefix: e.target.value })}
+                    className="mt-1"
+                    placeholder="AV"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm text-muted-foreground">Prochain numéro</Label>
+                  <Input
+                    type="number"
+                    value={formData.credit_note_next_number}
+                    onChange={(e) => setFormData({ ...formData, credit_note_next_number: Number(e.target.value) })}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg">
+                <div>
+                  <span className="text-xs text-muted-foreground">Prochain avoir:</span>
+                  <span className="ml-2 font-mono font-medium">
+                    {formData.credit_note_prefix}-{String(formData.credit_note_next_number).padStart(5, '0')}
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowResetCreditNoteDialog(true)}
+                  className="gap-2"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  Réinitialiser
+                </Button>
+              </div>
+            </div>
+          </div>
+
           {/* Payment Terms & Legal */}
           <div className="bg-card rounded-xl border border-border p-6">
             <h2 className="text-lg font-semibold mb-4">Mentions sur les factures</h2>
@@ -643,6 +697,30 @@ Les prix de nos produits sont indiqués en euros..."
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Reset Credit Note Number Dialog */}
+      <AlertDialog open={showResetCreditNoteDialog} onOpenChange={setShowResetCreditNoteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Réinitialiser la numérotation des avoirs</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir réinitialiser le numéro d'avoir à 1 ? 
+              Cette action est irréversible et peut causer des doublons si des avoirs existent déjà.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setFormData({ ...formData, credit_note_next_number: 1 });
+                toast({ title: "Numérotation réinitialisée", description: "N'oubliez pas d'enregistrer les modifications." });
+              }}
+            >
+              Réinitialiser à 1
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
