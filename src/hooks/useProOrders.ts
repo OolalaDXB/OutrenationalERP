@@ -109,14 +109,13 @@ export function useRequestRefund() {
       }
       
       // Flag the order for refund review
-      // Cast to any to handle new columns not yet in generated types
       const { data, error } = await supabase
         .from('orders')
         .update({
           refund_requested: true,
           refund_requested_at: new Date().toISOString(),
           refund_reason: reason
-        } as any)
+        })
         .eq('id', orderId)
         .select()
         .single();

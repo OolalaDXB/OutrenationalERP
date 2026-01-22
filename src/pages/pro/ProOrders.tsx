@@ -228,7 +228,7 @@ export function ProOrders() {
                             {paymentStatusLabel[order.payment_status]}
                           </StatusBadge>
                         )}
-                        {(order as any).refund_requested && order.status !== 'refunded' && (
+                        {order.refund_requested && order.status !== 'refunded' && (
                           <StatusBadge variant="warning">
                             Remboursement demandé
                           </StatusBadge>
