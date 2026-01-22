@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { User, Building2, MapPin, Lock, Loader2, Save, Check } from "lucide-react";
+import { useState, useEffect } from "react";
+import { User, Building2, MapPin, Lock, Loader2, Save, Check, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,10 +7,17 @@ import { useProAuth } from "@/hooks/useProAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
+const CURRENCIES = [
+  { code: 'EUR', label: 'Euro (€)', flag: '🇪🇺' },
+  { code: 'USD', label: 'Dollar ($)', flag: '🇺🇸' },
+  { code: 'GBP', label: 'Livre (£)', flag: '🇬🇧' },
+];
+
 export function ProAccount() {
   const { customer, refreshCustomer } = useProAuth();
   const [isUpdating, setIsUpdating] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [isUpdatingPreferences, setIsUpdatingPreferences] = useState(false);
   
   // Address form
   const [address, setAddress] = useState(customer?.address || '');
@@ -23,6 +30,24 @@ export function ProAccount() {
   // Password form
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+  // Preferences
+  const [preferredCurrency, setPreferredCurrency] = useState(
+    (customer as any)?.preferred_currency || 'EUR'
+  );
+
+  // Update local state when customer changes
+  useEffect(() => {
+    if (customer) {
+      setAddress(customer.address || '');
+      setAddressLine2(customer.address_line_2 || '');
+      setCity(customer.city || '');
+      setPostalCode(customer.postal_code || '');
+      setCountry(customer.country || '');
+      setPhone(customer.phone || '');
+      setPreferredCurrency((customer as any)?.preferred_currency || 'EUR');
+    }
+  }, [customer]);
 
   const handleUpdateAddress = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,6 +106,29 @@ export function ProAccount() {
     }
   };
 
+  const handleUpdatePreferences = async () => {
+    if (!customer) return;
+
+    setIsUpdatingPreferences(true);
+    try {
+      const { error } = await supabase
+        .from('customers')
+        .update({
+          preferred_currency: preferredCurrency
+        } as any)
+        .eq('id', customer.id);
+
+      if (error) throw error;
+
+      await refreshCustomer();
+      toast({ title: "Préférences mises à jour", description: "Votre devise préférée a été enregistrée." });
+    } catch (error) {
+      toast({ title: "Erreur", description: "Impossible de mettre à jour les préférences.", variant: "destructive" });
+    } finally {
+      setIsUpdatingPreferences(false);
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
@@ -121,6 +169,50 @@ export function ProAccount() {
         <p className="text-xs text-muted-foreground mt-4">
           Pour modifier ces informations, contactez notre équipe commerciale.
         </p>
+      </div>
+
+      {/* Preferences */}
+      <div className="bg-card rounded-xl border border-border p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <Globe className="w-5 h-5 text-muted-foreground" />
+          <h2 className="font-semibold">Préférences de paiement</h2>
+        </div>
+
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="currency">Devise préférée</Label>
+            <select
+              id="currency"
+              value={preferredCurrency}
+              onChange={(e) => setPreferredCurrency(e.target.value)}
+              className="w-full sm:w-64 px-3 py-2 rounded-md border border-border bg-background"
+            >
+              {CURRENCIES.map(c => (
+                <option key={c.code} value={c.code}>
+                  {c.flag} {c.label}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Cette devise sera présélectionnée lors du paiement
+            </p>
+          </div>
+
+          {preferredCurrency !== ((customer as any)?.preferred_currency || 'EUR') && (
+            <Button 
+              onClick={handleUpdatePreferences} 
+              disabled={isUpdatingPreferences}
+              size="sm"
+            >
+              {isUpdatingPreferences ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4 mr-2" />
+              )}
+              Enregistrer
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Shipping address */}

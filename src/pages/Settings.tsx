@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Settings, Save, Loader2, Upload, Image, X, Building, FileText, CreditCard, Receipt, Palette, ToggleLeft, Database, BarChart3, Store, History } from "lucide-react";
+import { Settings, Save, Loader2, Upload, Image, X, Building, FileText, CreditCard, Receipt, Palette, ToggleLeft, Database, BarChart3, Store, History, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,7 @@ import { WidgetVisibilitySection, defaultWidgetVisibility, defaultWidgetOrder, t
 import { SalesChannelsSection } from "@/components/settings/SalesChannelsSection";
 import { MarketplaceMappingsSection } from "@/components/settings/MarketplaceMappingsSection";
 import { ImportHistorySection } from "@/components/settings/ImportHistorySection";
+import { PaymentsSection } from "@/components/settings/PaymentsSection";
 
 export function SettingsPage() {
   const { toast } = useToast();
@@ -210,7 +211,7 @@ export function SettingsPage() {
       </div>
 
       <Tabs defaultValue="shop" className="w-full">
-        <TabsList className="grid w-full grid-cols-10">
+        <TabsList className="flex flex-wrap gap-1 h-auto p-1">
           <TabsTrigger value="shop" className="gap-2">
             <Building className="w-4 h-4" />
             Boutique
@@ -223,9 +224,9 @@ export function SettingsPage() {
             <FileText className="w-4 h-4" />
             Factures
           </TabsTrigger>
-          <TabsTrigger value="banking" className="gap-2">
-            <CreditCard className="w-4 h-4" />
-            Bancaire
+          <TabsTrigger value="payments" className="gap-2">
+            <Wallet className="w-4 h-4" />
+            Paiements
           </TabsTrigger>
           <TabsTrigger value="channels" className="gap-2">
             <Store className="w-4 h-4" />
@@ -563,75 +564,9 @@ Les prix de nos produits sont indiqués en euros..."
           </div>
         </TabsContent>
 
-        {/* Banking Tab */}
-        <TabsContent value="banking" className="space-y-6">
-          <div className="bg-card rounded-xl border border-border p-6">
-            <h2 className="text-lg font-semibold mb-4">Coordonnées bancaires</h2>
-            <p className="text-sm text-muted-foreground mb-4">
-              Ces informations apparaîtront en bas de vos factures pour faciliter le paiement.
-            </p>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
-                <Label className="text-sm text-muted-foreground">Nom de la banque</Label>
-                <Input
-                  value={formData.bank_name}
-                  onChange={(e) => setFormData({ ...formData, bank_name: e.target.value })}
-                  className="mt-1"
-                  placeholder="Ex: Crédit Lyonnais"
-                />
-              </div>
-              <div className="col-span-2">
-                <Label className="text-sm text-muted-foreground">IBAN</Label>
-                <Input
-                  value={formData.iban}
-                  onChange={(e) => setFormData({ ...formData, iban: e.target.value })}
-                  className="mt-1 font-mono"
-                  placeholder="FR76 1234 5678 9012 3456 7890 123"
-                />
-              </div>
-              <div>
-                <Label className="text-sm text-muted-foreground">BIC / SWIFT</Label>
-                <Input
-                  value={formData.bic}
-                  onChange={(e) => setFormData({ ...formData, bic: e.target.value })}
-                  className="mt-1 font-mono"
-                  placeholder="CRLYFRPP"
-                />
-              </div>
-            </div>
-
-            {/* Preview */}
-            {(formData.iban || formData.bic) && (
-              <div className="mt-6 p-4 bg-secondary/30 rounded-lg">
-                <h4 className="text-sm font-medium mb-2">Aperçu sur facture</h4>
-                <p className="text-xs text-muted-foreground font-mono">
-                  {formData.bank_name && <span>{formData.bank_name} - </span>}
-                  IBAN : {formData.iban || '...'} / BIC : {formData.bic || '...'}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* PayPal Section */}
-          <div className="bg-card rounded-xl border border-border p-6">
-            <h2 className="text-lg font-semibold mb-4">Paiement PayPal</h2>
-            <p className="text-sm text-muted-foreground mb-4">
-              Adresse PayPal pour les paiements des clients professionnels.
-            </p>
-            <div>
-              <Label className="text-sm text-muted-foreground">Adresse PayPal pour les paiements</Label>
-              <Input
-                type="email"
-                value={formData.paypal_email}
-                onChange={(e) => setFormData({ ...formData, paypal_email: e.target.value })}
-                className="mt-1"
-                placeholder="paiements@votreboutique.com"
-              />
-              <p className="text-xs text-muted-foreground mt-2">
-                Cette adresse sera affichée aux clients Pro qui choisissent PayPal comme mode de paiement.
-              </p>
-            </div>
-          </div>
+        {/* Payments Tab */}
+        <TabsContent value="payments" className="space-y-6">
+          <PaymentsSection />
         </TabsContent>
 
         {/* Sales Channels Tab */}

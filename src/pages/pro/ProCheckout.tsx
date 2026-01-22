@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { 
   ArrowLeft, 
@@ -9,7 +9,10 @@ import {
   Receipt,
   Building2,
   Info,
-  CheckCircle2
+  CheckCircle2,
+  Wallet,
+  Bitcoin,
+  Globe
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,9 +20,12 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { useProAuth } from "@/hooks/useProAuth";
 import { useCart } from "@/hooks/useCart";
 import { useSettings } from "@/hooks/useSettings";
+import { useActivePaymentMethodsForCurrency, type PaymentMethod } from "@/hooks/usePaymentMethods";
+import { useDefaultBankAccount } from "@/hooks/useBankAccounts";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/format";
 import { toast } from "@/hooks/use-toast";
@@ -27,7 +33,21 @@ import { calculateVatInfo, calculateShippingInfo } from "@/lib/vat-shipping-util
 
 const MIN_ORDER_AMOUNT = 100;
 
-type PaymentMethod = 'bank_transfer' | 'paypal';
+// EUR zone countries
+const EUR_ZONE_COUNTRIES = [
+  'France', 'Germany', 'Belgium', 'Netherlands', 'Italy', 'Spain', 'Portugal',
+  'Austria', 'Ireland', 'Luxembourg', 'Finland', 'Greece', 'Slovakia', 'Slovenia',
+  'Estonia', 'Latvia', 'Lithuania', 'Malta', 'Cyprus', 'Andorra', 'Monaco',
+  'FR', 'DE', 'BE', 'NL', 'IT', 'ES', 'PT', 'AT', 'IE', 'LU', 'FI', 'GR', 
+  'SK', 'SI', 'EE', 'LV', 'LT', 'MT', 'CY', 'AD', 'MC'
+];
+
+const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  Building2,
+  Wallet,
+  CreditCard,
+  Bitcoin,
+};
 
 export function ProCheckout() {
   const navigate = useNavigate();
@@ -35,7 +55,32 @@ export function ProCheckout() {
   const { items, clearCart, getSubtotal } = useCart();
   const { data: settings } = useSettings();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('bank_transfer');
+  
+  // Currency selection
+  const isEurZone = customer?.country ? EUR_ZONE_COUNTRIES.includes(customer.country) : true;
+  const defaultCurrency = (customer as any)?.preferred_currency || (isEurZone ? 'EUR' : 'USD');
+  const [selectedCurrency, setSelectedCurrency] = useState(defaultCurrency);
+  
+  // Payment methods
+  const { data: paymentMethods = [], isLoading: methodsLoading } = useActivePaymentMethodsForCurrency(selectedCurrency);
+  const [selectedMethodCode, setSelectedMethodCode] = useState<string>('');
+  
+  // Bank account for selected currency
+  const { data: bankAccount } = useDefaultBankAccount(selectedCurrency);
+
+  // Set default payment method when methods load
+  useEffect(() => {
+    if (paymentMethods.length > 0 && !selectedMethodCode) {
+      setSelectedMethodCode(paymentMethods[0].code);
+    }
+  }, [paymentMethods, selectedMethodCode]);
+
+  // Reset payment method when currency changes
+  useEffect(() => {
+    setSelectedMethodCode('');
+  }, [selectedCurrency]);
+
+  const selectedMethod = paymentMethods.find(m => m.code === selectedMethodCode);
 
   // Calculate prices
   const discountRate = customer?.discount_rate || 0;
@@ -58,8 +103,18 @@ export function ProCheckout() {
   // Generate order reference for bank transfer
   const generateOrderRef = () => `PRO-${Date.now().toString(36).toUpperCase()}`;
 
+  const getPaymentMethodLabel = (code: string) => {
+    switch (code) {
+      case 'bank_transfer': return 'Virement bancaire';
+      case 'paypal': return 'PayPal';
+      case 'stripe': return 'Carte bancaire';
+      case 'crypto': return 'Stablecoins (USDC/USDT)';
+      default: return code;
+    }
+  };
+
   const handleSubmitOrder = async () => {
-    if (!customer || !canOrder) return;
+    if (!customer || !canOrder || !selectedMethodCode) return;
 
     setIsSubmitting(true);
     try {
@@ -80,7 +135,9 @@ export function ProCheckout() {
           total: totalTTC,
           status: 'pending',
           payment_status: 'pending',
-          payment_method: paymentMethod === 'bank_transfer' ? 'Virement bancaire' : 'PayPal',
+          payment_method: getPaymentMethodLabel(selectedMethodCode),
+          payment_method_code: selectedMethodCode,
+          currency: selectedCurrency,
           source: 'pro_portal',
           shipping_address: customer.address,
           shipping_address_line_2: customer.address_line_2,
@@ -88,7 +145,7 @@ export function ProCheckout() {
           shipping_postal_code: customer.postal_code,
           shipping_country: customer.country,
           shipping_phone: customer.phone,
-          internal_notes: `Commande Pro - Remise ${discountRate}% - ${vatInfo.label}`
+          internal_notes: `Commande Pro - Remise ${discountRate}% - ${vatInfo.label} - ${selectedCurrency}`
         })
         .select()
         .single();
@@ -136,7 +193,9 @@ export function ProCheckout() {
             }))
           },
           vatLabel: vatInfo.label,
-          paymentTerms: customer?.payment_terms?.toString() || '30'
+          paymentTerms: customer?.payment_terms?.toString() || '30',
+          bankAccount,
+          paymentMethod: selectedMethod
         }
       });
     } catch (error) {
@@ -169,8 +228,12 @@ export function ProCheckout() {
     );
   }
 
-  const paymentTerms = customer?.payment_terms || settings?.payment_terms_text ? 
-    `${customer?.payment_terms || 30}` : '30';
+  const paymentTerms = customer?.payment_terms?.toString() || '30';
+
+  const renderIcon = (iconName: string | null) => {
+    const Icon = iconName ? ICON_MAP[iconName] || CreditCard : CreditCard;
+    return <Icon className="w-5 h-5" />;
+  };
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -289,66 +352,164 @@ export function ProCheckout() {
             </CardContent>
           </Card>
 
+          {/* Currency Selection (non-EUR zone only) */}
+          {!isEurZone && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Globe className="w-5 h-5" />
+                  Devise de paiement
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RadioGroup 
+                  value={selectedCurrency} 
+                  onValueChange={setSelectedCurrency}
+                  className="flex gap-4"
+                >
+                  <div 
+                    className={`flex-1 flex items-center space-x-3 p-4 rounded-lg border transition-colors cursor-pointer ${selectedCurrency === 'EUR' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
+                    onClick={() => setSelectedCurrency('EUR')}
+                  >
+                    <RadioGroupItem value="EUR" id="eur" />
+                    <Label htmlFor="eur" className="flex-1 cursor-pointer">
+                      <span className="font-medium">Payer en EUR (€)</span>
+                    </Label>
+                  </div>
+                  <div 
+                    className={`flex-1 flex items-center space-x-3 p-4 rounded-lg border transition-colors cursor-pointer ${selectedCurrency === 'USD' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
+                    onClick={() => setSelectedCurrency('USD')}
+                  >
+                    <RadioGroupItem value="USD" id="usd" />
+                    <Label htmlFor="usd" className="flex-1 cursor-pointer">
+                      <span className="font-medium">Payer en USD ($)</span>
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Payment Method */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
                 <CreditCard className="w-5 h-5" />
                 Mode de paiement
+                <Badge variant="outline" className="ml-2">{selectedCurrency}</Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <RadioGroup 
-                value={paymentMethod} 
-                onValueChange={(v) => setPaymentMethod(v as PaymentMethod)}
-                className="space-y-3"
-              >
-                <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:border-primary/50 transition-colors cursor-pointer"
-                  onClick={() => setPaymentMethod('bank_transfer')}
-                >
-                  <RadioGroupItem value="bank_transfer" id="bank_transfer" />
-                  <Label htmlFor="bank_transfer" className="flex-1 cursor-pointer">
-                    <span className="font-medium">Virement bancaire</span>
-                  </Label>
+              {methodsLoading ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                 </div>
-                
-                <div className="flex items-center space-x-3 p-3 rounded-lg border border-border hover:border-primary/50 transition-colors cursor-pointer"
-                  onClick={() => setPaymentMethod('paypal')}
+              ) : paymentMethods.length === 0 ? (
+                <Alert>
+                  <Info className="w-4 h-4" />
+                  <AlertDescription>
+                    Aucun moyen de paiement disponible pour {selectedCurrency}. Contactez-nous.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <RadioGroup 
+                  value={selectedMethodCode} 
+                  onValueChange={setSelectedMethodCode}
+                  className="space-y-3"
                 >
-                  <RadioGroupItem value="paypal" id="paypal" />
-                  <Label htmlFor="paypal" className="flex-1 cursor-pointer">
-                    <span className="font-medium">PayPal</span>
-                  </Label>
-                </div>
-              </RadioGroup>
+                  {paymentMethods.map((method) => (
+                    <div 
+                      key={method.id}
+                      className={`flex items-center space-x-3 p-3 rounded-lg border transition-colors cursor-pointer ${selectedMethodCode === method.code ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
+                      onClick={() => setSelectedMethodCode(method.code)}
+                    >
+                      <RadioGroupItem value={method.code} id={method.code} />
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${selectedMethodCode === method.code ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
+                        {renderIcon(method.icon)}
+                      </div>
+                      <Label htmlFor={method.code} className="flex-1 cursor-pointer">
+                        <span className="font-medium">{method.name}</span>
+                        {method.description && (
+                          <p className="text-xs text-muted-foreground">{method.description}</p>
+                        )}
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              )}
 
-              {/* Bank details */}
-              {paymentMethod === 'bank_transfer' && (
+              {/* Payment method details */}
+              {selectedMethodCode === 'bank_transfer' && bankAccount && (
                 <div className="mt-4 p-4 bg-secondary/50 rounded-lg space-y-2 text-sm">
                   <p className="font-medium flex items-center gap-2">
                     <Building2 className="w-4 h-4" />
-                    Coordonnées bancaires
+                    Coordonnées bancaires ({bankAccount.currency})
                   </p>
                   <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-muted-foreground">
                     <span>Banque:</span>
-                    <span className="font-medium text-foreground">{settings?.bank_name || '—'}</span>
+                    <span className="font-medium text-foreground">{bankAccount.bank_name}</span>
                     <span>IBAN:</span>
-                    <span className="font-medium text-foreground font-mono text-xs">{settings?.iban || '—'}</span>
+                    <span className="font-medium text-foreground font-mono text-xs">{bankAccount.iban}</span>
                     <span>BIC:</span>
-                    <span className="font-medium text-foreground font-mono">{settings?.bic || '—'}</span>
+                    <span className="font-medium text-foreground font-mono">{bankAccount.bic}</span>
                     <span>Référence:</span>
                     <span className="font-medium text-foreground">À indiquer après confirmation</span>
                   </div>
                 </div>
               )}
 
-              {/* PayPal info */}
-              {paymentMethod === 'paypal' && (
+              {selectedMethodCode === 'bank_transfer' && !bankAccount && (
+                <Alert className="mt-4">
+                  <Info className="w-4 h-4" />
+                  <AlertDescription>
+                    Aucun compte bancaire configuré pour {selectedCurrency}. Les coordonnées seront fournies après confirmation.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {selectedMethodCode === 'paypal' && selectedMethod && (
                 <div className="mt-4 p-4 bg-secondary/50 rounded-lg space-y-2 text-sm">
-                  <p className="font-medium">Paiement PayPal</p>
-                  <p className="text-muted-foreground">
-                    Paiement à effectuer sur: <span className="font-medium text-foreground">{settings?.paypal_email || settings?.shop_email || '—'}</span>
+                  <p className="font-medium flex items-center gap-2">
+                    <Wallet className="w-4 h-4" />
+                    Paiement PayPal
                   </p>
+                  <p className="text-muted-foreground">
+                    Paiement à effectuer sur: <span className="font-medium text-foreground">
+                      {selectedMethod.config.email || settings?.paypal_email || settings?.shop_email || '—'}
+                    </span>
+                  </p>
+                </div>
+              )}
+
+              {selectedMethodCode === 'stripe' && (
+                <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-950/30 rounded-lg space-y-2 text-sm">
+                  <p className="font-medium flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                    <CreditCard className="w-4 h-4" />
+                    Paiement par carte
+                  </p>
+                  <p className="text-amber-600 dark:text-amber-500">
+                    Bientôt disponible. Veuillez choisir un autre moyen de paiement.
+                  </p>
+                </div>
+              )}
+
+              {selectedMethodCode === 'crypto' && selectedMethod && (
+                <div className="mt-4 p-4 bg-secondary/50 rounded-lg space-y-2 text-sm">
+                  <p className="font-medium flex items-center gap-2">
+                    <Bitcoin className="w-4 h-4" />
+                    Paiement en Stablecoins
+                  </p>
+                  {selectedMethod.config.wallet_address ? (
+                    <div className="space-y-2 text-muted-foreground">
+                      <p>Envoyer <span className="font-medium text-foreground">{formatCurrency(totalTTC, 'USD')}</span> en USDC ou USDT à:</p>
+                      <div className="p-2 bg-background rounded border border-border font-mono text-xs break-all">
+                        {selectedMethod.config.wallet_address}
+                      </div>
+                      <p>Réseau: <span className="font-medium text-foreground capitalize">{selectedMethod.config.network || 'Ethereum'}</span></p>
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground">Adresse de wallet non configurée. Contactez-nous.</p>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -402,7 +563,7 @@ export function ProCheckout() {
               <Button 
                 className="w-full" 
                 size="lg"
-                disabled={!canOrder || isSubmitting}
+                disabled={!canOrder || isSubmitting || !selectedMethodCode || selectedMethodCode === 'stripe'}
                 onClick={handleSubmitOrder}
               >
                 {isSubmitting ? (
