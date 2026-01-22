@@ -542,10 +542,15 @@ function PaymentMethodsSection() {
                             className="w-full px-3 py-2 rounded-md border border-border bg-background"
                           >
                             <option value="">Sélectionner un réseau</option>
-                            <option value="ethereum">Ethereum</option>
+                            <option value="ethereum">Ethereum (ERC-20)</option>
                             <option value="polygon">Polygon</option>
                             <option value="arbitrum">Arbitrum</option>
                             <option value="base">Base</option>
+                            <option value="optimism">Optimism</option>
+                            <option value="solana">Solana</option>
+                            <option value="tron">Tron (TRC-20)</option>
+                            <option value="avalanche">Avalanche (C-Chain)</option>
+                            <option value="bsc">BNB Chain (BEP-20)</option>
                           </select>
                         </div>
                         {hasConfigChanges(method.id) && (
