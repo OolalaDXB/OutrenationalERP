@@ -429,17 +429,37 @@ export function ProCheckout() {
                       </p>
                     </div>
                   ) : (
-                    <div>
-                      <span className="font-medium">{formatCurrency(shippingCost)}</span>
-                      {shippingInfo.freeThreshold && (
-                        <p className="text-xs text-muted-foreground">
-                          Gratuit dès {formatCurrency(shippingInfo.freeThreshold)} HT
-                        </p>
-                      )}
-                    </div>
+                    <span className="font-medium">{formatCurrency(shippingCost)}</span>
                   )}
                 </div>
               </div>
+
+              {/* Shipping cost breakdown */}
+              {!shippingInfo.isFree && (shippingInfo.breakdown.itemPrice !== undefined || shippingInfo.rateType !== 'flat') && (
+                <div className="bg-muted/30 rounded-lg p-3 space-y-1.5 text-sm">
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Tarif de base (1er article)</span>
+                    <span>{formatCurrency(shippingInfo.breakdown.basePrice)}</span>
+                  </div>
+                  {shippingInfo.breakdown.itemPrice !== undefined && shippingInfo.breakdown.itemPrice > 0 && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Articles supplémentaires ({totalItemCount - 1} × {formatCurrency(shippingInfo.breakdown.itemPrice / (totalItemCount - 1))})</span>
+                      <span>+{formatCurrency(shippingInfo.breakdown.itemPrice)}</span>
+                    </div>
+                  )}
+                  <Separator className="my-1" />
+                  <div className="flex justify-between font-medium">
+                    <span>Total frais de port</span>
+                    <span>{formatCurrency(shippingCost)}</span>
+                  </div>
+                </div>
+              )}
+
+              {shippingInfo.freeThreshold && !shippingInfo.isFree && (
+                <p className="text-xs text-muted-foreground text-center">
+                  💡 Livraison gratuite dès {formatCurrency(shippingInfo.freeThreshold)} HT
+                </p>
+              )}
               
               <Alert className="bg-muted/50 border-muted">
                 <Info className="w-4 h-4" />
