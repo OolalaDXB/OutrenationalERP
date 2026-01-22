@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { FileText, Package, Loader2, ChevronDown, ChevronUp, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { generateProInvoicePDF } from "@/components/pro/ProInvoicePDF";
+import { generateProPurchaseOrderPDF, downloadProPurchaseOrder } from "@/components/pro/ProPurchaseOrderPDF";
 import { StatusBadge, orderStatusVariant, orderStatusLabel } from "@/components/ui/status-badge";
 import { OrderProgressTracker } from "@/components/pro/OrderProgressTracker";
 import { useProAuth } from "@/hooks/useProAuth";
+import { useSettings } from "@/hooks/useSettings";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency, formatDateTime } from "@/lib/format";
@@ -12,8 +13,10 @@ import { toast } from "sonner";
 
 export function ProOrders() {
   const { customer } = useProAuth();
+  const { data: settings } = useSettings();
   const queryClient = useQueryClient();
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [downloadingOrderId, setDownloadingOrderId] = useState<string | null>(null);
   const isInitialMount = useRef(true);
 
   // Fetch customer's orders
@@ -148,15 +151,62 @@ export function ProOrders() {
                       variant="outline"
                       size="icon"
                       className="h-9 w-9"
-                      onClick={(e) => {
+                      disabled={!settings || downloadingOrderId === order.id}
+                      onClick={async (e) => {
                         e.stopPropagation();
-                        if (customer) {
-                          generateProInvoicePDF(order, customer);
+                        if (!settings) return;
+                        
+                        setDownloadingOrderId(order.id);
+                        try {
+                          // Prepare order data for PDF
+                          const orderData = {
+                            id: order.id,
+                            order_number: order.order_number,
+                            created_at: order.created_at,
+                            customer_name: order.customer_name,
+                            customer_email: order.customer_email,
+                            shipping_address: order.shipping_address,
+                            shipping_address_line_2: order.shipping_address_line_2,
+                            shipping_city: order.shipping_city,
+                            shipping_postal_code: order.shipping_postal_code,
+                            shipping_country: order.shipping_country,
+                            subtotal: order.subtotal,
+                            discount_amount: order.discount_amount,
+                            tax_amount: order.tax_amount,
+                            shipping_amount: order.shipping_amount,
+                            total: order.total,
+                            payment_method: order.payment_method,
+                            order_items: items.map((item: any) => ({
+                              title: item.title,
+                              artist_name: item.artist_name,
+                              sku: item.sku,
+                              quantity: item.quantity,
+                              unit_price: item.unit_price,
+                              total_price: item.total_price
+                            }))
+                          };
+                          
+                          const doc = await generateProPurchaseOrderPDF({
+                            order: orderData,
+                            settings,
+                            vatLabel: 'TVA (20%)',
+                            paymentTerms: String(customer?.payment_terms || 30)
+                          });
+                          downloadProPurchaseOrder(doc, order.order_number);
+                        } catch (error) {
+                          console.error('Error generating PDF:', error);
+                          toast.error('Erreur lors de la génération du bon de commande');
+                        } finally {
+                          setDownloadingOrderId(null);
                         }
                       }}
-                      title="Télécharger la facture"
+                      title="Télécharger le bon de commande"
                     >
-                      <Download className="w-4 h-4" />
+                      {downloadingOrderId === order.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Download className="w-4 h-4" />
+                      )}
                     </Button>
                     {isExpanded ? (
                       <ChevronUp className="w-5 h-5 text-muted-foreground" />
