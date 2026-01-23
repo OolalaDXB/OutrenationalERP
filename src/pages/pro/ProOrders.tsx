@@ -205,6 +205,10 @@ export function ProOrders() {
         .order('created_at', { ascending: false });
       
       if (ordersError) throw ordersError;
+
+      if (!ordersData || ordersData.length === 0) {
+        return [];
+      }
       
       // Fetch invoices for these orders
       const orderIds = ordersData.map(o => o.id);
@@ -393,6 +397,11 @@ export function ProOrders() {
   const canDownloadInvoice = (order: any) => {
     const validStatuses = ['confirmed', 'processing', 'shipped', 'delivered'];
     return validStatuses.includes(order.status) && order.invoices?.length > 0;
+  };
+
+  const shouldShowInvoiceInfo = (order: any) => {
+    const validStatuses = ['confirmed', 'processing', 'shipped', 'delivered'];
+    return validStatuses.includes(order.status) && (!order.invoices || order.invoices.length === 0);
   };
 
   // Clear all filters
@@ -654,6 +663,12 @@ export function ProOrders() {
                           )}
                           Télécharger la facture
                         </Button>
+                      )}
+
+                      {!hasInvoice && shouldShowInvoiceInfo(order) && (
+                        <div className="text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded-md">
+                          Facture disponible une fois générée par notre équipe.
+                        </div>
                       )}
 
                       {canCancel && (
