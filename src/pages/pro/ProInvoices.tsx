@@ -6,14 +6,19 @@ import {
   Search, 
   Loader2,
   Receipt,
-  ExternalLink
+  ExternalLink,
+  ShoppingBag
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useProInvoices, type ProInvoice } from "@/hooks/useProInvoices";
+import { useSettings } from "@/hooks/useSettings";
+import { supabase } from "@/integrations/supabase/client";
+import { generateOrderInvoicePDF, downloadOrderInvoice } from "@/components/orders/OrderInvoicePDF";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { toast } from "sonner";
 
 type InvoiceStatus = 'all' | 'paid' | 'pending' | 'cancelled';
 
@@ -40,8 +45,10 @@ function getStatusBadge(status: string | null) {
 
 export function ProInvoices() {
   const { data: invoices = [], isLoading, error } = useProInvoices();
+  const { data: settings } = useSettings();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus>('all');
+  const [downloadingInvoiceId, setDownloadingInvoiceId] = useState<string | null>(null);
 
   const filteredInvoices = useMemo(() => {
     return invoices.filter(invoice => {
@@ -60,12 +67,54 @@ export function ProInvoices() {
     // If pre-generated PDF URL exists, open it
     if (invoice.pdf_url) {
       window.open(invoice.pdf_url, '_blank');
+      toast.success('Facture téléchargée');
       return;
     }
     
-    // TODO: Generate PDF on-the-fly using existing PDF component
-    // For now, show a message
-    console.log('PDF generation not yet implemented for invoice:', invoice.invoice_number);
+    // Generate PDF on-the-fly
+    if (!invoice.order_id) {
+      toast.error('Impossible de générer la facture : commande non trouvée');
+      return;
+    }
+
+    setDownloadingInvoiceId(invoice.id);
+
+    try {
+      // Fetch the complete order with items
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items (*)
+        `)
+        .eq('id', invoice.order_id)
+        .single();
+
+      if (orderError || !order) {
+        throw new Error('Commande introuvable');
+      }
+
+      if (!settings) {
+        throw new Error('Paramètres de la boutique non disponibles');
+      }
+
+      // Generate the PDF
+      const doc = await generateOrderInvoicePDF({
+        order: order as any,
+        settings: settings,
+        invoiceNumber: invoice.invoice_number
+      });
+
+      // Download the PDF
+      downloadOrderInvoice(doc, invoice.invoice_number);
+      toast.success('Facture générée avec succès');
+
+    } catch (err) {
+      console.error('Error generating invoice PDF:', err);
+      toast.error(err instanceof Error ? err.message : 'Erreur lors de la génération de la facture');
+    } finally {
+      setDownloadingInvoiceId(null);
+    }
   };
 
   if (isLoading) {
@@ -127,11 +176,19 @@ export function ProInvoices() {
           <CardContent className="py-12 text-center">
             <Receipt className="w-16 h-16 mx-auto text-muted-foreground/30 mb-4" />
             <h3 className="text-lg font-medium mb-2">Aucune facture disponible</h3>
-            <p className="text-muted-foreground text-sm">
+            <p className="text-muted-foreground text-sm mb-6">
               {invoices.length === 0 
-                ? "Vous n'avez pas encore de factures." 
+                ? "Vous n'avez pas encore de factures. Les factures sont générées après confirmation de vos commandes." 
                 : "Aucune facture ne correspond à votre recherche."}
             </p>
+            {invoices.length === 0 && (
+              <Link to="/pro/orders">
+                <Button variant="outline" className="gap-2">
+                  <ShoppingBag className="w-4 h-4" />
+                  Voir mes commandes
+                </Button>
+              </Link>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -208,9 +265,14 @@ export function ProInvoices() {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleDownloadPDF(invoice)}
+                          disabled={downloadingInvoiceId === invoice.id}
                           className="gap-1.5"
                         >
-                          <Download className="w-4 h-4" />
+                          {downloadingInvoiceId === invoice.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Download className="w-4 h-4" />
+                          )}
                           <span className="hidden sm:inline">PDF</span>
                         </Button>
                       </td>
