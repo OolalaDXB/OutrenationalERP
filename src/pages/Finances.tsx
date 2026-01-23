@@ -204,21 +204,23 @@ export default function FinancesPage() {
 
         {/* Quick Links */}
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" asChild className="gap-2">
-            <Link to="/finances/journal">
-              <CreditCard className="h-4 w-4" />
-              Journal des paiements
-            </Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild className="gap-2">
-            <Link to="/finances/impayes">
-              <AlertCircle className="h-4 w-4" />
-              Factures impayées
-              {(kpis?.overdueCount || 0) > 0 && (
-                <Badge variant="destructive" className="ml-1">{kpis?.overdueCount}</Badge>
-              )}
-            </Link>
-          </Button>
+          <Link 
+            to="/finances/journal"
+            className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3"
+          >
+            <CreditCard className="h-4 w-4" />
+            Journal des paiements
+          </Link>
+          <Link 
+            to="/finances/impayes"
+            className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3"
+          >
+            <AlertCircle className="h-4 w-4" />
+            Factures impayées
+            {(kpis?.overdueCount || 0) > 0 && (
+              <Badge variant="destructive" className="ml-1">{kpis?.overdueCount}</Badge>
+            )}
+          </Link>
         </div>
 
         {/* KPI Cards */}
