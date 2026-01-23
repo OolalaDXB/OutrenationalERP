@@ -7,7 +7,8 @@ import {
   Loader2,
   Receipt,
   ExternalLink,
-  ShoppingBag
+  ShoppingBag,
+  RefreshCw
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -45,11 +46,17 @@ function getStatusBadge(status: string | null) {
 }
 
 export function ProInvoices() {
-  const { data: invoices = [], isLoading, error } = useProInvoices();
+  const { data: invoices = [], isLoading, error, refetch, isFetching } = useProInvoices();
   const { data: settings } = useSettings();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus>('all');
   const [downloadingInvoiceId, setDownloadingInvoiceId] = useState<string | null>(null);
+  const [hasLoaded, setHasLoaded] = useState(false);
+
+  // Track when initial load completes for animation
+  if (!isLoading && !hasLoaded) {
+    setHasLoaded(true);
+  }
 
   const filteredInvoices = useMemo(() => {
     return invoices.filter(invoice => {
@@ -189,11 +196,23 @@ export function ProInvoices() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 transition-opacity duration-300 ${hasLoaded ? 'animate-fade-in' : ''}`}>
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold">Mes factures</h1>
-        <p className="text-muted-foreground">Téléchargez vos factures</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Mes factures</h1>
+          <p className="text-muted-foreground">Téléchargez vos factures</p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="gap-2"
+        >
+          <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+          <span className="hidden sm:inline">Actualiser</span>
+        </Button>
       </div>
 
       {/* Filters */}
