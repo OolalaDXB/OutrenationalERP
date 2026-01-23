@@ -8,7 +8,8 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
-  XCircle
+  XCircle,
+  ArrowLeft
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { usePaymentJournal } from "@/hooks/usePaymentJournal";
 import { exportToXLS } from "@/lib/excel-utils";
+
+interface PaymentJournalPageProps {
+  onNavigate?: (path: string) => void;
+}
 
 const STATUS_CONFIG: Record<string, { label: string; icon: React.ElementType; className: string }> = {
   paid: { label: "Payé", icon: CheckCircle2, className: "bg-success/20 text-success border-success/30" },
@@ -48,7 +53,7 @@ function formatCurrency(value: number, currency = "EUR") {
   }).format(value);
 }
 
-export default function PaymentJournalPage() {
+export default function PaymentJournalPage({ onNavigate }: PaymentJournalPageProps) {
   const [startDate, setStartDate] = useState<Date>(startOfMonth(subMonths(new Date(), 2)));
   const [endDate, setEndDate] = useState<Date>(endOfMonth(new Date()));
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -114,14 +119,25 @@ export default function PaymentJournalPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <CreditCard className="h-6 w-6" />
-            Journal des paiements
-          </h1>
-          <p className="text-muted-foreground">
-            Historique des transactions financières
-          </p>
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => onNavigate?.("/finances")}
+            className="gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Retour
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <CreditCard className="h-6 w-6" />
+              Journal des paiements
+            </h1>
+            <p className="text-muted-foreground">
+              Historique des transactions financières
+            </p>
+          </div>
         </div>
         
         <Button onClick={handleExport} variant="outline" size="sm" className="gap-2">
