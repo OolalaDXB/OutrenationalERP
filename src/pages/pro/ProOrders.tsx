@@ -9,7 +9,45 @@ import { generateProPurchaseOrderPDF, downloadProPurchaseOrder } from "@/compone
 import { generateOrderInvoicePDF, downloadOrderInvoice } from "@/components/orders/OrderInvoicePDF";
 import { StatusBadge, orderStatusVariant, orderStatusLabel, paymentStatusVariant, paymentStatusLabel } from "@/components/ui/status-badge";
 import { useProAuth } from "@/hooks/useProAuth";
-import { useSettings } from "@/hooks/useSettings";
+import { useSettings, type Settings } from "@/hooks/useSettings";
+
+// Fallback settings for PDF generation when settings are loading
+const FALLBACK_SETTINGS: Settings = {
+  id: 'fallback',
+  shop_name: 'Outre-National',
+  legal_name: 'Outre-National',
+  shop_email: null,
+  shop_phone: null,
+  shop_address: null,
+  shop_city: null,
+  shop_postal_code: null,
+  shop_country: 'France',
+  vat_number: null,
+  siret: null,
+  vat_rate: 20,
+  default_currency: 'EUR',
+  invoice_prefix: 'FC',
+  invoice_next_number: 1,
+  payout_invoice_prefix: 'REV',
+  payout_invoice_next_number: 1,
+  credit_note_prefix: 'AV',
+  credit_note_next_number: 1,
+  primary_color: null,
+  shop_logo_url: null,
+  payment_terms_text: null,
+  legal_mentions: null,
+  bank_name: null,
+  iban: null,
+  bic: null,
+  eori: null,
+  cgv: null,
+  paypal_email: null,
+  show_artists_section: true,
+  visible_widgets: null,
+  widget_order: null,
+  sales_channels: null,
+  custom_marketplace_mappings: null,
+};
 import { useCancelProOrder, useRequestRefund } from "@/hooks/useProOrders";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -356,7 +394,7 @@ export function ProOrders() {
 
   // Handle invoice download
   const handleDownloadInvoice = async (order: any) => {
-    if (!settings) return;
+    const effectiveSettings = settings || FALLBACK_SETTINGS;
     
     const invoice = order.invoices?.[0];
     if (!invoice) {
@@ -368,7 +406,7 @@ export function ProOrders() {
     try {
       const doc = await generateOrderInvoicePDF({ 
         order, 
-        settings,
+        settings: effectiveSettings,
         invoiceNumber: invoice.invoice_number
       });
       downloadOrderInvoice(doc, invoice.invoice_number);
@@ -569,10 +607,10 @@ export function ProOrders() {
                       variant="outline"
                       size="icon"
                       className="h-9 w-9"
-                      disabled={!settings || downloadingOrderId === order.id}
+                      disabled={downloadingOrderId === order.id}
                       onClick={async (e) => {
                         e.stopPropagation();
-                        if (!settings) return;
+                        const effectiveSettings = settings || FALLBACK_SETTINGS;
                         
                         setDownloadingOrderId(order.id);
                         try {
@@ -605,7 +643,7 @@ export function ProOrders() {
                           
                           const doc = await generateProPurchaseOrderPDF({
                             order: orderData,
-                            settings,
+                            settings: effectiveSettings,
                             vatLabel: 'TVA (20%)',
                             paymentTerms: String(customer?.payment_terms || 30)
                           });

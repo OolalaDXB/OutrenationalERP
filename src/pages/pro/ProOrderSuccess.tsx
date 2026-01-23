@@ -16,12 +16,50 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { useSettings } from "@/hooks/useSettings";
+import { useSettings, type Settings } from "@/hooks/useSettings";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { generateProPurchaseOrderPDF, downloadProPurchaseOrder } from "@/components/pro/ProPurchaseOrderPDF";
 import { QRCodeSVG } from "qrcode.react";
 import { type PaymentMethod } from "@/hooks/usePaymentMethods";
 import { toast } from "sonner";
+
+// Fallback settings for PDF generation when settings are loading
+const FALLBACK_SETTINGS: Settings = {
+  id: 'fallback',
+  shop_name: 'Outre-National',
+  legal_name: 'Outre-National',
+  shop_email: null,
+  shop_phone: null,
+  shop_address: null,
+  shop_city: null,
+  shop_postal_code: null,
+  shop_country: 'France',
+  vat_number: null,
+  siret: null,
+  vat_rate: 20,
+  default_currency: 'EUR',
+  invoice_prefix: 'FC',
+  invoice_next_number: 1,
+  payout_invoice_prefix: 'REV',
+  payout_invoice_next_number: 1,
+  credit_note_prefix: 'AV',
+  credit_note_next_number: 1,
+  primary_color: null,
+  shop_logo_url: null,
+  payment_terms_text: null,
+  legal_mentions: null,
+  bank_name: null,
+  iban: null,
+  bic: null,
+  eori: null,
+  cgv: null,
+  paypal_email: null,
+  show_artists_section: true,
+  visible_widgets: null,
+  widget_order: null,
+  sales_channels: null,
+  custom_marketplace_mappings: null,
+};
 
 interface OrderItem {
   title: string;
@@ -87,18 +125,13 @@ export function ProOrderSuccess() {
   }
 
   const handleDownloadPDF = async () => {
-    if (!settings) {
-      toast.error("Impossible de générer le PDF", {
-        description: "Les paramètres de la boutique ne sont pas disponibles. Réessayez dans quelques secondes.",
-      });
-      return;
-    }
+    const effectiveSettings = settings || FALLBACK_SETTINGS;
     
     setIsGeneratingPDF(true);
     try {
       const doc = await generateProPurchaseOrderPDF({
         order,
-        settings,
+        settings: effectiveSettings,
         vatLabel,
         paymentTerms
       });
@@ -304,7 +337,7 @@ export function ProOrderSuccess() {
       <div className="flex flex-col sm:flex-row gap-3">
         <Button 
           onClick={handleDownloadPDF}
-          disabled={isGeneratingPDF || !settings}
+          disabled={isGeneratingPDF}
           className="flex-1"
         >
           {isGeneratingPDF ? (
