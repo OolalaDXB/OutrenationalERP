@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
 import { format, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
-import { Link } from "react-router-dom";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -97,7 +96,11 @@ function formatPercent(value: number) {
   }).format(value / 100);
 }
 
-export default function FinancesPage() {
+interface FinancesPageProps {
+  onNavigate?: (path: string) => void;
+}
+
+export default function FinancesPage({ onNavigate }: FinancesPageProps) {
   const [period, setPeriod] = useState<PeriodType>("this_month");
   const [customStart, setCustomStart] = useState<Date | undefined>();
   const [customEnd, setCustomEnd] = useState<Date | undefined>();
@@ -204,23 +207,27 @@ export default function FinancesPage() {
 
         {/* Quick Links */}
         <div className="flex gap-2 flex-wrap">
-          <Link 
-            to="/finances/journal"
-            className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3"
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => onNavigate?.("/finances/journal")}
+            className="gap-2"
           >
             <CreditCard className="h-4 w-4" />
             Journal des paiements
-          </Link>
-          <Link 
-            to="/finances/impayes"
-            className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3"
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => onNavigate?.("/finances/impayes")}
+            className="gap-2"
           >
             <AlertCircle className="h-4 w-4" />
             Factures impayées
             {(kpis?.overdueCount || 0) > 0 && (
               <Badge variant="destructive" className="ml-1">{kpis?.overdueCount}</Badge>
             )}
-          </Link>
+          </Button>
         </div>
 
         {/* KPI Cards */}

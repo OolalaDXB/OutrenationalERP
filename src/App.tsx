@@ -139,9 +139,9 @@ function BackofficeContentInner({ onNavigate }: { onNavigate: (path: string) => 
       case "/movements": return <StockMovementsPage />;
       case "/reorder": return <ReorderPage />;
       case "/invoices": return <InvoicesPage />;
-      case "/finances": return <FinancesPage />;
-      case "/finances/journal": return <PaymentJournalPage />;
-      case "/finances/impayes": return <OverdueInvoicesPage />;
+      case "/finances": return <FinancesPage onNavigate={handleNavigate} />;
+      case "/finances/journal": return <PaymentJournalPage onNavigate={handleNavigate} />;
+      case "/finances/impayes": return <OverdueInvoicesPage onNavigate={handleNavigate} />;
       case "/analytics": return <AnalyticsPage />;
       case "/supplier-sales": return <SupplierSalesPage />;
       case "/admin/roles": return <UserRolesPage />;

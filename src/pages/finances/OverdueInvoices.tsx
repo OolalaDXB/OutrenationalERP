@@ -7,7 +7,8 @@ import {
   Phone,
   Clock,
   FileSpreadsheet,
-  Send
+  Send,
+  ArrowLeft
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,10 @@ import { cn } from "@/lib/utils";
 import { useOverdueInvoicesWithCustomer } from "@/hooks/useOverdueInvoicesWithCustomer";
 import { exportToXLS } from "@/lib/excel-utils";
 import { toast } from "sonner";
+
+interface OverdueInvoicesPageProps {
+  onNavigate?: (path: string) => void;
+}
 
 function formatCurrency(value: number, currency = "EUR") {
   return new Intl.NumberFormat("fr-FR", {
@@ -40,7 +45,7 @@ function getDaysOverdueBadgeClass(days: number): string {
   return "bg-danger/20 text-danger border-danger/30";
 }
 
-export default function OverdueInvoicesPage() {
+export default function OverdueInvoicesPage({ onNavigate }: OverdueInvoicesPageProps) {
   const { data: overdueInvoices, isLoading } = useOverdueInvoicesWithCustomer();
   const [sendingReminder, setSendingReminder] = useState<string | null>(null);
 
@@ -90,14 +95,25 @@ export default function OverdueInvoicesPage() {
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2 text-danger">
-              <AlertTriangle className="h-6 w-6" />
-              Factures impayées
-            </h1>
-            <p className="text-muted-foreground">
-              Factures en retard de paiement
-            </p>
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => onNavigate?.("/finances")}
+              className="gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Retour
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold flex items-center gap-2 text-danger">
+                <AlertTriangle className="h-6 w-6" />
+                Factures impayées
+              </h1>
+              <p className="text-muted-foreground">
+                Factures en retard de paiement
+              </p>
+            </div>
           </div>
           
           <Button onClick={handleExport} variant="outline" size="sm" className="gap-2">
