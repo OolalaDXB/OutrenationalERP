@@ -21,6 +21,7 @@ import { InvoicesPage } from "@/pages/Invoices";
 import { AnalyticsPage } from "@/pages/Analytics";
 import { StockMovementsPage } from "@/pages/StockMovements";
 import { UserRolesPage } from "@/pages/UserRoles";
+import FinancesPage from "@/pages/Finances";
 
 import { SettingsPage } from "@/pages/Settings";
 import { LoginPage } from "@/pages/Login";
@@ -92,6 +93,7 @@ const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   "/reorder": { title: "Réapprovisionnement", subtitle: "Commandes fournisseurs" },
   "/customers": { title: "Clients", subtitle: "Base clients" },
   "/invoices": { title: "Factures", subtitle: "Facturation" },
+  "/finances": { title: "Finances", subtitle: "Tableau de bord financier" },
   "/analytics": { title: "Analytics", subtitle: "Statistiques" },
   "/supplier-sales": { title: "Ventes par fournisseur", subtitle: "Rapports" },
   "/admin/roles": { title: "Gestion des rôles", subtitle: "Administration" },
@@ -133,6 +135,7 @@ function BackofficeContentInner({ onNavigate }: { onNavigate: (path: string) => 
       case "/movements": return <StockMovementsPage />;
       case "/reorder": return <ReorderPage />;
       case "/invoices": return <InvoicesPage />;
+      case "/finances": return <FinancesPage />;
       case "/analytics": return <AnalyticsPage />;
       case "/supplier-sales": return <SupplierSalesPage />;
       case "/admin/roles": return <UserRolesPage />;
