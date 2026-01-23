@@ -188,22 +188,38 @@ export function ProOrders() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
 
-  // Fetch customer's orders with their invoices
+  // Fetch customer's orders
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ['pro_orders_full', customer?.id],
     queryFn: async () => {
       if (!customer?.id) return [];
-      const { data, error } = await supabase
+      
+      // Fetch orders with items
+      const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select(`
           *,
-          order_items (*),
-          invoices (id, invoice_number, status)
+          order_items (*)
         `)
         .eq('customer_id', customer.id)
         .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data;
+      
+      if (ordersError) throw ordersError;
+      
+      // Fetch invoices for these orders
+      const orderIds = ordersData.map(o => o.id);
+      const { data: invoicesData, error: invoicesError } = await supabase
+        .from('invoices')
+        .select('id, invoice_number, status, order_id')
+        .in('order_id', orderIds);
+      
+      if (invoicesError) throw invoicesError;
+      
+      // Merge invoices into orders
+      return ordersData.map(order => ({
+        ...order,
+        invoices: invoicesData?.filter(inv => inv.order_id === order.id) || []
+      }));
     },
     enabled: !!customer?.id
   });
