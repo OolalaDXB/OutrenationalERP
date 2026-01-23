@@ -12,9 +12,8 @@ import { toast } from "@/hooks/use-toast";
 import { formatCurrency, formatDate } from "@/lib/format";
 
 const CURRENCIES = [
-  { code: 'EUR', label: 'Euro (€)', flag: '🇪🇺' },
-  { code: 'USD', label: 'Dollar ($)', flag: '🇺🇸' },
-  { code: 'GBP', label: 'Livre (£)', flag: '🇬🇧' },
+  { code: 'EUR', label: 'Euro (€)' },
+  { code: 'USD', label: 'Dollar ($)' },
 ];
 
 export function ProAccount() {
@@ -244,7 +243,7 @@ export function ProAccount() {
             >
               {CURRENCIES.map(c => (
                 <option key={c.code} value={c.code}>
-                  {c.flag} {c.label}
+                  {c.label}
                 </option>
               ))}
             </select>
