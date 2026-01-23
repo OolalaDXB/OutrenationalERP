@@ -73,7 +73,9 @@ export function useProInvoices() {
   return useQuery({
     queryKey: ['pro-invoices', customer?.id],
     queryFn: () => fetchProInvoices(customer!.id),
-    enabled: !!customer?.id
+    enabled: !!customer?.id,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
   });
 }
 
@@ -88,6 +90,8 @@ export function useRecentProInvoices(limit: number = 3) {
       const invoices = await fetchProInvoices(customer.id);
       return invoices.slice(0, limit);
     },
-    enabled: !!customer?.id
+    enabled: !!customer?.id,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
   });
 }
