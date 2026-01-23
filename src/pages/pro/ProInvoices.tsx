@@ -9,6 +9,7 @@ import {
   ExternalLink,
   ShoppingBag
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -119,8 +120,62 @@ export function ProInvoices() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="space-y-6">
+        {/* Header skeleton */}
+        <div>
+          <Skeleton className="h-8 w-48 mb-2" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+
+        {/* Filters skeleton */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Skeleton className="h-10 flex-1" />
+              <div className="flex gap-2">
+                <Skeleton className="h-9 w-20" />
+                <Skeleton className="h-9 w-20" />
+                <Skeleton className="h-9 w-24" />
+                <Skeleton className="h-9 w-24" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Table skeleton */}
+        <Card>
+          <CardHeader className="pb-3">
+            <Skeleton className="h-6 w-32" />
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border bg-secondary/50">
+                    <th className="text-left px-4 py-3"><Skeleton className="h-3 w-20" /></th>
+                    <th className="text-left px-4 py-3 hidden sm:table-cell"><Skeleton className="h-3 w-16" /></th>
+                    <th className="text-left px-4 py-3 hidden md:table-cell"><Skeleton className="h-3 w-24" /></th>
+                    <th className="text-right px-4 py-3"><Skeleton className="h-3 w-20 ml-auto" /></th>
+                    <th className="text-left px-4 py-3"><Skeleton className="h-3 w-16" /></th>
+                    <th className="text-right px-4 py-3"><Skeleton className="h-3 w-12 ml-auto" /></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[1, 2, 3, 4].map((i) => (
+                    <tr key={i} className="border-b border-border last:border-0">
+                      <td className="px-4 py-4"><Skeleton className="h-5 w-24" /></td>
+                      <td className="px-4 py-4 hidden sm:table-cell"><Skeleton className="h-4 w-20" /></td>
+                      <td className="px-4 py-4 hidden md:table-cell"><Skeleton className="h-4 w-28" /></td>
+                      <td className="px-4 py-4 text-right"><Skeleton className="h-5 w-16 ml-auto" /></td>
+                      <td className="px-4 py-4"><Skeleton className="h-6 w-20 rounded-full" /></td>
+                      <td className="px-4 py-4 text-right"><Skeleton className="h-8 w-16 ml-auto" /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
