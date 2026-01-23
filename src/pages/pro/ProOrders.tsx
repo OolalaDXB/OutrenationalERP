@@ -682,6 +682,73 @@ export function ProOrders() {
 
                     {/* Actions for Pro customer */}
                     <div className="flex flex-wrap gap-3">
+                      {/* Purchase order download button */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        disabled={downloadingOrderId === order.id}
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          const effectiveSettings = settings || FALLBACK_SETTINGS;
+                          
+                          setDownloadingOrderId(order.id);
+                          try {
+                            const orderData = {
+                              id: order.id,
+                              order_number: order.order_number,
+                              created_at: order.created_at,
+                              customer_name: order.customer_name,
+                              customer_email: order.customer_email,
+                              shipping_address: order.shipping_address,
+                              shipping_address_line_2: order.shipping_address_line_2,
+                              shipping_city: order.shipping_city,
+                              shipping_postal_code: order.shipping_postal_code,
+                              shipping_country: order.shipping_country,
+                              subtotal: order.subtotal,
+                              discount_amount: order.discount_amount,
+                              tax_amount: order.tax_amount,
+                              shipping_amount: order.shipping_amount,
+                              total: order.total,
+                              payment_method: order.payment_method,
+                              order_items: items.map((item: any) => ({
+                                title: item.title,
+                                artist_name: item.artist_name,
+                                sku: item.sku,
+                                quantity: item.quantity,
+                                unit_price: item.unit_price,
+                                total_price: item.total_price
+                              }))
+                            };
+                            
+                            const doc = await generateProPurchaseOrderPDF({
+                              order: orderData,
+                              settings: effectiveSettings,
+                              vatLabel: 'TVA (20%)',
+                              paymentTerms: String(customer?.payment_terms || 30)
+                            });
+                            downloadProPurchaseOrder(doc, order.order_number);
+                            
+                            // Show warning if using fallback settings
+                            if (!settings || settings.id === 'fallback') {
+                              toast.warning("Document généré sans en-tête légal complet");
+                            }
+                          } catch (error) {
+                            console.error('Error generating PDF:', error);
+                            toast.error('Erreur lors de la génération du bon de commande');
+                          } finally {
+                            setDownloadingOrderId(null);
+                          }
+                        }}
+                      >
+                        {downloadingOrderId === order.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Download className="w-4 h-4" />
+                        )}
+                        Télécharger le bon de commande
+                      </Button>
+
                       {/* Invoice download button */}
                       {hasInvoice && (
                         <Button
@@ -703,6 +770,15 @@ export function ProOrders() {
                         </Button>
                       )}
 
+                      {/* Invoice info for pending orders */}
+                      {order.status === 'pending' && (
+                        <div className="text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded-md flex items-center gap-2">
+                          <Clock className="w-4 h-4" />
+                          La facture sera disponible après confirmation de votre commande.
+                        </div>
+                      )}
+
+                      {/* Invoice info for confirmed orders without invoice */}
                       {!hasInvoice && shouldShowInvoiceInfo(order) && (
                         <div className="text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded-md">
                           Facture disponible une fois générée par notre équipe.
