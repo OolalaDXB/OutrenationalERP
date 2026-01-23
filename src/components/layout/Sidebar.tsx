@@ -23,7 +23,8 @@ import {
   Shield,
   ShieldCheck,
   Eye,
-  Settings
+  Settings,
+  TrendingUp
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import outreNationalLogo from "@/assets/outre-national-logo.png";
@@ -77,6 +78,7 @@ const navigation: NavSection[] = [
   {
     title: "Rapports",
     items: [
+      { icon: TrendingUp, label: "Finances", href: "/finances" },
       { icon: BarChart3, label: "Analytics", href: "/analytics" },
       { icon: PieChart, label: "Ventes par fournisseur", href: "/supplier-sales" },
     ],

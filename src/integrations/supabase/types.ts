@@ -2019,6 +2019,65 @@ export type Database = {
           },
         ]
       }
+      v_order_items_with_margin: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          item_consignment_rate: number | null
+          margin: number | null
+          margin_type: string | null
+          order_date: string | null
+          order_id: string | null
+          product_id: string | null
+          quantity: number | null
+          sku: string | null
+          status: string | null
+          supplier_commission_rate: number | null
+          supplier_id: string | null
+          supplier_type: Database["public"]["Enums"]["supplier_type"] | null
+          title: string | null
+          total_price: number | null
+          unit_cost: number | null
+          unit_price: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_low_stock_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "v_supplier_sales"
+            referencedColumns: ["supplier_id"]
+          },
+        ]
+      }
       v_supplier_sales: {
         Row: {
           commission_rate: number | null
@@ -2032,6 +2091,32 @@ export type Database = {
           supplier_type: Database["public"]["Enums"]["supplier_type"] | null
         }
         Relationships: []
+      }
+      v_top_products_by_revenue: {
+        Row: {
+          order_count: number | null
+          product_id: string | null
+          sku: string | null
+          title: string | null
+          total_quantity: number | null
+          total_revenue: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "v_low_stock_products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
