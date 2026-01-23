@@ -1,12 +1,15 @@
 import { useState, useMemo } from "react";
 import { format, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
+import { Link } from "react-router-dom";
 import { 
   TrendingUp, 
   TrendingDown, 
   AlertTriangle,
   FileText,
-  ArrowRight
+  ArrowRight,
+  CreditCard,
+  AlertCircle
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +29,7 @@ import {
   getDateRange,
   PeriodType 
 } from "@/hooks/useFinanceStats";
+import { FinanceExportButton } from "@/components/finances/FinanceExportButton";
 import {
   LineChart,
   Line,
@@ -139,7 +143,7 @@ export default function FinancesPage() {
             </p>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Select value={period} onValueChange={(v) => setPeriod(v as PeriodType)}>
               <SelectTrigger className="w-[160px]">
                 <SelectValue />
@@ -188,7 +192,33 @@ export default function FinancesPage() {
                 </Popover>
               </div>
             )}
+
+            <FinanceExportButton
+              kpis={kpis}
+              monthlyRevenue={monthlyRevenue}
+              tvaBreakdown={tvaBreakdown}
+              periodLabel={PERIOD_OPTIONS.find(o => o.value === period)?.label || period}
+            />
           </div>
+        </div>
+
+        {/* Quick Links */}
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" size="sm" asChild className="gap-2">
+            <Link to="/finances/journal">
+              <CreditCard className="h-4 w-4" />
+              Journal des paiements
+            </Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild className="gap-2">
+            <Link to="/finances/impayes">
+              <AlertCircle className="h-4 w-4" />
+              Factures impayées
+              {(kpis?.overdueCount || 0) > 0 && (
+                <Badge variant="destructive" className="ml-1">{kpis?.overdueCount}</Badge>
+              )}
+            </Link>
+          </Button>
         </div>
 
         {/* KPI Cards */}
