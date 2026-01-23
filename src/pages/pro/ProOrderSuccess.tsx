@@ -21,6 +21,7 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { generateProPurchaseOrderPDF, downloadProPurchaseOrder } from "@/components/pro/ProPurchaseOrderPDF";
 import { QRCodeSVG } from "qrcode.react";
 import { type PaymentMethod } from "@/hooks/usePaymentMethods";
+import { toast } from "sonner";
 
 interface OrderItem {
   title: string;
@@ -86,7 +87,12 @@ export function ProOrderSuccess() {
   }
 
   const handleDownloadPDF = async () => {
-    if (!settings) return;
+    if (!settings) {
+      toast.error("Impossible de générer le PDF", {
+        description: "Les paramètres de la boutique ne sont pas disponibles. Réessayez dans quelques secondes.",
+      });
+      return;
+    }
     
     setIsGeneratingPDF(true);
     try {
@@ -99,6 +105,7 @@ export function ProOrderSuccess() {
       downloadProPurchaseOrder(doc, order.order_number);
     } catch (error) {
       console.error('Error generating PDF:', error);
+      toast.error("Erreur lors de la génération du bon de commande");
     } finally {
       setIsGeneratingPDF(false);
     }
