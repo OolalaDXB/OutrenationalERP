@@ -147,7 +147,7 @@ function BackofficeContentInner({ onNavigate }: { onNavigate: (path: string) => 
       case "/customers": return <CustomersPage />;
       case "/artists": return <ArtistsPage />;
       case "/movements": return <StockMovementsPage />;
-      case "/reorder": return <ReorderPage />;
+      case "/reorder": return <ReorderPage onNavigate={handleNavigate} />;
       case "/purchase-orders": return <PurchaseOrdersPage onNavigate={handleNavigate} />;
       case "/purchase-orders/new": return <PurchaseOrderCreatePage onNavigate={handleNavigate} />;
       case "/invoices": return <InvoicesPage />;
