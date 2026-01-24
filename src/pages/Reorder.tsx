@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AlertTriangle, ShoppingCart, Package, TrendingDown, Send, Check, Loader2 } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ interface ReorderSuggestion {
 }
 
 export function ReorderPage() {
+  const navigate = useNavigate();
   const { data: lowStockProducts = [], isLoading: productsLoading, isError: productsError, error: productsErr, refetch: refetchProducts } = useLowStockProducts();
   const { data: suppliers = [], isLoading: suppliersLoading, isError: suppliersError, error: suppliersErr, refetch: refetchSuppliers } = useSuppliers();
   const { isEnabled, isLoading: capabilityLoading } = useCapability();
@@ -139,6 +141,40 @@ export function ReorderPage() {
     setSelectedItems(newSelected);
   };
 
+  // Handle "Commander" button click - navigate to PO create with selected items
+  const handleCreatePO = () => {
+    // Get selected suggestions
+    const selectedSuggestions = suggestions.filter(s => selectedItems.has(s.product.id));
+    
+    // Group by supplier - take first supplier's items (or handle multi-supplier differently)
+    const supplierGroups = new Map<string, typeof selectedSuggestions>();
+    selectedSuggestions.forEach(s => {
+      const existing = supplierGroups.get(s.supplier.id) || [];
+      existing.push(s);
+      supplierGroups.set(s.supplier.id, existing);
+    });
+
+    // If multiple suppliers selected, use the first one (or could show a modal to pick)
+    const firstSupplierId = supplierGroups.keys().next().value;
+    const itemsForSupplier = supplierGroups.get(firstSupplierId) || [];
+
+    // Navigate to PO create with pre-filled data
+    navigate('/purchase-orders/new', {
+      state: {
+        supplierId: firstSupplierId,
+        items: itemsForSupplier.map(s => ({
+          product_id: s.product.id,
+          sku: s.product.sku,
+          title: s.product.artist_name 
+            ? `${s.product.artist_name} - ${s.product.title}` 
+            : s.product.title,
+          quantity_ordered: s.suggestedQty,
+          unit_cost: s.product.purchase_price || 0,
+        })),
+      },
+    });
+  };
+
   const priorityStyles = {
     critical: "bg-danger-light text-danger",
     high: "bg-warning-light text-warning-foreground",
@@ -240,6 +276,7 @@ export function ReorderPage() {
             className="gap-2"
             disabled={!canCreatePO || capabilityLoading}
             title={!canCreatePO ? "Mise à niveau requise" : undefined}
+            onClick={handleCreatePO}
           >
             <Send className="w-4 h-4" />
             Commander ({selectedItems.size} produits)
