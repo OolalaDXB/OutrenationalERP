@@ -37,7 +37,8 @@ export function InventoryPage() {
         searchTerm === "" ||
         product.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (product.artist_name && product.artist_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        product.sku.toLowerCase().includes(searchTerm.toLowerCase());
+        product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (product.barcode && product.barcode.toLowerCase().includes(searchTerm.toLowerCase()));
 
       const stock = product.stock ?? 0;
       const threshold = product.stock_threshold ?? 5;
@@ -251,7 +252,7 @@ export function InventoryPage() {
               </select>
               <input
                 type="text"
-                placeholder="Rechercher produit, SKU..."
+                placeholder="Rechercher produit, SKU, code-barres..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="flex-1 min-w-[200px] max-w-[300px] px-3 py-2 rounded-md border border-border bg-card text-sm"

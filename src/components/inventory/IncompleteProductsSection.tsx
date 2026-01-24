@@ -31,6 +31,7 @@ export function IncompleteProductsSection() {
   const { data: allProducts } = useProducts();
   const [isExpanded, setIsExpanded] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [focusField, setFocusField] = useState<string | null>(null);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   
   // Filter products based on active filters
@@ -164,7 +165,11 @@ export function IncompleteProductsSection() {
             <div
               key={product.id}
               className="flex items-center gap-4 p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors cursor-pointer group"
-              onClick={() => setEditingProductId(product.id)}
+              onClick={() => {
+                setEditingProductId(product.id);
+                // Focus barcode field if barcode is missing
+                setFocusField(product.missing_fields.includes('barcode') ? 'barcode' : null);
+              }}
             >
               {/* Image */}
               <div className="w-10 h-10 rounded-md bg-secondary flex items-center justify-center overflow-hidden flex-shrink-0">
@@ -234,8 +239,12 @@ export function IncompleteProductsSection() {
       {editingProduct && (
         <ProductFormModal
           isOpen={!!editingProductId}
-          onClose={() => setEditingProductId(null)}
+          onClose={() => {
+            setEditingProductId(null);
+            setFocusField(null);
+          }}
           product={editingProduct}
+          focusField={focusField}
         />
       )}
     </>
