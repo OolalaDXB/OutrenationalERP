@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.create-pro-customer]
 verify_jwt = false
+
+[functions.admin-cbac]
+verify_jwt = false
