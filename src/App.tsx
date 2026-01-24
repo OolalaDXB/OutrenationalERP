@@ -1,6 +1,5 @@
-import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { NotificationProvider } from "@/hooks/use-notifications";
@@ -50,17 +49,13 @@ import "@fontsource/inter/500.css";
 import "@fontsource/inter/600.css";
 import "@fontsource/inter/700.css";
 
-// Configure QueryClient with proper defaults to avoid cache/retry issues
+// Configure QueryClient with proper defaults
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Cache data for 5 minutes before considering it stale
       staleTime: 1000 * 60 * 5,
-      // Keep unused data in cache for 10 minutes
       gcTime: 1000 * 60 * 10,
-      // Custom retry logic
       retry: (failureCount, error) => {
-        // Don't retry on authentication errors
         const errorMessage = error instanceof Error ? error.message : String(error);
         if (
           errorMessage.includes('JWT') ||
@@ -71,16 +66,12 @@ const queryClient = new QueryClient({
         ) {
           return false;
         }
-        // Retry other errors up to 2 times
         return failureCount < 2;
       },
-      // Don't refetch on window focus to avoid unnecessary requests
       refetchOnWindowFocus: false,
-      // Don't refetch on reconnect automatically
       refetchOnReconnect: 'always',
     },
     mutations: {
-      // Don't retry mutations by default
       retry: false,
     },
   },
@@ -109,13 +100,14 @@ const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   "/admin/settings": { title: "Paramètres", subtitle: "Configuration" },
 };
 
-function BackofficeContentInner({ onNavigate }: { onNavigate: (path: string) => void }) {
+function BackofficeContentInner() {
   const { user, loading } = useAuth();
-  const [currentPath, setCurrentPath] = useState("/");
+  const navigate = useNavigate();
+  const location = useLocation();
+  const currentPath = location.pathname;
 
   const handleNavigate = (path: string) => {
-    setCurrentPath(path);
-    onNavigate(path);
+    navigate(path);
   };
 
   if (loading) {
@@ -130,46 +122,43 @@ function BackofficeContentInner({ onNavigate }: { onNavigate: (path: string) => 
     return <LoginPage />;
   }
 
-  const renderPage = () => {
-    // Handle dynamic routes
-    if (currentPath.startsWith('/purchase-orders/') && currentPath !== '/purchase-orders/new') {
-      const poId = currentPath.split('/')[2];
-      return <PurchaseOrderDetailPage poId={poId} onNavigate={handleNavigate} />;
-    }
-
-    switch (currentPath) {
-      case "/": return <Dashboard />;
-      case "/orders": return <OrdersPage />;
-      case "/products": return <ProductsPage />;
-      case "/suppliers": return <SuppliersPage />;
-      case "/labels": return <LabelsPage />;
-      case "/inventory": return <InventoryPage />;
-      case "/customers": return <CustomersPage />;
-      case "/artists": return <ArtistsPage />;
-      case "/movements": return <StockMovementsPage />;
-      case "/reorder": return <ReorderPage onNavigate={handleNavigate} />;
-      case "/purchase-orders": return <PurchaseOrdersPage onNavigate={handleNavigate} />;
-      case "/purchase-orders/new": return <PurchaseOrderCreatePage onNavigate={handleNavigate} />;
-      case "/invoices": return <InvoicesPage />;
-      case "/finances": return <FinancesPage onNavigate={handleNavigate} />;
-      case "/finances/journal": return <PaymentJournalPage onNavigate={handleNavigate} />;
-      case "/finances/impayes": return <OverdueInvoicesPage onNavigate={handleNavigate} />;
-      case "/analytics": return <AnalyticsPage />;
-      case "/supplier-sales": return <SupplierSalesPage />;
-      case "/admin/roles": return <UserRolesPage />;
-      case "/admin/settings": return <SettingsPage />;
-      default: return <Dashboard />;
-    }
-  };
-
-  const pageInfo = pageTitles[currentPath] || { title: "Dashboard" };
+  // Get page info - handle dynamic routes
+  let pageInfo = pageTitles[currentPath];
+  if (!pageInfo && currentPath.startsWith('/purchase-orders/')) {
+    pageInfo = { title: "Commande fournisseur", subtitle: "Détail de la commande" };
+  }
+  if (!pageInfo) {
+    pageInfo = { title: "Dashboard" };
+  }
 
   return (
     <NotificationProvider>
       <div className="min-h-screen bg-background">
         <Sidebar currentPath={currentPath} onNavigate={handleNavigate} />
         <PageLayout title={pageInfo.title} subtitle={pageInfo.subtitle} onNavigate={handleNavigate}>
-          {renderPage()}
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/orders" element={<OrdersPage />} />
+            <Route path="/products" element={<ProductsPage />} />
+            <Route path="/suppliers" element={<SuppliersPage />} />
+            <Route path="/labels" element={<LabelsPage />} />
+            <Route path="/inventory" element={<InventoryPage />} />
+            <Route path="/customers" element={<CustomersPage />} />
+            <Route path="/artists" element={<ArtistsPage />} />
+            <Route path="/movements" element={<StockMovementsPage />} />
+            <Route path="/reorder" element={<ReorderPage />} />
+            <Route path="/purchase-orders" element={<PurchaseOrdersPage />} />
+            <Route path="/purchase-orders/new" element={<PurchaseOrderCreatePage />} />
+            <Route path="/purchase-orders/:poId" element={<PurchaseOrderDetailPage />} />
+            <Route path="/invoices" element={<InvoicesPage />} />
+            <Route path="/finances" element={<FinancesPage />} />
+            <Route path="/finances/journal" element={<PaymentJournalPage />} />
+            <Route path="/finances/impayes" element={<OverdueInvoicesPage />} />
+            <Route path="/analytics" element={<AnalyticsPage />} />
+            <Route path="/supplier-sales" element={<SupplierSalesPage />} />
+            <Route path="/admin/roles" element={<UserRolesPage />} />
+            <Route path="/admin/settings" element={<SettingsPage />} />
+          </Routes>
         </PageLayout>
       </div>
     </NotificationProvider>
@@ -179,7 +168,7 @@ function BackofficeContentInner({ onNavigate }: { onNavigate: (path: string) => 
 function BackofficeContent() {
   return (
     <AuthProvider>
-      <BackofficeContentInner onNavigate={() => {}} />
+      <BackofficeContentInner />
     </AuthProvider>
   );
 }
@@ -189,7 +178,6 @@ function AppRouter() {
   const isProRoute = location.pathname.startsWith('/pro');
   const isResetPasswordRoute = location.pathname === '/reset-password';
 
-  // Handle reset password route separately (no auth required)
   if (isResetPasswordRoute) {
     return <ResetPasswordPage />;
   }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, Plus, Trash2, Loader2, Search, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { useProducts } from "@/hooks/useProducts";
 import { useCreatePurchaseOrder } from "@/hooks/usePurchaseOrders";
 import { useCapability } from "@/hooks/useCapability";
 import { UpgradePrompt } from "@/components/ui/upgrade-prompt";
+import { PODebugBanner } from "@/components/debug/PODebugBanner";
 import { formatCurrency } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -21,10 +22,6 @@ interface POItem {
   title: string;
   quantity_ordered: number;
   unit_cost: number;
-}
-
-interface PurchaseOrderCreatePageProps {
-  onNavigate: (path: string) => void;
 }
 
 // State passed from Reorder page
@@ -39,8 +36,9 @@ interface PrefilledState {
   }>;
 }
 
-export function PurchaseOrderCreatePage({ onNavigate }: PurchaseOrderCreatePageProps) {
+export function PurchaseOrderCreatePage() {
   const location = useLocation();
+  const navigate = useNavigate();
 
   const readPrefill = (): PrefilledState | null => {
     // 1) react-router state (future-proof)
@@ -63,7 +61,7 @@ export function PurchaseOrderCreatePage({ onNavigate }: PurchaseOrderCreatePageP
   const { data: suppliers = [], isLoading: suppliersLoading } = useSuppliers();
   const { data: products = [] } = useProducts();
   const createPO = useCreatePurchaseOrder();
-  const { isEnabled } = useCapability();
+  const { isEnabled, isLoading: cbacLoading } = useCapability();
   const { toast } = useToast();
 
   const canCreatePO = isEnabled('purchase_orders');
@@ -204,7 +202,7 @@ export function PurchaseOrderCreatePage({ onNavigate }: PurchaseOrderCreatePageP
         description: "La commande fournisseur a été créée avec succès",
       });
 
-      onNavigate(`/purchase-orders/${poId}`);
+      navigate(`/purchase-orders/${poId}`);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
       
@@ -224,6 +222,13 @@ export function PurchaseOrderCreatePage({ onNavigate }: PurchaseOrderCreatePageP
 
   return (
     <div className="space-y-6">
+      {/* Dev-only Debug Banner */}
+      <PODebugBanner 
+        canCreatePO={canCreatePO} 
+        cbacLoading={cbacLoading} 
+        isPending={createPO.isPending} 
+      />
+
       {/* Upgrade Prompt */}
       <UpgradePrompt
         capability="purchase_orders"
@@ -233,7 +238,7 @@ export function PurchaseOrderCreatePage({ onNavigate }: PurchaseOrderCreatePageP
 
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => onNavigate("/purchase-orders")}>
+        <Button variant="ghost" size="icon" onClick={() => navigate("/purchase-orders")}>
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <div>

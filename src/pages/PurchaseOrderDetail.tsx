@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { ArrowLeft, FileDown, Loader2, Printer } from "lucide-react";
+import { useParams, useNavigate } from "react-router-dom";
+import { ArrowLeft, FileDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { usePurchaseOrder, useChangePOStatus, poStatusConfig, poAllowedTransitions, POStatus } from "@/hooks/usePurchaseOrders";
@@ -18,13 +19,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-interface PurchaseOrderDetailPageProps {
-  poId: string;
-  onNavigate: (path: string) => void;
-}
-
-export function PurchaseOrderDetailPage({ poId, onNavigate }: PurchaseOrderDetailPageProps) {
-  const { data: po, isLoading, error } = usePurchaseOrder(poId);
+export function PurchaseOrderDetailPage() {
+  const { poId } = useParams<{ poId: string }>();
+  const navigate = useNavigate();
+  const { data: po, isLoading, error } = usePurchaseOrder(poId || '');
   const { data: settings } = useSettings();
   const changeStatus = useChangePOStatus();
   const { toast } = useToast();
@@ -33,6 +31,7 @@ export function PurchaseOrderDetailPage({ poId, onNavigate }: PurchaseOrderDetai
   const [isExporting, setIsExporting] = useState(false);
 
   const handleStatusChange = async (toStatus: POStatus) => {
+    if (!poId) return;
     try {
       await changeStatus.mutateAsync({
         id: poId,
@@ -88,7 +87,7 @@ export function PurchaseOrderDetailPage({ poId, onNavigate }: PurchaseOrderDetai
     return (
       <div className="p-12 text-center">
         <p className="text-destructive mb-4">Commande non trouvée</p>
-        <Button variant="outline" onClick={() => onNavigate("/purchase-orders")}>
+        <Button variant="outline" onClick={() => navigate("/purchase-orders")}>
           Retour à la liste
         </Button>
       </div>
@@ -130,7 +129,7 @@ export function PurchaseOrderDetailPage({ poId, onNavigate }: PurchaseOrderDetai
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => onNavigate("/purchase-orders")}>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/purchase-orders")}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
