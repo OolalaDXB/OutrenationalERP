@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge, supplierTypeVariant, supplierTypeLabel } from "@/components/ui/status-badge";
 import { useLowStockProducts } from "@/hooks/useProducts";
 import { useSuppliers, type Supplier } from "@/hooks/useSuppliers";
+import { useCapability } from "@/hooks/useCapability";
 import { formatCurrency } from "@/lib/format";
 
 interface ReorderSuggestion {
@@ -28,6 +29,9 @@ interface ReorderSuggestion {
 export function ReorderPage() {
   const { data: lowStockProducts = [], isLoading: productsLoading, isError: productsError, error: productsErr, refetch: refetchProducts } = useLowStockProducts();
   const { data: suppliers = [], isLoading: suppliersLoading, isError: suppliersError, error: suppliersErr, refetch: refetchSuppliers } = useSuppliers();
+  const { isEnabled, isLoading: capabilityLoading } = useCapability();
+  
+  const canCreatePO = isEnabled('purchase_orders');
   
   const [searchTerm, setSearchTerm] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("all");
@@ -232,7 +236,11 @@ export function ReorderPage() {
           />
         </div>
         {selectedItems.size > 0 && (
-          <Button className="gap-2">
+          <Button 
+            className="gap-2"
+            disabled={!canCreatePO || capabilityLoading}
+            title={!canCreatePO ? "Mise à niveau requise" : undefined}
+          >
             <Send className="w-4 h-4" />
             Commander ({selectedItems.size} produits)
           </Button>
