@@ -131,6 +131,42 @@ export type Database = {
         }
         Relationships: []
       }
+      cbac_audit_log: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          capability: string | null
+          created_at: string
+          id: string
+          metadata: Json | null
+          new_value: Json | null
+          old_value: Json | null
+          reason: string | null
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          capability?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          new_value?: Json | null
+          old_value?: Json | null
+          reason?: string | null
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          capability?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          new_value?: Json | null
+          old_value?: Json | null
+          reason?: string | null
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           accepts_marketing: boolean | null
@@ -1348,6 +1384,8 @@ export type Database = {
         Row: {
           bank_name: string | null
           bic: string | null
+          capabilities: Json
+          capability_overrides: Json
           cgv: string | null
           created_at: string | null
           credit_note_next_number: number | null
@@ -1365,6 +1403,8 @@ export type Database = {
           payout_invoice_next_number: number | null
           payout_invoice_prefix: string | null
           paypal_email: string | null
+          plan_code: string
+          plan_version: string
           primary_color: string | null
           sales_channels: Json | null
           shop_address: string | null
@@ -1386,6 +1426,8 @@ export type Database = {
         Insert: {
           bank_name?: string | null
           bic?: string | null
+          capabilities?: Json
+          capability_overrides?: Json
           cgv?: string | null
           created_at?: string | null
           credit_note_next_number?: number | null
@@ -1403,6 +1445,8 @@ export type Database = {
           payout_invoice_next_number?: number | null
           payout_invoice_prefix?: string | null
           paypal_email?: string | null
+          plan_code?: string
+          plan_version?: string
           primary_color?: string | null
           sales_channels?: Json | null
           shop_address?: string | null
@@ -1424,6 +1468,8 @@ export type Database = {
         Update: {
           bank_name?: string | null
           bic?: string | null
+          capabilities?: Json
+          capability_overrides?: Json
           cgv?: string | null
           created_at?: string | null
           credit_note_next_number?: number | null
@@ -1441,6 +1487,8 @@ export type Database = {
           payout_invoice_next_number?: number | null
           payout_invoice_prefix?: string | null
           paypal_email?: string | null
+          plan_code?: string
+          plan_version?: string
           primary_color?: string | null
           sales_channels?: Json | null
           shop_address?: string | null
@@ -1920,6 +1968,17 @@ export type Database = {
       }
     }
     Views: {
+      v_cbac_status: {
+        Row: {
+          active_trials_count: number | null
+          capabilities: Json | null
+          capability_overrides: Json | null
+          expired_overrides_count: number | null
+          plan_code: string | null
+          plan_version: string | null
+        }
+        Relationships: []
+      }
       v_dashboard_kpis: {
         Row: {
           active_suppliers: number | null
@@ -2160,6 +2219,64 @@ export type Database = {
         }
         Returns: string
       }
+      assert_cbac: { Args: { _key: string }; Returns: undefined }
+      assert_cbac_array: {
+        Args: { _key: string; _value: string }
+        Returns: undefined
+      }
+      assert_cbac_limit: {
+        Args: { _current_count: number; _key: string }
+        Returns: undefined
+      }
+      cbac_add_override: {
+        Args: {
+          _capability: string
+          _enabled?: boolean
+          _expires_at?: string
+          _reason?: string
+          _value?: number
+        }
+        Returns: undefined
+      }
+      cbac_add_override_json: {
+        Args: {
+          _capability: string
+          _expires_at?: string
+          _payload: Json
+          _reason?: string
+        }
+        Returns: undefined
+      }
+      cbac_array_contains: {
+        Args: { _key: string; _value: string }
+        Returns: boolean
+      }
+      cbac_enabled: { Args: { _key: string }; Returns: boolean }
+      cbac_limit: { Args: { _key: string }; Returns: number }
+      cbac_log_change: {
+        Args: {
+          _action: string
+          _capability?: string
+          _metadata?: Json
+          _new_value?: Json
+          _old_value?: Json
+          _reason?: string
+        }
+        Returns: string
+      }
+      cbac_remove_override: {
+        Args: { _capability: string; _reason?: string }
+        Returns: undefined
+      }
+      cbac_set_plan: {
+        Args: {
+          _capabilities: Json
+          _plan_code: string
+          _plan_version: string
+          _reason?: string
+        }
+        Returns: undefined
+      }
       count_orders: {
         Args: {
           p_customer_id?: string
@@ -2193,6 +2310,7 @@ export type Database = {
           id: string
         }[]
       }
+      get_cbac: { Args: never; Returns: Json }
       has_any_role: {
         Args: {
           _roles: Database["public"]["Enums"]["app_role"][]
