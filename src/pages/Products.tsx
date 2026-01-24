@@ -24,6 +24,7 @@ import { ProductFormModal } from "@/components/forms/ProductFormModal";
 import { ProductDrawer } from "@/components/drawers/ProductDrawer";
 import { ImportExportModal } from "@/components/import-export/ImportExportModal";
 import { useToast } from "@/hooks/use-toast";
+import { validateBarcode } from "@/lib/barcode-validation";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   DropdownMenu,
@@ -96,6 +97,7 @@ export function ProductsPage() {
   const [labelFilter, setLabelFilter] = useState("all");
   const [formatFilter, setFormatFilter] = useState("all");
   const [stockFilter, setStockFilter] = useState("all");
+  const [barcodeFilter, setBarcodeFilter] = useState("all");
   const [showImportExport, setShowImportExport] = useState(false);
   
   // Confirmation dialogs state
@@ -140,10 +142,10 @@ export function ProductsPage() {
 
   // Reset to page 1 when search/filters change
   useEffect(() => {
-    if (currentPage > 1 && (searchTerm || formatFilter !== 'all' || stockFilter !== 'all')) {
+    if (currentPage > 1 && (searchTerm || formatFilter !== 'all' || stockFilter !== 'all' || barcodeFilter !== 'all')) {
       handlePageChange(1);
     }
-  }, [searchTerm, formatFilter, stockFilter]);
+  }, [searchTerm, formatFilter, stockFilter, barcodeFilter]);
   
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -190,9 +192,17 @@ export function ProductsPage() {
         matchesStock = stock === 0;
       }
 
-      return matchesSearch && matchesSupplier && matchesLabel && matchesFormat && matchesStock;
+      // Barcode filter
+      let matchesBarcode = true;
+      if (barcodeFilter === "with") {
+        matchesBarcode = !!product.barcode && product.barcode.trim() !== "";
+      } else if (barcodeFilter === "without") {
+        matchesBarcode = !product.barcode || product.barcode.trim() === "";
+      }
+
+      return matchesSearch && matchesSupplier && matchesLabel && matchesFormat && matchesStock && matchesBarcode;
     });
-  }, [products, searchTerm, supplierFilter, labelFilter, formatFilter, stockFilter]);
+  }, [products, searchTerm, supplierFilter, labelFilter, formatFilter, stockFilter, barcodeFilter]);
 
   // Client-side filtering on deleted products (trash view)
   const filteredDeletedProducts = useMemo(() => {
@@ -287,7 +297,16 @@ export function ProductsPage() {
       if (stockFilter === "in_stock") matchesStock = stock > threshold;
       else if (stockFilter === "low") matchesStock = stock > 0 && stock <= threshold;
       else if (stockFilter === "out") matchesStock = stock === 0;
-      return matchesSearch && matchesSupplier && matchesLabel && matchesFormat && matchesStock;
+      
+      // Barcode filter
+      let matchesBarcode = true;
+      if (barcodeFilter === "with") {
+        matchesBarcode = !!product.barcode && product.barcode.trim() !== "";
+      } else if (barcodeFilter === "without") {
+        matchesBarcode = !product.barcode || product.barcode.trim() === "";
+      }
+      
+      return matchesSearch && matchesSupplier && matchesLabel && matchesFormat && matchesStock && matchesBarcode;
     });
     
     if (dataToExport.length === 0) {
@@ -295,18 +314,35 @@ export function ProductsPage() {
       return;
     }
 
-    const headers = ["SKU", "Titre", "Artiste", "Fournisseur", "Label", "Format", "Prix", "Stock", "Emplacement"];
-    const rows = dataToExport.map(product => [
-      product.sku,
-      `"${(product.title || '').replace(/"/g, '""')}"`,
-      `"${(product.artist_name || '').replace(/"/g, '""')}"`,
-      `"${(product.supplier_name || '').replace(/"/g, '""')}"`,
-      `"${(product.label_name || '').replace(/"/g, '""')}"`,
-      product.format || '',
-      product.selling_price?.toString() || '',
-      (product.stock ?? 0).toString(),
-      `"${(product.location || '').replace(/"/g, '""')}"`
-    ].join(";"));
+    const headers = ["SKU", "Titre", "Artiste", "Code-barres", "Format code-barres", "Fournisseur", "Label", "Format", "Prix", "Stock", "Emplacement"];
+    const rows = dataToExport.map(product => {
+      // Determine barcode format
+      let barcodeFormat = "";
+      if (product.barcode && product.barcode.trim()) {
+        if (product.barcode.startsWith('SILLON-') || product.barcode.startsWith('SIL-')) {
+          barcodeFormat = "Interne";
+        } else {
+          const validation = validateBarcode(product.barcode);
+          barcodeFormat = validation.isValid && validation.format ? validation.format : "Inconnu";
+        }
+      } else {
+        barcodeFormat = "Aucun";
+      }
+      
+      return [
+        product.sku,
+        `"${(product.title || '').replace(/"/g, '""')}"`,
+        `"${(product.artist_name || '').replace(/"/g, '""')}"`,
+        `"${(product.barcode || '').replace(/"/g, '""')}"`,
+        barcodeFormat,
+        `"${(product.supplier_name || '').replace(/"/g, '""')}"`,
+        `"${(product.label_name || '').replace(/"/g, '""')}"`,
+        product.format || '',
+        product.selling_price?.toString() || '',
+        (product.stock ?? 0).toString(),
+        `"${(product.location || '').replace(/"/g, '""')}"`
+      ].join(";");
+    });
 
     const csvContent = [headers.join(";"), ...rows].join("\n");
     const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
@@ -320,7 +356,7 @@ export function ProductsPage() {
     URL.revokeObjectURL(url);
 
     toast({ title: "Export réussi", description: `${dataToExport.length} produit(s) exporté(s)` });
-  }, [allProducts, searchTerm, supplierFilter, labelFilter, formatFilter, stockFilter, toast]);
+  }, [allProducts, searchTerm, supplierFilter, labelFilter, formatFilter, stockFilter, barcodeFilter, toast]);
 
   if (isLoading) {
     return (
@@ -425,6 +461,15 @@ export function ProductsPage() {
                 <option value="in_stock">En stock</option>
                 <option value="low">Stock faible</option>
                 <option value="out">Rupture</option>
+              </select>
+              <select
+                className="px-3 py-2 rounded-md border border-border bg-card text-sm cursor-pointer"
+                value={barcodeFilter}
+                onChange={(e) => setBarcodeFilter(e.target.value)}
+              >
+                <option value="all">Code-barres: Tous</option>
+                <option value="with">Avec code-barres</option>
+                <option value="without">Sans code-barres</option>
               </select>
             </>
           )}
