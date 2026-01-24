@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Loader2, Truck, ExternalLink } from "lucide-react";
+import { Loader2, Truck, ExternalLink, Zap, PenLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -226,6 +226,21 @@ export function POTrackingModal({ open, onClose, poId, existingTracking, current
                 </option>
               ))}
             </select>
+            
+            {/* Ship24 vs Manual mode indicator */}
+            <div className={`mt-2 flex items-center gap-1.5 text-xs ${isOtherCarrier ? 'text-muted-foreground' : 'text-primary'}`}>
+              {isOtherCarrier ? (
+                <>
+                  <PenLine className="w-3.5 h-3.5" />
+                  <span>Mode manuel – lien personnalisé</span>
+                </>
+              ) : (
+                <>
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>Suivi automatique Ship24</span>
+                </>
+              )}
+            </div>
           </div>
 
           <div className="space-y-2">
