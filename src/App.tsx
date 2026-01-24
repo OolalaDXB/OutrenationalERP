@@ -24,6 +24,9 @@ import { UserRolesPage } from "@/pages/UserRoles";
 import FinancesPage from "@/pages/Finances";
 import PaymentJournalPage from "@/pages/finances/PaymentJournal";
 import OverdueInvoicesPage from "@/pages/finances/OverdueInvoices";
+import { PurchaseOrdersPage } from "@/pages/PurchaseOrders";
+import { PurchaseOrderCreatePage } from "@/pages/PurchaseOrderCreate";
+import { PurchaseOrderDetailPage } from "@/pages/PurchaseOrderDetail";
 
 import { SettingsPage } from "@/pages/Settings";
 import { LoginPage } from "@/pages/Login";
@@ -92,7 +95,9 @@ const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   "/artists": { title: "Artistes", subtitle: "Catalogue artistes" },
   "/inventory": { title: "Inventaire", subtitle: "État des stocks" },
   "/movements": { title: "Mouvements", subtitle: "Historique stock" },
-  "/reorder": { title: "Réapprovisionnement", subtitle: "Commandes fournisseurs" },
+  "/reorder": { title: "Réapprovisionnement", subtitle: "Suggestions réappro" },
+  "/purchase-orders": { title: "Achats fournisseurs", subtitle: "Commandes d'achat" },
+  "/purchase-orders/new": { title: "Nouvelle commande", subtitle: "Créer une commande fournisseur" },
   "/customers": { title: "Clients", subtitle: "Base clients" },
   "/invoices": { title: "Factures", subtitle: "Facturation" },
   "/finances": { title: "Finances", subtitle: "Tableau de bord financier" },
@@ -101,7 +106,6 @@ const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   "/analytics": { title: "Analytics", subtitle: "Statistiques" },
   "/supplier-sales": { title: "Ventes par fournisseur", subtitle: "Rapports" },
   "/admin/roles": { title: "Gestion des rôles", subtitle: "Administration" },
-  
   "/admin/settings": { title: "Paramètres", subtitle: "Configuration" },
 };
 
@@ -127,6 +131,12 @@ function BackofficeContentInner({ onNavigate }: { onNavigate: (path: string) => 
   }
 
   const renderPage = () => {
+    // Handle dynamic routes
+    if (currentPath.startsWith('/purchase-orders/') && currentPath !== '/purchase-orders/new') {
+      const poId = currentPath.split('/')[2];
+      return <PurchaseOrderDetailPage poId={poId} onNavigate={handleNavigate} />;
+    }
+
     switch (currentPath) {
       case "/": return <Dashboard />;
       case "/orders": return <OrdersPage />;
@@ -138,6 +148,8 @@ function BackofficeContentInner({ onNavigate }: { onNavigate: (path: string) => 
       case "/artists": return <ArtistsPage />;
       case "/movements": return <StockMovementsPage />;
       case "/reorder": return <ReorderPage />;
+      case "/purchase-orders": return <PurchaseOrdersPage onNavigate={handleNavigate} />;
+      case "/purchase-orders/new": return <PurchaseOrderCreatePage onNavigate={handleNavigate} />;
       case "/invoices": return <InvoicesPage />;
       case "/finances": return <FinancesPage onNavigate={handleNavigate} />;
       case "/finances/journal": return <PaymentJournalPage onNavigate={handleNavigate} />;
@@ -145,7 +157,6 @@ function BackofficeContentInner({ onNavigate }: { onNavigate: (path: string) => 
       case "/analytics": return <AnalyticsPage />;
       case "/supplier-sales": return <SupplierSalesPage />;
       case "/admin/roles": return <UserRolesPage />;
-      
       case "/admin/settings": return <SettingsPage />;
       default: return <Dashboard />;
     }

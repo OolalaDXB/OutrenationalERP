@@ -66,6 +66,7 @@ const navigation: NavSection[] = [
       { icon: Warehouse, label: "Inventaire", href: "/inventory" },
       { icon: ArrowUpDown, label: "Mouvements", href: "/movements" },
       { icon: RefreshCwIcon, label: "Réapprovisionnement", href: "/reorder" },
+      { icon: Package, label: "Achats fournisseurs", href: "/purchase-orders" },
     ],
   },
   {
