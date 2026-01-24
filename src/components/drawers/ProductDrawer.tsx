@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Disc3, MapPin, Tag, Package, Euro, TrendingUp, Pencil, Trash2, ExternalLink, History, Loader2, Building2, ChevronRight, Music, Info } from "lucide-react";
+import { X, Disc3, MapPin, Tag, Package, Euro, TrendingUp, Pencil, Trash2, ExternalLink, History, Loader2, Building2, ChevronRight, Music, Info, Barcode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { StockIndicator } from "@/components/ui/stock-indicator";
@@ -175,6 +175,13 @@ export function ProductDrawer({ product, isOpen, onClose }: ProductDrawerProps) 
                 <span className="text-muted-foreground">SKU:</span>
                 <span className="font-mono">{product.sku}</span>
               </div>
+              {product.barcode && (
+                <div className="flex items-center gap-3 text-sm">
+                  <Barcode className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Code-barres:</span>
+                  <span className="font-mono">{product.barcode}</span>
+                </div>
+              )}
               <div className="flex items-center gap-3 text-sm">
                 <Disc3 className="w-4 h-4 text-muted-foreground" />
                 <span className="text-muted-foreground">Format:</span>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { X, Package, Loader2, Wand2 } from "lucide-react";
@@ -31,9 +31,10 @@ interface ProductFormProps {
   isOpen: boolean;
   onClose: () => void;
   product?: Product | null; // For edit mode
+  focusField?: string | null; // Field to focus on open
 }
 
-export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps) {
+export function ProductFormModal({ isOpen, onClose, product, focusField }: ProductFormProps) {
   const { toast } = useToast();
   const { data: suppliers = [] } = useSuppliers();
   const { data: labels = [] } = useLabels();
@@ -49,6 +50,7 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
   
   const [formData, setFormData] = useState<{
     sku: string;
+    barcode: string;
     title: string;
     artist_name: string;
     supplier_id: string;
@@ -74,6 +76,7 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
     image_urls: string[] | null;
   }>({
     sku: "",
+    barcode: "",
     title: "",
     artist_name: "",
     supplier_id: "",
@@ -105,6 +108,7 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
       const productAny = product as any;
       setFormData({
         sku: product.sku || "",
+        barcode: product.barcode || "",
         title: product.title || "",
         artist_name: product.artist_name || "",
         supplier_id: product.supplier_id || "",
@@ -139,6 +143,7 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
       // Reset form for create mode
       setFormData({
         sku: "",
+        barcode: "",
         title: "",
         artist_name: "",
         supplier_id: "",
@@ -171,6 +176,23 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
   const isEditMode = !!product;
   const selectedSupplier = suppliers.find(s => s.id === formData.supplier_id);
   const isLoading = createProduct.isPending || updateProduct.isPending;
+  
+  // Ref for focusing fields
+  const barcodeInputRef = useRef<HTMLInputElement>(null);
+  
+  // Focus on specific field when modal opens
+  useEffect(() => {
+    if (isOpen && focusField) {
+      // Small timeout to ensure DOM is ready
+      const timer = setTimeout(() => {
+        if (focusField === 'barcode' && barcodeInputRef.current) {
+          barcodeInputRef.current.focus();
+          barcodeInputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, focusField]);
 
   // Early return AFTER all hooks
   if (!isOpen) return null;
@@ -266,8 +288,10 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
         shipping_cost?: number;
         exchange_rate?: number;
         currency?: string;
+        barcode?: string | null;
       } = {
         sku: formData.sku || `SKU-${Date.now()}`,
+        barcode: formData.barcode || null,
         title: formData.title,
         artist_name: formData.artist_name || null,
         supplier_id: formData.supplier_id,
@@ -389,6 +413,17 @@ export function ProductFormModal({ isOpen, onClose, product }: ProductFormProps)
                   value={formData.sku}
                   onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                   placeholder="SF130"
+                  className="mt-1.5"
+                />
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground">Code-barres</Label>
+                <Input
+                  ref={barcodeInputRef}
+                  value={formData.barcode}
+                  onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                  placeholder="EAN13, UPC, ou autre"
                   className="mt-1.5"
                 />
               </div>

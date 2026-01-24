@@ -172,7 +172,8 @@ export function ProductsPage() {
         searchTerm === "" ||
         product.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (product.artist_name && product.artist_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        product.sku.toLowerCase().includes(searchTerm.toLowerCase());
+        product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (product.barcode && product.barcode.toLowerCase().includes(searchTerm.toLowerCase()));
 
       const matchesSupplier = supplierFilter === "all" || product.supplier_id === supplierFilter;
       const matchesLabel = labelFilter === "all" || product.label_id === labelFilter;
@@ -200,7 +201,8 @@ export function ProductsPage() {
         searchTerm === "" ||
         product.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (product.artist_name && product.artist_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        product.sku.toLowerCase().includes(searchTerm.toLowerCase());
+        product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (product.barcode && product.barcode.toLowerCase().includes(searchTerm.toLowerCase()));
       return matchesSearch;
     });
   }, [deletedProducts, searchTerm]);
@@ -274,7 +276,8 @@ export function ProductsPage() {
         searchTerm === "" ||
         product.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (product.artist_name && product.artist_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        product.sku.toLowerCase().includes(searchTerm.toLowerCase());
+        product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (product.barcode && product.barcode.toLowerCase().includes(searchTerm.toLowerCase()));
       const matchesSupplier = supplierFilter === "all" || product.supplier_id === supplierFilter;
       const matchesLabel = labelFilter === "all" || product.label_id === labelFilter;
       const matchesFormat = formatFilter === "all" || product.format === formatFilter;
@@ -427,7 +430,7 @@ export function ProductsPage() {
           )}
           <input
             type="text"
-            placeholder="Rechercher produit, artiste, SKU..."
+            placeholder="Rechercher produit, artiste, SKU, code-barres..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="flex-1 min-w-[200px] max-w-[300px] px-3 py-2 rounded-md border border-border bg-card text-sm"
