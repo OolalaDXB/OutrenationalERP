@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { X, Package, Loader2, Wand2 } from "lucide-react";
+import { X, Package, Loader2, Wand2, AlertTriangle, Check } from "lucide-react";
 import { useDiscogsSearch } from "@/hooks/useDiscogsSearch";
+import { validateBarcode } from "@/lib/barcode-validation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -426,6 +427,7 @@ export function ProductFormModal({ isOpen, onClose, product, focusField }: Produ
                   placeholder="EAN13, UPC, ou autre"
                   className="mt-1.5"
                 />
+                <BarcodeValidationHint barcode={formData.barcode} />
               </div>
 
               <div>
@@ -1002,5 +1004,30 @@ function AutoCompleteButton({
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+// Barcode validation hint component
+function BarcodeValidationHint({ barcode }: { barcode: string }) {
+  const validation = useMemo(() => validateBarcode(barcode), [barcode]);
+  
+  if (!barcode || barcode.trim() === '') {
+    return null;
+  }
+  
+  if (validation.isValid && validation.format) {
+    return (
+      <p className="text-xs text-green-600 dark:text-green-400 mt-1 flex items-center gap-1">
+        <Check className="w-3 h-3" />
+        {validation.message}
+      </p>
+    );
+  }
+  
+  return (
+    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
+      <AlertTriangle className="w-3 h-3" />
+      {validation.message}
+    </p>
   );
 }
