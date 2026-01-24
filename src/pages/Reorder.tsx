@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { AlertTriangle, ShoppingCart, Package, TrendingDown, Send, Check, Loader2 } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { Button } from "@/components/ui/button";
@@ -27,8 +26,11 @@ interface ReorderSuggestion {
   priority: "critical" | "high" | "medium";
 }
 
-export function ReorderPage() {
-  const navigate = useNavigate();
+type ReorderPageProps = {
+  onNavigate?: (path: string) => void;
+};
+
+export function ReorderPage({ onNavigate }: ReorderPageProps) {
   const { data: lowStockProducts = [], isLoading: productsLoading, isError: productsError, error: productsErr, refetch: refetchProducts } = useLowStockProducts();
   const { data: suppliers = [], isLoading: suppliersLoading, isError: suppliersError, error: suppliersErr, refetch: refetchSuppliers } = useSuppliers();
   const { isEnabled, isLoading: capabilityLoading } = useCapability();
@@ -143,8 +145,11 @@ export function ReorderPage() {
 
   // Handle "Commander" button click - navigate to PO create with selected items
   const handleCreatePO = () => {
+    if (typeof onNavigate !== 'function') return;
+
     // Get selected suggestions
     const selectedSuggestions = suggestions.filter(s => selectedItems.has(s.product.id));
+    if (selectedSuggestions.length === 0) return;
     
     // Group by supplier - take first supplier's items (or handle multi-supplier differently)
     const supplierGroups = new Map<string, typeof selectedSuggestions>();
@@ -158,21 +163,25 @@ export function ReorderPage() {
     const firstSupplierId = supplierGroups.keys().next().value;
     const itemsForSupplier = supplierGroups.get(firstSupplierId) || [];
 
-    // Navigate to PO create with pre-filled data
-    navigate('/purchase-orders/new', {
-      state: {
-        supplierId: firstSupplierId,
-        items: itemsForSupplier.map(s => ({
-          product_id: s.product.id,
-          sku: s.product.sku,
-          title: s.product.artist_name 
-            ? `${s.product.artist_name} - ${s.product.title}` 
-            : s.product.title,
-          quantity_ordered: s.suggestedQty,
-          unit_cost: s.product.purchase_price || 0,
-        })),
-      },
-    });
+    // Persist prefill data because the backoffice shell uses internal navigation (not react-router state)
+    const prefill = {
+      supplierId: firstSupplierId,
+      items: itemsForSupplier.map(s => ({
+        product_id: s.product.id,
+        sku: s.product.sku,
+        title: s.product.artist_name ? `${s.product.artist_name} - ${s.product.title}` : s.product.title,
+        quantity_ordered: s.suggestedQty,
+        unit_cost: s.product.purchase_price || 0,
+      })),
+    };
+
+    try {
+      sessionStorage.setItem('po-create-prefill', JSON.stringify(prefill));
+    } catch {
+      // Ignore storage errors
+    }
+
+    onNavigate('/purchase-orders/new');
   };
 
   const priorityStyles = {

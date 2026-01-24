@@ -41,7 +41,24 @@ interface PrefilledState {
 
 export function PurchaseOrderCreatePage({ onNavigate }: PurchaseOrderCreatePageProps) {
   const location = useLocation();
-  const prefilledState = location.state as PrefilledState | null;
+
+  const readPrefill = (): PrefilledState | null => {
+    // 1) react-router state (future-proof)
+    const fromRouter = location.state as PrefilledState | null;
+    if (fromRouter?.supplierId || fromRouter?.items?.length) return fromRouter;
+
+    // 2) sessionStorage (used by backoffice internal navigation)
+    try {
+      const raw = sessionStorage.getItem('po-create-prefill');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as PrefilledState;
+      return parsed;
+    } catch {
+      return null;
+    }
+  };
+
+  const prefilledState = readPrefill();
 
   const { data: suppliers = [], isLoading: suppliersLoading } = useSuppliers();
   const { data: products = [] } = useProducts();
@@ -68,6 +85,16 @@ export function PurchaseOrderCreatePage({ onNavigate }: PurchaseOrderCreatePageP
   const [expectedDate, setExpectedDate] = useState("");
   const [notes, setNotes] = useState("");
   const [currency, setCurrency] = useState("EUR");
+
+  // Clear the prefill payload after mount so refresh doesn't re-apply.
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem('po-create-prefill');
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Product search
   const [searchTerm, setSearchTerm] = useState("");
