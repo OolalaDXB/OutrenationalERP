@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { ArrowLeft, Plus, Trash2, Loader2, Search, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +27,22 @@ interface PurchaseOrderCreatePageProps {
   onNavigate: (path: string) => void;
 }
 
+// State passed from Reorder page
+interface PrefilledState {
+  supplierId?: string;
+  items?: Array<{
+    product_id: string;
+    sku: string;
+    title: string;
+    quantity_ordered: number;
+    unit_cost: number;
+  }>;
+}
+
 export function PurchaseOrderCreatePage({ onNavigate }: PurchaseOrderCreatePageProps) {
+  const location = useLocation();
+  const prefilledState = location.state as PrefilledState | null;
+
   const { data: suppliers = [], isLoading: suppliersLoading } = useSuppliers();
   const { data: products = [] } = useProducts();
   const createPO = useCreatePurchaseOrder();
@@ -37,9 +53,17 @@ export function PurchaseOrderCreatePage({ onNavigate }: PurchaseOrderCreatePageP
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
 
   // Form state
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [supplierId, setSupplierId] = useState("");
-  const [items, setItems] = useState<POItem[]>([]);
+  const [step, setStep] = useState<1 | 2 | 3>(prefilledState?.supplierId ? 2 : 1);
+  const [supplierId, setSupplierId] = useState(prefilledState?.supplierId || "");
+  const [items, setItems] = useState<POItem[]>(() => {
+    if (prefilledState?.items) {
+      return prefilledState.items.map(item => ({
+        id: crypto.randomUUID(),
+        ...item,
+      }));
+    }
+    return [];
+  });
   const [shippingCost, setShippingCost] = useState(0);
   const [expectedDate, setExpectedDate] = useState("");
   const [notes, setNotes] = useState("");
@@ -52,15 +76,22 @@ export function PurchaseOrderCreatePage({ onNavigate }: PurchaseOrderCreatePageP
   // Get selected supplier
   const selectedSupplier = suppliers.find(s => s.id === supplierId);
 
-  // Filter products by supplier
-  const supplierProducts = products.filter(p => 
-    p.supplier_id === supplierId && 
-    (searchTerm === "" || 
-      p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.artist_name?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  );
+  // Filter products by supplier AND search term
+  const supplierProducts = products.filter(p => {
+    // Must match supplier
+    if (p.supplier_id !== supplierId) return false;
+    
+    // If no search term, show all products for this supplier
+    if (searchTerm === "") return true;
+    
+    // Match search term against title, sku, or artist name
+    const term = searchTerm.toLowerCase();
+    return (
+      p.title?.toLowerCase().includes(term) ||
+      p.sku?.toLowerCase().includes(term) ||
+      p.artist_name?.toLowerCase().includes(term)
+    );
+  });
 
   // Calculate totals
   const subtotal = items.reduce((sum, item) => sum + (item.quantity_ordered * item.unit_cost), 0);
@@ -262,40 +293,50 @@ export function PurchaseOrderCreatePage({ onNavigate }: PurchaseOrderCreatePageP
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
-                  setShowProductSearch(e.target.value.length > 0);
+                  setShowProductSearch(true);
                 }}
-                onFocus={() => setShowProductSearch(searchTerm.length > 0)}
+                onFocus={() => setShowProductSearch(true)}
+                onBlur={() => {
+                  // Delay to allow click on dropdown item
+                  setTimeout(() => setShowProductSearch(false), 200);
+                }}
                 className="pl-10"
               />
             </div>
             
-            {showProductSearch && supplierProducts.length > 0 && (
+            {showProductSearch && (
               <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded-lg shadow-lg max-h-64 overflow-y-auto">
-                {supplierProducts.slice(0, 10).map((product) => (
-                  <button
-                    key={product.id}
-                    onClick={() => addItem(product)}
-                    className="w-full p-3 text-left hover:bg-secondary/50 border-b border-border last:border-0 flex items-center gap-3"
-                  >
-                    {product.image_url ? (
-                      <img src={product.image_url} alt="" className="w-10 h-10 rounded object-cover" />
-                    ) : (
-                      <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
-                        <Package className="w-5 h-5 text-muted-foreground" />
+                {supplierProducts.length > 0 ? (
+                  supplierProducts.slice(0, 10).map((product) => (
+                    <button
+                      key={product.id}
+                      onClick={() => addItem(product)}
+                      className="w-full p-3 text-left hover:bg-secondary/50 border-b border-border last:border-0 flex items-center gap-3"
+                    >
+                      {product.image_url ? (
+                        <img src={product.image_url} alt="" className="w-10 h-10 rounded object-cover" />
+                      ) : (
+                        <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
+                          <Package className="w-5 h-5 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">
+                          {product.artist_name && <span>{product.artist_name} - </span>}
+                          {product.title}
+                        </div>
+                        <div className="text-sm text-muted-foreground">{product.sku}</div>
                       </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate">
-                        {product.artist_name && <span>{product.artist_name} - </span>}
-                        {product.title}
+                      <div className="text-sm font-medium">
+                        {formatCurrency(product.purchase_price || product.cost_price || 0)}
                       </div>
-                      <div className="text-sm text-muted-foreground">{product.sku}</div>
-                    </div>
-                    <div className="text-sm font-medium">
-                      {formatCurrency(product.purchase_price || product.cost_price || 0)}
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  ))
+                ) : (
+                  <div className="p-4 text-center text-muted-foreground">
+                    {searchTerm ? "Aucun produit trouvé" : "Aucun produit pour ce fournisseur"}
+                  </div>
+                )}
               </div>
             )}
           </div>
