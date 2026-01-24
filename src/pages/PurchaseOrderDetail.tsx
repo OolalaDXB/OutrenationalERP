@@ -133,7 +133,9 @@ export function PurchaseOrderDetailPage() {
   const allowedTransitions = poAllowedTransitions[po.status] || [];
   const isPaid = !!po.paid_at;
   const canRecordPayment = po.status !== 'cancelled' && po.status !== 'closed' && !isPaid;
-  const showTrackingButton = po.status === 'acknowledged';
+  // Allow adding tracking from sent, acknowledged, or editing if in_transit
+  const canAddTracking = ['sent', 'acknowledged', 'in_transit'].includes(po.status) && !po.tracking_number;
+  const canEditTracking = po.status === 'in_transit' && !!po.tracking_number;
   const showReceivedButton = po.status === 'in_transit';
 
   // Calculate totals
@@ -151,6 +153,12 @@ export function PurchaseOrderDetailPage() {
             open={showTrackingModal}
             onClose={() => setShowTrackingModal(false)}
             poId={poId}
+            existingTracking={{
+              carrier: po.carrier,
+              trackingNumber: po.tracking_number,
+              shippedAt: po.shipped_at,
+            }}
+            currentStatus={po.status}
           />
           <POPaymentModal
             open={showPaymentModal}
@@ -214,8 +222,8 @@ export function PurchaseOrderDetailPage() {
             Exporter PDF
           </Button>
           
-          {/* Tracking Button (acknowledged → in_transit) */}
-          {showTrackingButton && (
+          {/* Tracking Button (sent, acknowledged, or edit in_transit) */}
+          {canAddTracking && (
             <Button
               variant="default"
               onClick={() => setShowTrackingModal(true)}
@@ -268,14 +276,27 @@ export function PurchaseOrderDetailPage() {
               <Truck className="w-4 h-4" />
               Suivi d'expédition
             </h3>
-            {po.tracking_status && (
-              <span className={cn(
-                "px-2 py-1 rounded-full text-xs font-medium",
-                trackingStatusConfig[po.tracking_status]?.color || trackingStatusConfig.unknown.color
-              )}>
-                {trackingStatusConfig[po.tracking_status]?.label || po.tracking_status}
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {po.tracking_status && (
+                <span className={cn(
+                  "px-2 py-1 rounded-full text-xs font-medium",
+                  trackingStatusConfig[po.tracking_status]?.color || trackingStatusConfig.unknown.color
+                )}>
+                  {trackingStatusConfig[po.tracking_status]?.label || po.tracking_status}
+                </span>
+              )}
+              {/* Add/Edit tracking button inside card */}
+              {canAddTracking && (
+                <Button size="sm" variant="outline" onClick={() => setShowTrackingModal(true)}>
+                  Ajouter suivi
+                </Button>
+              )}
+              {canEditTracking && (
+                <Button size="sm" variant="ghost" onClick={() => setShowTrackingModal(true)}>
+                  Modifier
+                </Button>
+              )}
+            </div>
           </div>
           {po.tracking_number ? (
             <div className="space-y-3 text-sm">
