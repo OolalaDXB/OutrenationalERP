@@ -1,4 +1,4 @@
-import React, { useState, forwardRef } from "react";
+import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -176,15 +176,13 @@ function BackofficeContentInner({ onNavigate }: { onNavigate: (path: string) => 
   );
 }
 
-const BackofficeContent = forwardRef<HTMLDivElement>(function BackofficeContent(_props, ref) {
+function BackofficeContent() {
   return (
     <AuthProvider>
-      <div ref={ref}>
-        <BackofficeContentInner onNavigate={() => {}} />
-      </div>
+      <BackofficeContentInner onNavigate={() => {}} />
     </AuthProvider>
   );
-});
+}
 
 function AppRouter() {
   const location = useLocation();
