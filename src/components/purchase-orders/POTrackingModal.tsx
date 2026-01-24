@@ -12,6 +12,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useUpdatePurchaseOrder, useChangePOStatus } from "@/hooks/usePurchaseOrders";
+import { useCreateShip24Tracker } from "@/hooks/useShip24Tracking";
 import { useToast } from "@/hooks/use-toast";
 
 const CARRIERS = [
@@ -21,6 +22,10 @@ const CARRIERS = [
   { value: "colissimo", label: "Colissimo" },
   { value: "la_poste", label: "La Poste" },
   { value: "chronopost", label: "Chronopost" },
+  { value: "tnt", label: "TNT" },
+  { value: "gls", label: "GLS" },
+  { value: "mondial_relay", label: "Mondial Relay" },
+  { value: "dpd", label: "DPD" },
   { value: "other", label: "Autre" },
 ];
 
@@ -33,6 +38,7 @@ interface POTrackingModalProps {
 export function POTrackingModal({ open, onClose, poId }: POTrackingModalProps) {
   const updatePO = useUpdatePurchaseOrder();
   const changeStatus = useChangePOStatus();
+  const createTracker = useCreateShip24Tracker();
   const { toast } = useToast();
 
   const [carrier, setCarrier] = useState("dhl");
@@ -70,10 +76,25 @@ export function POTrackingModal({ open, onClose, poId }: POTrackingModalProps) {
         reason: `Expédié via ${CARRIERS.find(c => c.value === carrier)?.label || carrier}`,
       });
 
-      toast({
-        title: "Suivi ajouté",
-        description: "La commande est maintenant en transit",
-      });
+      // Try to create Ship24 tracker (non-blocking)
+      try {
+        await createTracker.mutateAsync({
+          trackingNumber: trackingNumber.trim(),
+          courierCode: carrier,
+          purchaseOrderId: poId,
+        });
+        toast({
+          title: "Suivi ajouté",
+          description: "La commande est en transit. Le suivi automatique Ship24 est activé.",
+        });
+      } catch (ship24Error) {
+        // Ship24 failed but manual tracking still works
+        console.warn("Ship24 tracker creation failed:", ship24Error);
+        toast({
+          title: "Suivi ajouté",
+          description: "La commande est en transit. (Suivi automatique non disponible)",
+        });
+      }
 
       onClose();
     } catch (error) {

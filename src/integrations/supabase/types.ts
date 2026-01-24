@@ -1298,13 +1298,17 @@ export type Database = {
           payment_reference: string | null
           po_number: string
           received_date: string | null
+          ship24_tracker_id: string | null
           shipped_at: string | null
           shipping_cost: number | null
           status: Database["public"]["Enums"]["po_status"]
           subtotal: number | null
           supplier_id: string
           total: number | null
+          tracking_events: Json | null
+          tracking_last_update: string | null
           tracking_number: string | null
+          tracking_status: string | null
           updated_at: string | null
         }
         Insert: {
@@ -1320,13 +1324,17 @@ export type Database = {
           payment_reference?: string | null
           po_number: string
           received_date?: string | null
+          ship24_tracker_id?: string | null
           shipped_at?: string | null
           shipping_cost?: number | null
           status?: Database["public"]["Enums"]["po_status"]
           subtotal?: number | null
           supplier_id: string
           total?: number | null
+          tracking_events?: Json | null
+          tracking_last_update?: string | null
           tracking_number?: string | null
+          tracking_status?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -1342,13 +1350,17 @@ export type Database = {
           payment_reference?: string | null
           po_number?: string
           received_date?: string | null
+          ship24_tracker_id?: string | null
           shipped_at?: string | null
           shipping_cost?: number | null
           status?: Database["public"]["Enums"]["po_status"]
           subtotal?: number | null
           supplier_id?: string
           total?: number | null
+          tracking_events?: Json | null
+          tracking_last_update?: string | null
           tracking_number?: string | null
+          tracking_status?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -1893,6 +1905,50 @@ export type Database = {
           website?: string | null
         }
         Relationships: []
+      }
+      tracking_events: {
+        Row: {
+          created_at: string
+          id: string
+          location: string | null
+          message: string | null
+          occurred_at: string
+          purchase_order_id: string
+          raw_event: Json | null
+          status: string
+          status_code: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          location?: string | null
+          message?: string | null
+          occurred_at: string
+          purchase_order_id: string
+          raw_event?: Json | null
+          status: string
+          status_code?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          location?: string | null
+          message?: string | null
+          occurred_at?: string
+          purchase_order_id?: string
+          raw_event?: Json | null
+          status?: string
+          status_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracking_events_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
