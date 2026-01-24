@@ -10,7 +10,10 @@ import { useToast } from "@/hooks/use-toast";
 import { generatePurchaseOrderPDF, downloadPurchaseOrderPDF } from "@/components/pdf/PurchaseOrderPDF";
 import { POTrackingModal } from "@/components/purchase-orders/POTrackingModal";
 import { POPaymentModal } from "@/components/purchase-orders/POPaymentModal";
+import { TrackingTimeline } from "@/components/purchase-orders/TrackingTimeline";
 import { getCarrierTrackingUrl } from "@/lib/carrier-tracking-urls";
+import { useRefreshTracking, trackingStatusConfig } from "@/hooks/useShip24Tracking";
+import { cn } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,12 +37,33 @@ export function PurchaseOrderDetailPage() {
   const { data: po, isLoading, error } = usePurchaseOrder(poId || '');
   const { data: settings } = useSettings();
   const changeStatus = useChangePOStatus();
+  const refreshTracking = useRefreshTracking();
   const { toast } = useToast();
 
   const [confirmTransition, setConfirmTransition] = useState<{ to: POStatus; label: string } | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [showTrackingModal, setShowTrackingModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+
+  const handleRefreshTracking = async () => {
+    if (!po?.ship24_tracker_id || !poId) return;
+    try {
+      await refreshTracking.mutateAsync({
+        trackerId: po.ship24_tracker_id,
+        purchaseOrderId: poId,
+      });
+      toast({
+        title: "Suivi actualisé",
+        description: "Les informations de suivi ont été mises à jour",
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible d'actualiser le suivi",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleStatusChange = async (toStatus: POStatus) => {
     if (!poId) return;
@@ -244,9 +268,17 @@ export function PurchaseOrderDetailPage() {
               <Truck className="w-4 h-4" />
               Suivi d'expédition
             </h3>
+            {po.tracking_status && (
+              <span className={cn(
+                "px-2 py-1 rounded-full text-xs font-medium",
+                trackingStatusConfig[po.tracking_status]?.color || trackingStatusConfig.unknown.color
+              )}>
+                {trackingStatusConfig[po.tracking_status]?.label || po.tracking_status}
+              </span>
+            )}
           </div>
           {po.tracking_number ? (
-            <div className="space-y-2 text-sm">
+            <div className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Transporteur</span>
                 <span className="font-medium">{carrierLabels[po.carrier || ''] || po.carrier || '—'}</span>
@@ -271,6 +303,19 @@ export function PurchaseOrderDetailPage() {
                   Suivre le colis
                 </a>
               </div>
+
+              {/* Ship24 Tracking Timeline */}
+              {po.ship24_tracker_id && (
+                <div className="pt-3 border-t border-border">
+                  <TrackingTimeline
+                    events={po.tracking_events as Array<{ status: string; statusCode?: string; location?: string; message?: string; occurredAt: string }> || []}
+                    currentStatus={po.tracking_status || undefined}
+                    lastUpdate={po.tracking_last_update || undefined}
+                    onRefresh={handleRefreshTracking}
+                    isRefreshing={refreshTracking.isPending}
+                  />
+                </div>
+              )}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">Aucun suivi enregistré</p>
