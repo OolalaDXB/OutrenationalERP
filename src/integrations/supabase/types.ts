@@ -1295,7 +1295,7 @@ export type Database = {
           po_number: string
           received_date: string | null
           shipping_cost: number | null
-          status: string | null
+          status: Database["public"]["Enums"]["po_status"]
           subtotal: number | null
           supplier_id: string
           total: number | null
@@ -1311,7 +1311,7 @@ export type Database = {
           po_number: string
           received_date?: string | null
           shipping_cost?: number | null
-          status?: string | null
+          status?: Database["public"]["Enums"]["po_status"]
           subtotal?: number | null
           supplier_id: string
           total?: number | null
@@ -1327,7 +1327,7 @@ export type Database = {
           po_number?: string
           received_date?: string | null
           shipping_cost?: number | null
-          status?: string | null
+          status?: Database["public"]["Enums"]["po_status"]
           subtotal?: number | null
           supplier_id?: string
           total?: number | null
@@ -2338,6 +2338,14 @@ export type Database = {
       is_pro_customer: { Args: never; Returns: boolean }
       is_staff_or_admin: { Args: never; Returns: boolean }
       is_viewer_or_more: { Args: never; Returns: boolean }
+      po_change_status: {
+        Args: {
+          _po_id: string
+          _reason?: string
+          _to: Database["public"]["Enums"]["po_status"]
+        }
+        Returns: Database["public"]["Enums"]["po_status"]
+      }
       restore_deleted: {
         Args: { p_id: string; p_table_name: string }
         Returns: boolean
@@ -2362,6 +2370,14 @@ export type Database = {
         | "cancelled"
         | "refunded"
       payment_status: "pending" | "paid" | "partial" | "refunded" | "failed"
+      po_status:
+        | "draft"
+        | "sent"
+        | "acknowledged"
+        | "partially_received"
+        | "received"
+        | "closed"
+        | "cancelled"
       product_format:
         | "lp"
         | "2lp"
@@ -2526,6 +2542,15 @@ export const Constants = {
         "refunded",
       ],
       payment_status: ["pending", "paid", "partial", "refunded", "failed"],
+      po_status: [
+        "draft",
+        "sent",
+        "acknowledged",
+        "partially_received",
+        "received",
+        "closed",
+        "cancelled",
+      ],
       product_format: [
         "lp",
         "2lp",
