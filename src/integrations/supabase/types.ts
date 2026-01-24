@@ -1286,51 +1286,69 @@ export type Database = {
       }
       purchase_orders: {
         Row: {
+          carrier: string | null
           created_at: string | null
           currency: string | null
           expected_date: string | null
           id: string
           notes: string | null
           order_date: string | null
+          paid_at: string | null
+          payment_method: string | null
+          payment_reference: string | null
           po_number: string
           received_date: string | null
+          shipped_at: string | null
           shipping_cost: number | null
           status: Database["public"]["Enums"]["po_status"]
           subtotal: number | null
           supplier_id: string
           total: number | null
+          tracking_number: string | null
           updated_at: string | null
         }
         Insert: {
+          carrier?: string | null
           created_at?: string | null
           currency?: string | null
           expected_date?: string | null
           id?: string
           notes?: string | null
           order_date?: string | null
+          paid_at?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
           po_number: string
           received_date?: string | null
+          shipped_at?: string | null
           shipping_cost?: number | null
           status?: Database["public"]["Enums"]["po_status"]
           subtotal?: number | null
           supplier_id: string
           total?: number | null
+          tracking_number?: string | null
           updated_at?: string | null
         }
         Update: {
+          carrier?: string | null
           created_at?: string | null
           currency?: string | null
           expected_date?: string | null
           id?: string
           notes?: string | null
           order_date?: string | null
+          paid_at?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
           po_number?: string
           received_date?: string | null
+          shipped_at?: string | null
           shipping_cost?: number | null
           status?: Database["public"]["Enums"]["po_status"]
           subtotal?: number | null
           supplier_id?: string
           total?: number | null
+          tracking_number?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -2374,6 +2392,7 @@ export type Database = {
         | "draft"
         | "sent"
         | "acknowledged"
+        | "in_transit"
         | "partially_received"
         | "received"
         | "closed"
@@ -2546,6 +2565,7 @@ export const Constants = {
         "draft",
         "sent",
         "acknowledged",
+        "in_transit",
         "partially_received",
         "received",
         "closed",

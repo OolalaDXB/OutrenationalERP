@@ -1,15 +1,21 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Package, Plus, Loader2, Truck, CheckCircle, Clock } from "lucide-react";
+import { Package, Plus, Loader2, Truck, CheckCircle, Clock, Euro, MapPin } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { TablePagination } from "@/components/ui/table-pagination";
-import { usePurchaseOrders, poStatusConfig, POStatus } from "@/hooks/usePurchaseOrders";
+import { usePurchaseOrders, poStatusConfig, POStatus, carrierLabels } from "@/hooks/usePurchaseOrders";
 import { useSuppliers } from "@/hooks/useSuppliers";
 import { useCapability } from "@/hooks/useCapability";
 import { UpgradePrompt } from "@/components/ui/upgrade-prompt";
 import { formatCurrency, formatDate } from "@/lib/format";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const PAGE_SIZE = 25;
 
@@ -17,6 +23,7 @@ const ALL_STATUSES: { value: POStatus; label: string }[] = [
   { value: "draft", label: "Brouillon" },
   { value: "sent", label: "Envoyée" },
   { value: "acknowledged", label: "Confirmée" },
+  { value: "in_transit", label: "En transit" },
   { value: "partially_received", label: "Partielle" },
   { value: "received", label: "Réceptionnée" },
   { value: "closed", label: "Clôturée" },
@@ -35,6 +42,7 @@ export function PurchaseOrdersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("");
   const [selectedSupplier, setSelectedSupplier] = useState<string>("");
+  const [paymentFilter, setPaymentFilter] = useState<string>("");
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
 
   // Filter orders
@@ -46,8 +54,12 @@ export function PurchaseOrdersPage() {
 
     const matchesStatus = selectedStatus === "" || po.status === selectedStatus;
     const matchesSupplier = selectedSupplier === "" || po.supplier_id === selectedSupplier;
+    
+    const matchesPayment = paymentFilter === "" || 
+      (paymentFilter === "paid" && po.paid_at) ||
+      (paymentFilter === "unpaid" && !po.paid_at);
 
-    return matchesSearch && matchesStatus && matchesSupplier;
+    return matchesSearch && matchesStatus && matchesSupplier && matchesPayment;
   });
 
   // Paginate
@@ -59,9 +71,9 @@ export function PurchaseOrdersPage() {
 
   // KPIs
   const draftCount = purchaseOrders.filter(po => po.status === 'draft').length;
-  const sentCount = purchaseOrders.filter(po => po.status === 'sent').length;
+  const inTransitCount = purchaseOrders.filter(po => po.status === 'in_transit').length;
   const inProgressCount = purchaseOrders.filter(po => 
-    ['acknowledged', 'partially_received'].includes(po.status)
+    ['sent', 'acknowledged', 'partially_received'].includes(po.status)
   ).length;
   const completedCount = purchaseOrders.filter(po => 
     ['received', 'closed'].includes(po.status)
@@ -100,7 +112,7 @@ export function PurchaseOrdersPage() {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <KpiCard icon={Clock} value={draftCount.toString()} label="Brouillons" variant="primary" />
-        <KpiCard icon={Truck} value={sentCount.toString()} label="Envoyées" variant="info" />
+        <KpiCard icon={Truck} value={inTransitCount.toString()} label="En transit" variant="info" />
         <KpiCard icon={Package} value={inProgressCount.toString()} label="En cours" variant="warning" />
         <KpiCard icon={CheckCircle} value={completedCount.toString()} label="Terminées" variant="success" />
       </div>
@@ -161,6 +173,19 @@ export function PurchaseOrdersPage() {
               ))}
             </select>
 
+            <select
+              value={paymentFilter}
+              onChange={(e) => {
+                setPaymentFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="px-3 py-2 rounded-md border border-border bg-card text-sm"
+            >
+              <option value="">Tous paiements</option>
+              <option value="paid">Payées</option>
+              <option value="unpaid">Non payées</option>
+            </select>
+
             <input
               type="text"
               placeholder="Rechercher..."
@@ -181,21 +206,25 @@ export function PurchaseOrdersPage() {
                   <th className="text-left py-3 px-4 font-semibold">N° Commande</th>
                   <th className="text-left py-3 px-4 font-semibold">Fournisseur</th>
                   <th className="text-left py-3 px-4 font-semibold">Statut</th>
+                  <th className="text-center py-3 px-4 font-semibold">Suivi</th>
+                  <th className="text-center py-3 px-4 font-semibold">Paiement</th>
                   <th className="text-right py-3 px-4 font-semibold">Total</th>
                   <th className="text-left py-3 px-4 font-semibold">Date</th>
-                  <th className="text-left py-3 px-4 font-semibold">Livraison prévue</th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-12 text-muted-foreground">
+                    <td colSpan={7} className="text-center py-12 text-muted-foreground">
                       Aucune commande fournisseur trouvée
                     </td>
                   </tr>
                 ) : (
                   paginatedOrders.map((po) => {
                     const statusConfig = poStatusConfig[po.status];
+                    const hasTracking = !!po.tracking_number;
+                    const isPaid = !!po.paid_at;
+                    
                     return (
                       <tr
                         key={po.id}
@@ -209,14 +238,51 @@ export function PurchaseOrdersPage() {
                             {statusConfig.label}
                           </StatusBadge>
                         </td>
+                        <td className="py-3 px-4 text-center">
+                          {hasTracking ? (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-info-light text-info">
+                                    <MapPin className="w-4 h-4" />
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{carrierLabels[po.carrier || ''] || po.carrier}: {po.tracking_number}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          ) : (
+                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-muted text-muted-foreground">
+                              <MapPin className="w-4 h-4" />
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          {isPaid ? (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-success-light text-success">
+                                    <Euro className="w-4 h-4" />
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Payée le {formatDate(po.paid_at!)}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          ) : (
+                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-muted text-muted-foreground">
+                              <Euro className="w-4 h-4" />
+                            </span>
+                          )}
+                        </td>
                         <td className="py-3 px-4 text-right font-medium">
                           {formatCurrency(po.total || 0, po.currency || 'EUR')}
                         </td>
                         <td className="py-3 px-4 text-muted-foreground">
                           {formatDate(po.created_at)}
-                        </td>
-                        <td className="py-3 px-4 text-muted-foreground">
-                          {po.expected_date ? formatDate(po.expected_date) : '—'}
                         </td>
                       </tr>
                     );

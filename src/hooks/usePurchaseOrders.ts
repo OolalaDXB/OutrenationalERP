@@ -19,25 +19,51 @@ export const poStatusConfig: Record<POStatus, { label: string; variant: 'primary
   draft: { label: 'Brouillon', variant: 'primary' },
   sent: { label: 'Envoyée', variant: 'info' },
   acknowledged: { label: 'Confirmée', variant: 'warning' },
+  in_transit: { label: 'En transit', variant: 'info' },
   partially_received: { label: 'Réception partielle', variant: 'warning' },
   received: { label: 'Réceptionnée', variant: 'success' },
   closed: { label: 'Clôturée', variant: 'success' },
   cancelled: { label: 'Annulée', variant: 'danger' },
 };
 
+// Carrier labels for display
+export const carrierLabels: Record<string, string> = {
+  dhl: 'DHL',
+  fedex: 'FedEx',
+  ups: 'UPS',
+  colissimo: 'Colissimo',
+  la_poste: 'La Poste',
+  chronopost: 'Chronopost',
+  other: 'Autre',
+};
+
+// Payment method labels for display
+export const paymentMethodLabels: Record<string, string> = {
+  bank_transfer: 'Virement bancaire',
+  card: 'Carte bancaire',
+  paypal: 'PayPal',
+  check: 'Chèque',
+  cash: 'Espèces',
+  other: 'Autre',
+};
+
 // Allowed transitions for UI button display
+// Note: 'in_transit' transition is handled via tracking modal, not direct button
 export const poAllowedTransitions: Record<POStatus, { to: POStatus; label: string; variant?: 'default' | 'destructive' | 'outline' }[]> = {
   draft: [
     { to: 'sent', label: 'Envoyer', variant: 'default' },
     { to: 'cancelled', label: 'Annuler', variant: 'destructive' },
   ],
   sent: [
-    { to: 'acknowledged', label: 'Confirmer réception', variant: 'default' },
+    { to: 'acknowledged', label: 'Fournisseur a confirmé', variant: 'default' },
     { to: 'cancelled', label: 'Annuler', variant: 'destructive' },
   ],
   acknowledged: [
-    // Reception handled in Task 4
+    // in_transit handled via tracking modal
     { to: 'cancelled', label: 'Annuler', variant: 'destructive' },
+  ],
+  in_transit: [
+    // received handled in Sprint 5-B (goods reception)
   ],
   partially_received: [
     { to: 'cancelled', label: 'Annuler', variant: 'destructive' },
