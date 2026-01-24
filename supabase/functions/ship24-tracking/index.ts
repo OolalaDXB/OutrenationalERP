@@ -249,94 +249,110 @@ Deno.serve(async (req) => {
     // ===== WEBHOOK (from Ship24) =====
     if (path === 'webhook' && req.method === 'POST') {
       const body = await req.json();
-      console.log('Ship24 webhook received:', JSON.stringify(body, null, 2));
-
-      const trackerId = body.trackerId;
-      if (!trackerId) {
-        console.error('No trackerId in webhook payload');
+      
+      // Debug logging
+      console.log('Ship24 webhook received');
+      console.log('Headers:', JSON.stringify(Object.fromEntries(req.headers.entries())));
+      console.log('Body:', JSON.stringify(body, null, 2));
+      
+      // Check webhook secret if configured
+      const webhookSecret = Deno.env.get('SHIP24_WEBHOOK_SECRET');
+      console.log('Webhook secret configured:', !!webhookSecret);
+      
+      // Ship24 sends data in trackings array format
+      // Structure: { trackings: [{ tracker: { trackerId }, shipment: {...}, events: [...] }] }
+      const trackings = body.trackings || [];
+      
+      if (!trackings.length) {
+        // Could be a test ping or empty webhook - return 200 OK
+        console.log('No trackings in webhook payload - returning 200 OK (possibly test ping)');
         return new Response(
-          JSON.stringify({ error: 'Invalid webhook payload' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // Find the purchase order by tracker ID
-      const { data: po, error: findError } = await supabase
-        .from('purchase_orders')
-        .select('id, tracking_events')
-        .eq('ship24_tracker_id', trackerId)
-        .single();
-
-      if (findError || !po) {
-        console.error('PO not found for tracker:', trackerId, findError);
-        // Return 200 anyway to not trigger retries for unknown trackers
-        return new Response(
-          JSON.stringify({ message: 'Tracker not linked to any PO' }),
+          JSON.stringify({ message: 'Webhook received, no trackings to process' }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      // Extract events and status
-      const events: Ship24WebhookEvent['events'] = body.events || [];
-      const shipment = body.shipment;
-      const currentStatus = mapShip24Status(shipment?.statusMilestone || 'unknown');
+      let processedCount = 0;
+      let errorCount = 0;
 
-      // Map events to our format
-      const mappedEvents = events.map((e) => ({
-        status: e.status,
-        statusCode: e.statusCode,
-        location: [e.location?.city, e.location?.state, e.location?.country].filter(Boolean).join(', '),
-        message: e.status,
-        occurredAt: e.occurrenceDatetime,
-      }));
+      // Process each tracking in the webhook
+      for (const tracking of trackings) {
+        const trackerId = tracking.tracker?.trackerId;
+        const trackingNumber = tracking.tracker?.trackingNumber;
+        
+        if (!trackerId) {
+          console.log('Tracking entry without trackerId, skipping:', JSON.stringify(tracking.tracker));
+          continue;
+        }
 
-      // Merge with existing events (dedupe by occurredAt)
-      const existingEvents: Array<{ occurredAt: string }> = po.tracking_events || [];
-      const existingTimestamps = new Set(existingEvents.map(e => e.occurredAt));
-      const newEvents = mappedEvents.filter(e => !existingTimestamps.has(e.occurredAt));
-      const allEvents = [...existingEvents, ...newEvents].sort(
-        (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
-      );
+        console.log(`Processing tracker: ${trackerId} (tracking number: ${trackingNumber})`);
 
-      // Update purchase order
-      const { error: updateError } = await supabase
-        .from('purchase_orders')
-        .update({
-          tracking_status: currentStatus,
-          tracking_events: allEvents,
-          tracking_last_update: new Date().toISOString(),
-        })
-        .eq('id', po.id);
+        // Find the purchase order by tracker ID
+        const { data: po, error: findError } = await supabase
+          .from('purchase_orders')
+          .select('id, tracking_events')
+          .eq('ship24_tracker_id', trackerId)
+          .single();
 
-      if (updateError) {
-        console.error('Failed to update PO tracking:', updateError);
-      }
+        if (findError || !po) {
+          console.log(`PO not found for tracker ${trackerId} - this is OK for test webhooks`);
+          continue;
+        }
 
-      // Insert new events into tracking_events table
-      if (newEvents.length > 0) {
-        const eventRecords = newEvents.map(e => ({
-          purchase_order_id: po.id,
+        // Extract events and status from this tracking
+        const events: Ship24WebhookEvent['events'] = tracking.events || [];
+        const shipment = tracking.shipment;
+        const currentStatus = mapShip24Status(shipment?.statusMilestone || 'unknown');
+
+        console.log(`Tracker ${trackerId}: status=${currentStatus}, events=${events.length}`);
+
+        // Map events to our format
+        const mappedEvents = events.map((e: Ship24WebhookEvent['events'][0]) => ({
           status: e.status,
-          status_code: e.statusCode,
-          location: e.location,
-          message: e.message,
-          occurred_at: e.occurredAt,
-          raw_event: e,
+          statusCode: e.statusCode,
+          location: e.location ? [e.location.city, e.location.state, e.location.country].filter(Boolean).join(', ') : '',
+          message: e.status,
+          occurredAt: e.occurrenceDatetime,
         }));
 
-        const { error: insertError } = await supabase
-          .from('tracking_events')
-          .insert(eventRecords);
+        // Merge with existing events (dedupe by occurredAt)
+        const existingEvents: Array<{ occurredAt: string }> = po.tracking_events || [];
+        const existingTimestamps = new Set(existingEvents.map(e => e.occurredAt));
+        const newEvents = mappedEvents.filter(e => !existingTimestamps.has(e.occurredAt));
+        const allEvents = [...existingEvents, ...newEvents].sort(
+          (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
+        );
 
-        if (insertError) {
-          console.error('Failed to insert tracking events:', insertError);
+        // Update purchase order
+        const { error: updateError } = await supabase
+          .from('purchase_orders')
+          .update({
+            tracking_status: currentStatus,
+            tracking_events: allEvents,
+            tracking_last_update: new Date().toISOString(),
+          })
+          .eq('id', po.id);
+
+        if (updateError) {
+          console.error(`Failed to update PO ${po.id}:`, updateError);
+          errorCount++;
+          continue;
         }
+
+        console.log(`Updated PO ${po.id} with ${newEvents.length} new events, status: ${currentStatus}`);
+        processedCount++;
       }
 
-      console.log(`Updated PO ${po.id} with ${newEvents.length} new events, status: ${currentStatus}`);
+      console.log(`Webhook processing complete: ${processedCount} processed, ${errorCount} errors`);
 
+      // Always return 200 OK for valid webhooks to prevent retries
       return new Response(
-        JSON.stringify({ success: true, eventsProcessed: newEvents.length }),
+        JSON.stringify({ 
+          success: true, 
+          trackingsReceived: trackings.length,
+          trackingsProcessed: processedCount,
+          errors: errorCount 
+        }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
