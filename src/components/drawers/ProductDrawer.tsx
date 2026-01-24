@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Disc3, MapPin, Tag, Package, Euro, TrendingUp, Pencil, Trash2, ExternalLink, History, Loader2, Building2, ChevronRight, Music, Info, Barcode } from "lucide-react";
+import { X, Disc3, MapPin, Tag, Package, Euro, TrendingUp, Pencil, Trash2, ExternalLink, History, Loader2, Building2, ChevronRight, Music, Info, Barcode, Check, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { StockIndicator } from "@/components/ui/stock-indicator";
@@ -16,6 +16,7 @@ import { toast } from "@/hooks/use-toast";
 import { ProductFormModal } from "@/components/forms/ProductFormModal";
 import { SupplierDrawer } from "@/components/drawers/SupplierDrawer";
 import { ArtistDrawer } from "@/components/drawers/ArtistDrawer";
+import { validateBarcode } from "@/lib/barcode-validation";
 
 interface ProductDrawerProps {
   product: Product | null;
@@ -180,6 +181,7 @@ export function ProductDrawer({ product, isOpen, onClose }: ProductDrawerProps) 
                   <Barcode className="w-4 h-4 text-muted-foreground" />
                   <span className="text-muted-foreground">Code-barres:</span>
                   <span className="font-mono">{product.barcode}</span>
+                  <BarcodeFormatBadge barcode={product.barcode} />
                 </div>
               )}
               <div className="flex items-center gap-3 text-sm">
@@ -483,5 +485,35 @@ export function ProductDrawer({ product, isOpen, onClose }: ProductDrawerProps) 
         onClose={() => setShowArtistDrawer(false)}
       />
     </>
+  );
+}
+
+// Barcode format validation badge
+function BarcodeFormatBadge({ barcode }: { barcode: string }) {
+  const validation = validateBarcode(barcode);
+  
+  // Check if it's an internal SILLON barcode
+  if (barcode.startsWith('SILLON-') || barcode.startsWith('SIL-')) {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground">
+        Interne
+      </span>
+    );
+  }
+  
+  if (validation.isValid && validation.format) {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+        <Check className="w-3 h-3" />
+        {validation.format}
+      </span>
+    );
+  }
+  
+  return (
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+      <AlertTriangle className="w-3 h-3" />
+      Format inconnu
+    </span>
   );
 }

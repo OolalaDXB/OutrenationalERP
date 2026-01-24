@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { X, Package, Loader2, Wand2, AlertTriangle, Check } from "lucide-react";
+import { X, Package, Loader2, Wand2, AlertTriangle, Check, Sparkles } from "lucide-react";
 import { useDiscogsSearch } from "@/hooks/useDiscogsSearch";
 import { validateBarcode } from "@/lib/barcode-validation";
 import { Button } from "@/components/ui/button";
@@ -419,7 +419,23 @@ export function ProductFormModal({ isOpen, onClose, product, focusField }: Produ
               </div>
 
               <div>
-                <Label className="text-sm font-medium text-muted-foreground">Code-barres</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium text-muted-foreground">Code-barres</Label>
+                  {!formData.barcode && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Generate internal barcode: SILLON- + 8 random digits
+                        const randomDigits = Math.floor(10000000 + Math.random() * 90000000).toString();
+                        setFormData({ ...formData, barcode: `SILLON-${randomDigits}` });
+                      }}
+                      className="text-xs text-primary hover:underline flex items-center gap-1"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      Générer code interne
+                    </button>
+                  )}
+                </div>
                 <Input
                   ref={barcodeInputRef}
                   value={formData.barcode}
@@ -1013,6 +1029,16 @@ function BarcodeValidationHint({ barcode }: { barcode: string }) {
   
   if (!barcode || barcode.trim() === '') {
     return null;
+  }
+  
+  // Check if it's an internal SILLON barcode
+  if (barcode.startsWith('SILLON-') || barcode.startsWith('SIL-')) {
+    return (
+      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+        <Check className="w-3 h-3" />
+        Code-barres interne SILLON
+      </p>
+    );
   }
   
   if (validation.isValid && validation.format) {
