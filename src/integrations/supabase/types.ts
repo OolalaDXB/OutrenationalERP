@@ -2293,6 +2293,15 @@ export type Database = {
         }
         Returns: number
       }
+      create_purchase_order: {
+        Args: {
+          p_expected_delivery_date?: string
+          p_items: Json
+          p_notes?: string
+          p_supplier_id: string
+        }
+        Returns: string
+      }
       debug_admin_ctx: {
         Args: never
         Returns: {
