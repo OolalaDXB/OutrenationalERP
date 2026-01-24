@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, ShoppingCart, Package, TrendingDown, Send, Check, Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { AlertTriangle, ShoppingCart, Package, TrendingDown, Send, Check, Loader2, CheckSquare, Square } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge, supplierTypeVariant, supplierTypeLabel } from "@/components/ui/status-badge";
+import { MultiSupplierPOModal } from "@/components/reorder/MultiSupplierPOModal";
 import { useLowStockProducts } from "@/hooks/useProducts";
 import { useSuppliers, type Supplier } from "@/hooks/useSuppliers";
 import { useCapability } from "@/hooks/useCapability";
@@ -26,11 +28,8 @@ interface ReorderSuggestion {
   priority: "critical" | "high" | "medium";
 }
 
-type ReorderPageProps = {
-  onNavigate?: (path: string) => void;
-};
-
-export function ReorderPage({ onNavigate }: ReorderPageProps) {
+export function ReorderPage() {
+  const navigate = useNavigate();
   const { data: lowStockProducts = [], isLoading: productsLoading, isError: productsError, error: productsErr, refetch: refetchProducts } = useLowStockProducts();
   const { data: suppliers = [], isLoading: suppliersLoading, isError: suppliersError, error: suppliersErr, refetch: refetchSuppliers } = useSuppliers();
   const { isEnabled, isLoading: capabilityLoading } = useCapability();
@@ -41,6 +40,7 @@ export function ReorderPage({ onNavigate }: ReorderPageProps) {
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [supplierFilter, setSupplierFilter] = useState("all");
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [showMultiSupplierModal, setShowMultiSupplierModal] = useState(false);
 
   const isLoading = productsLoading || suppliersLoading;
   const isError = productsError || suppliersError;
@@ -143,45 +143,72 @@ export function ReorderPage({ onNavigate }: ReorderPageProps) {
     setSelectedItems(newSelected);
   };
 
-  // Handle "Commander" button click - navigate to PO create with selected items
+  // Select all / Deselect all (respects filters)
+  const allFilteredSelected = filteredSuggestions.length > 0 && 
+    filteredSuggestions.every((s) => selectedItems.has(s.product.id));
+
+  const handleSelectAll = () => {
+    const newSelected = new Set(selectedItems);
+    filteredSuggestions.forEach((s) => newSelected.add(s.product.id));
+    setSelectedItems(newSelected);
+  };
+
+  const handleDeselectAll = () => {
+    const filteredIds = new Set(filteredSuggestions.map((s) => s.product.id));
+    const newSelected = new Set(
+      Array.from(selectedItems).filter((id) => !filteredIds.has(id))
+    );
+    setSelectedItems(newSelected);
+  };
+
+  // Get selected suggestions for modal
+  const selectedSuggestions = useMemo(() => {
+    return suggestions.filter((s) => selectedItems.has(s.product.id));
+  }, [suggestions, selectedItems]);
+
+  // Count unique suppliers in selection
+  const selectedSupplierCount = useMemo(() => {
+    const supplierIds = new Set(selectedSuggestions.map((s) => s.supplier.id));
+    return supplierIds.size;
+  }, [selectedSuggestions]);
+
+  // Handle "Commander" button click
   const handleCreatePO = () => {
-    if (typeof onNavigate !== 'function') return;
-
-    // Get selected suggestions
-    const selectedSuggestions = suggestions.filter(s => selectedItems.has(s.product.id));
     if (selectedSuggestions.length === 0) return;
-    
-    // Group by supplier - take first supplier's items (or handle multi-supplier differently)
-    const supplierGroups = new Map<string, typeof selectedSuggestions>();
-    selectedSuggestions.forEach(s => {
-      const existing = supplierGroups.get(s.supplier.id) || [];
-      existing.push(s);
-      supplierGroups.set(s.supplier.id, existing);
-    });
 
-    // If multiple suppliers selected, use the first one (or could show a modal to pick)
-    const firstSupplierId = supplierGroups.keys().next().value;
-    const itemsForSupplier = supplierGroups.get(firstSupplierId) || [];
+    if (selectedSupplierCount > 1) {
+      // Multiple suppliers - show modal
+      setShowMultiSupplierModal(true);
+    } else {
+      // Single supplier - navigate to PO create with prefill
+      const firstSupplier = selectedSuggestions[0]?.supplier;
+      if (!firstSupplier) return;
 
-    // Persist prefill data because the backoffice shell uses internal navigation (not react-router state)
-    const prefill = {
-      supplierId: firstSupplierId,
-      items: itemsForSupplier.map(s => ({
-        product_id: s.product.id,
-        sku: s.product.sku,
-        title: s.product.artist_name ? `${s.product.artist_name} - ${s.product.title}` : s.product.title,
-        quantity_ordered: s.suggestedQty,
-        unit_cost: s.product.purchase_price || 0,
-      })),
-    };
+      const prefill = {
+        supplierId: firstSupplier.id,
+        items: selectedSuggestions.map((s) => ({
+          product_id: s.product.id,
+          sku: s.product.sku,
+          title: s.product.artist_name ? `${s.product.artist_name} - ${s.product.title}` : s.product.title,
+          quantity_ordered: s.suggestedQty,
+          unit_cost: s.product.purchase_price || 0,
+        })),
+      };
 
-    try {
-      sessionStorage.setItem('po-create-prefill', JSON.stringify(prefill));
-    } catch {
-      // Ignore storage errors
+      try {
+        sessionStorage.setItem('po-create-prefill', JSON.stringify(prefill));
+      } catch {
+        // Ignore storage errors
+      }
+
+      navigate('/purchase-orders/new');
     }
+  };
 
-    onNavigate('/purchase-orders/new');
+  const handleMultiPOSuccess = () => {
+    setShowMultiSupplierModal(false);
+    setSelectedItems(new Set());
+    navigate('/purchase-orders');
   };
 
   const priorityStyles = {
@@ -221,6 +248,14 @@ export function ReorderPage({ onNavigate }: ReorderPageProps) {
 
   return (
     <div className="space-y-6">
+      {/* Multi-supplier PO Modal */}
+      <MultiSupplierPOModal
+        open={showMultiSupplierModal}
+        onClose={() => setShowMultiSupplierModal(false)}
+        selectedSuggestions={selectedSuggestions}
+        onSuccess={handleMultiPOSuccess}
+      />
+
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <KpiCard
@@ -280,17 +315,47 @@ export function ReorderPage({ onNavigate }: ReorderPageProps) {
             className="flex-1 min-w-[200px] max-w-[300px] px-3 py-2 rounded-md border border-border bg-card text-sm"
           />
         </div>
-        {selectedItems.size > 0 && (
-          <Button 
-            className="gap-2"
-            disabled={!canCreatePO || capabilityLoading}
-            title={!canCreatePO ? "Mise à niveau requise" : undefined}
-            onClick={handleCreatePO}
-          >
-            <Send className="w-4 h-4" />
-            Commander ({selectedItems.size} produits)
-          </Button>
-        )}
+        
+        <div className="flex items-center gap-2">
+          {/* Select All / Deselect All */}
+          {filteredSuggestions.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={allFilteredSelected ? handleDeselectAll : handleSelectAll}
+              className="gap-2"
+            >
+              {allFilteredSelected ? (
+                <>
+                  <Square className="w-4 h-4" />
+                  Tout désélectionner
+                </>
+              ) : (
+                <>
+                  <CheckSquare className="w-4 h-4" />
+                  Tout sélectionner
+                </>
+              )}
+            </Button>
+          )}
+
+          {selectedItems.size > 0 && (
+            <Button 
+              className="gap-2"
+              disabled={!canCreatePO || capabilityLoading}
+              title={!canCreatePO ? "Mise à niveau requise" : undefined}
+              onClick={handleCreatePO}
+            >
+              <Send className="w-4 h-4" />
+              Commander ({selectedItems.size} produits)
+              {selectedSupplierCount > 1 && (
+                <span className="text-xs opacity-80">
+                  · {selectedSupplierCount} fournisseurs
+                </span>
+              )}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Suggestions groupées par fournisseur */}

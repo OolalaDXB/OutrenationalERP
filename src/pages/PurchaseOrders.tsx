@@ -1,5 +1,6 @@
-import { useState, useMemo } from "react";
-import { Package, Plus, Loader2, Truck, CheckCircle, Clock, XCircle } from "lucide-react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Package, Plus, Loader2, Truck, CheckCircle, Clock } from "lucide-react";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
@@ -22,11 +23,8 @@ const ALL_STATUSES: { value: POStatus; label: string }[] = [
   { value: "cancelled", label: "Annulée" },
 ];
 
-interface PurchaseOrdersPageProps {
-  onNavigate: (path: string) => void;
-}
-
-export function PurchaseOrdersPage({ onNavigate }: PurchaseOrdersPageProps) {
+export function PurchaseOrdersPage() {
+  const navigate = useNavigate();
   const { data: purchaseOrders = [], isLoading, error } = usePurchaseOrders();
   const { data: suppliers = [] } = useSuppliers();
   const { isEnabled, isLoading: capLoading } = useCapability();
@@ -40,19 +38,17 @@ export function PurchaseOrdersPage({ onNavigate }: PurchaseOrdersPageProps) {
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false);
 
   // Filter orders
-  const filteredOrders = useMemo(() => {
-    return purchaseOrders.filter((po) => {
-      const matchesSearch =
-        searchTerm === "" ||
-        po.po_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        po.suppliers?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredOrders = purchaseOrders.filter((po) => {
+    const matchesSearch =
+      searchTerm === "" ||
+      po.po_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      po.suppliers?.name?.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesStatus = selectedStatus === "" || po.status === selectedStatus;
-      const matchesSupplier = selectedSupplier === "" || po.supplier_id === selectedSupplier;
+    const matchesStatus = selectedStatus === "" || po.status === selectedStatus;
+    const matchesSupplier = selectedSupplier === "" || po.supplier_id === selectedSupplier;
 
-      return matchesSearch && matchesStatus && matchesSupplier;
-    });
-  }, [purchaseOrders, searchTerm, selectedStatus, selectedSupplier]);
+    return matchesSearch && matchesStatus && matchesSupplier;
+  });
 
   // Paginate
   const totalPages = Math.ceil(filteredOrders.length / PAGE_SIZE);
@@ -72,7 +68,7 @@ export function PurchaseOrdersPage({ onNavigate }: PurchaseOrdersPageProps) {
   ).length;
 
   const handleRowClick = (poId: string) => {
-    onNavigate(`/purchase-orders/${poId}`);
+    navigate(`/purchase-orders/${poId}`);
   };
 
   const handleCreateNew = () => {
@@ -80,7 +76,7 @@ export function PurchaseOrdersPage({ onNavigate }: PurchaseOrdersPageProps) {
       setShowUpgradePrompt(true);
       return;
     }
-    onNavigate("/purchase-orders/new");
+    navigate("/purchase-orders/new");
   };
 
   if (isLoading) {
