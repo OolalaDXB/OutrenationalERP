@@ -88,6 +88,10 @@ export function PurchaseOrderCreatePage({ onNavigate }: PurchaseOrderCreatePageP
 
   // Clear the prefill payload after mount so refresh doesn't re-apply.
   useEffect(() => {
+    // Defensive: ensure we never keep a stale pending mutation state when navigating internally
+    // (the backoffice shell can re-render pages without changing the router location).
+    createPO.reset();
+
     try {
       sessionStorage.removeItem('po-create-prefill');
     } catch {
