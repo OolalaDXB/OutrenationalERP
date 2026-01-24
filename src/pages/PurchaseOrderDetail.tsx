@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, FileDown, Loader2 } from "lucide-react";
+import { ArrowLeft, FileDown, Loader2, Truck, CreditCard, CheckCircle2, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { usePurchaseOrder, useChangePOStatus, poStatusConfig, poAllowedTransitions, POStatus } from "@/hooks/usePurchaseOrders";
+import { usePurchaseOrder, useChangePOStatus, poStatusConfig, poAllowedTransitions, POStatus, carrierLabels, paymentMethodLabels } from "@/hooks/usePurchaseOrders";
 import { useSettings } from "@/hooks/useSettings";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 import { generatePurchaseOrderPDF, downloadPurchaseOrderPDF } from "@/components/pdf/PurchaseOrderPDF";
+import { POTrackingModal } from "@/components/purchase-orders/POTrackingModal";
+import { POPaymentModal } from "@/components/purchase-orders/POPaymentModal";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,6 +20,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export function PurchaseOrderDetailPage() {
   const { poId } = useParams<{ poId: string }>();
@@ -29,6 +37,8 @@ export function PurchaseOrderDetailPage() {
 
   const [confirmTransition, setConfirmTransition] = useState<{ to: POStatus; label: string } | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [showTrackingModal, setShowTrackingModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   const handleStatusChange = async (toStatus: POStatus) => {
     if (!poId) return;
@@ -96,6 +106,10 @@ export function PurchaseOrderDetailPage() {
 
   const statusConfig = poStatusConfig[po.status];
   const allowedTransitions = poAllowedTransitions[po.status] || [];
+  const isPaid = !!po.paid_at;
+  const canRecordPayment = po.status !== 'cancelled' && po.status !== 'closed' && !isPaid;
+  const showTrackingButton = po.status === 'acknowledged';
+  const showReceivedButton = po.status === 'in_transit';
 
   // Calculate totals
   const subtotal = po.purchase_order_items?.reduce(
@@ -105,6 +119,22 @@ export function PurchaseOrderDetailPage() {
 
   return (
     <div className="space-y-6">
+      {/* Modals */}
+      {poId && (
+        <>
+          <POTrackingModal
+            open={showTrackingModal}
+            onClose={() => setShowTrackingModal(false)}
+            poId={poId}
+          />
+          <POPaymentModal
+            open={showPaymentModal}
+            onClose={() => setShowPaymentModal(false)}
+            poId={poId}
+          />
+        </>
+      )}
+
       {/* Confirm Transition Dialog */}
       <AlertDialog open={!!confirmTransition} onOpenChange={() => setConfirmTransition(null)}>
         <AlertDialogContent>
@@ -127,7 +157,7 @@ export function PurchaseOrderDetailPage() {
       </AlertDialog>
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate("/purchase-orders")}>
             <ArrowLeft className="w-5 h-5" />
@@ -141,9 +171,15 @@ export function PurchaseOrderDetailPage() {
           <StatusBadge variant={statusConfig.variant}>
             {statusConfig.label}
           </StatusBadge>
+          {isPaid && (
+            <StatusBadge variant="success">
+              <CheckCircle2 className="w-3 h-3 mr-1" />
+              Payée
+            </StatusBadge>
+          )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button variant="outline" onClick={handleExportPDF} disabled={isExporting}>
             {isExporting ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -152,6 +188,37 @@ export function PurchaseOrderDetailPage() {
             )}
             Exporter PDF
           </Button>
+          
+          {/* Tracking Button (acknowledged → in_transit) */}
+          {showTrackingButton && (
+            <Button
+              variant="default"
+              onClick={() => setShowTrackingModal(true)}
+              className="gap-2"
+            >
+              <Truck className="w-4 h-4" />
+              Ajouter suivi expédition
+            </Button>
+          )}
+
+          {/* Received Button (in_transit → received, disabled for Sprint 5-B) */}
+          {showReceivedButton && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button variant="default" disabled className="gap-2">
+                      <Package className="w-4 h-4" />
+                      Marquer reçu
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Réception des marchandises - Sprint 5-B</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
           
           {/* Action Buttons */}
           {allowedTransitions.map((transition) => (
@@ -164,6 +231,74 @@ export function PurchaseOrderDetailPage() {
               {transition.label}
             </Button>
           ))}
+        </div>
+      </div>
+
+      {/* Tracking & Payment Info Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Tracking Card */}
+        <div className="bg-card rounded-lg border border-border p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold flex items-center gap-2">
+              <Truck className="w-4 h-4" />
+              Suivi d'expédition
+            </h3>
+          </div>
+          {po.tracking_number ? (
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Transporteur</span>
+                <span className="font-medium">{carrierLabels[po.carrier || ''] || po.carrier || '—'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">N° de suivi</span>
+                <span className="font-mono font-medium">{po.tracking_number}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Date d'expédition</span>
+                <span className="font-medium">{po.shipped_at ? formatDate(po.shipped_at) : '—'}</span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Aucun suivi enregistré</p>
+          )}
+        </div>
+
+        {/* Payment Card */}
+        <div className="bg-card rounded-lg border border-border p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold flex items-center gap-2">
+              <CreditCard className="w-4 h-4" />
+              Paiement
+            </h3>
+            {canRecordPayment && (
+              <Button size="sm" variant="outline" onClick={() => setShowPaymentModal(true)}>
+                Enregistrer paiement
+              </Button>
+            )}
+          </div>
+          {isPaid ? (
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Statut</span>
+                <StatusBadge variant="success">Payée le {formatDate(po.paid_at!)}</StatusBadge>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Mode de paiement</span>
+                <span className="font-medium">{paymentMethodLabels[po.payment_method || ''] || po.payment_method || '—'}</span>
+              </div>
+              {po.payment_reference && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Référence</span>
+                  <span className="font-mono font-medium">{po.payment_reference}</span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {po.status === 'cancelled' ? 'Commande annulée' : 'Paiement non enregistré'}
+            </p>
+          )}
         </div>
       </div>
 
