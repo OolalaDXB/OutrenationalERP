@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, FileDown, Loader2, Truck, CreditCard, CheckCircle2, Package } from "lucide-react";
+import { ArrowLeft, FileDown, Loader2, Truck, CreditCard, CheckCircle2, Package, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { usePurchaseOrder, useChangePOStatus, poStatusConfig, poAllowedTransitions, POStatus, carrierLabels, paymentMethodLabels } from "@/hooks/usePurchaseOrders";
@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { generatePurchaseOrderPDF, downloadPurchaseOrderPDF } from "@/components/pdf/PurchaseOrderPDF";
 import { POTrackingModal } from "@/components/purchase-orders/POTrackingModal";
 import { POPaymentModal } from "@/components/purchase-orders/POPaymentModal";
+import { getCarrierTrackingUrl } from "@/lib/carrier-tracking-urls";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -257,6 +258,18 @@ export function PurchaseOrderDetailPage() {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Date d'expédition</span>
                 <span className="font-medium">{po.shipped_at ? formatDate(po.shipped_at) : '—'}</span>
+              </div>
+              {/* Track Package Link */}
+              <div className="pt-2 border-t border-border">
+                <a
+                  href={getCarrierTrackingUrl(po.carrier, po.tracking_number)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-primary hover:underline font-medium"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Suivre le colis
+                </a>
               </div>
             </div>
           ) : (
