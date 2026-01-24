@@ -33,21 +33,32 @@ interface POTrackingModalProps {
   open: boolean;
   onClose: () => void;
   poId: string;
+  existingTracking?: {
+    carrier?: string | null;
+    trackingNumber?: string | null;
+    shippedAt?: string | null;
+  };
+  currentStatus?: string;
 }
 
-export function POTrackingModal({ open, onClose, poId }: POTrackingModalProps) {
+export function POTrackingModal({ open, onClose, poId, existingTracking, currentStatus }: POTrackingModalProps) {
   const updatePO = useUpdatePurchaseOrder();
   const changeStatus = useChangePOStatus();
   const createTracker = useCreateShip24Tracker();
   const { toast } = useToast();
 
-  const [carrier, setCarrier] = useState("dhl");
-  const [trackingNumber, setTrackingNumber] = useState("");
+  const [carrier, setCarrier] = useState(existingTracking?.carrier || "dhl");
+  const [trackingNumber, setTrackingNumber] = useState(existingTracking?.trackingNumber || "");
   const [shippedAt, setShippedAt] = useState(() => {
-    const today = new Date();
-    return today.toISOString().split("T")[0];
+    if (existingTracking?.shippedAt) {
+      return existingTracking.shippedAt.split("T")[0];
+    }
+    return new Date().toISOString().split("T")[0];
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Reset form when modal opens with new data
+  const isEditing = !!existingTracking?.trackingNumber;
 
   const handleSubmit = async () => {
     if (!trackingNumber.trim()) {
@@ -69,30 +80,41 @@ export function POTrackingModal({ open, onClose, poId }: POTrackingModalProps) {
         shipped_at: new Date(shippedAt).toISOString(),
       });
 
-      // Change status to in_transit
-      await changeStatus.mutateAsync({
-        id: poId,
-        status: "in_transit",
-        reason: `Expédié via ${CARRIERS.find(c => c.value === carrier)?.label || carrier}`,
-      });
+      // Only change status to in_transit if not already in_transit or beyond
+      const needsStatusChange = currentStatus && !['in_transit', 'partially_received', 'received', 'closed'].includes(currentStatus);
+      
+      if (needsStatusChange) {
+        await changeStatus.mutateAsync({
+          id: poId,
+          status: "in_transit",
+          reason: `Expédié via ${CARRIERS.find(c => c.value === carrier)?.label || carrier}`,
+        });
+      }
 
-      // Try to create Ship24 tracker (non-blocking)
-      try {
-        await createTracker.mutateAsync({
-          trackingNumber: trackingNumber.trim(),
-          courierCode: carrier,
-          purchaseOrderId: poId,
-        });
+      // Try to create Ship24 tracker only if new tracking (not editing)
+      if (!isEditing) {
+        try {
+          await createTracker.mutateAsync({
+            trackingNumber: trackingNumber.trim(),
+            courierCode: carrier,
+            purchaseOrderId: poId,
+          });
+          toast({
+            title: "Suivi ajouté",
+            description: "La commande est en transit. Le suivi automatique Ship24 est activé.",
+          });
+        } catch (ship24Error) {
+          // Ship24 failed but manual tracking still works
+          console.warn("Ship24 tracker creation failed:", ship24Error);
+          toast({
+            title: "Suivi ajouté",
+            description: "La commande est en transit. (Suivi automatique non disponible)",
+          });
+        }
+      } else {
         toast({
-          title: "Suivi ajouté",
-          description: "La commande est en transit. Le suivi automatique Ship24 est activé.",
-        });
-      } catch (ship24Error) {
-        // Ship24 failed but manual tracking still works
-        console.warn("Ship24 tracker creation failed:", ship24Error);
-        toast({
-          title: "Suivi ajouté",
-          description: "La commande est en transit. (Suivi automatique non disponible)",
+          title: "Suivi modifié",
+          description: "Les informations de suivi ont été mises à jour.",
         });
       }
 
@@ -111,9 +133,10 @@ export function POTrackingModal({ open, onClose, poId }: POTrackingModalProps) {
 
   const handleClose = () => {
     if (!isSubmitting) {
-      setTrackingNumber("");
-      setCarrier("dhl");
-      setShippedAt(new Date().toISOString().split("T")[0]);
+      // Reset to initial values (or existing tracking data)
+      setTrackingNumber(existingTracking?.trackingNumber || "");
+      setCarrier(existingTracking?.carrier || "dhl");
+      setShippedAt(existingTracking?.shippedAt?.split("T")[0] || new Date().toISOString().split("T")[0]);
       onClose();
     }
   };
@@ -124,10 +147,12 @@ export function POTrackingModal({ open, onClose, poId }: POTrackingModalProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Truck className="w-5 h-5" />
-            Ajouter le suivi d'expédition
+            {isEditing ? "Modifier le suivi d'expédition" : "Ajouter le suivi d'expédition"}
           </DialogTitle>
           <DialogDescription>
-            Renseignez les informations de suivi pour cette commande fournisseur.
+            {isEditing 
+              ? "Modifiez les informations de suivi pour cette commande fournisseur."
+              : "Renseignez les informations de suivi pour cette commande fournisseur."}
           </DialogDescription>
         </DialogHeader>
 
@@ -180,7 +205,7 @@ export function POTrackingModal({ open, onClose, poId }: POTrackingModalProps) {
                 Enregistrement...
               </>
             ) : (
-              "Confirmer l'expédition"
+              isEditing ? "Enregistrer les modifications" : "Confirmer l'expédition"
             )}
           </Button>
         </DialogFooter>
