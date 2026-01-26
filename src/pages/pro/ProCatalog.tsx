@@ -21,12 +21,17 @@ const FORMATS = [
 ];
 
 export function ProCatalog() {
-  const { data: products = [], isLoading } = useProducts();
+  const { data: products = [], isLoading, error } = useProducts();
   const { data: suppliers = [] } = useSuppliers();
   const { data: genres = [] } = useGenres();
   const { data: productGenres = [] } = useProductGenres();
   const { customer } = useProAuth();
   const { addItem, items } = useCart();
+
+  // Debug: Log any errors
+  if (error) {
+    console.error('ProCatalog products error:', error);
+  }
 
   const [searchTerm, setSearchTerm] = useState("");
   const [formatFilter, setFormatFilter] = useState("all");
@@ -105,6 +110,15 @@ export function ProCatalog() {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-center">
+        <p className="text-destructive font-medium mb-2">Erreur de chargement</p>
+        <p className="text-sm text-muted-foreground">{error.message}</p>
       </div>
     );
   }
