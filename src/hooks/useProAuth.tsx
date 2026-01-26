@@ -48,7 +48,7 @@ export function ProAuthProvider({ children }: { children: React.ReactNode }) {
       .from('customers')
       .select('*')
       .eq('auth_user_id', userId)
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
       // No customer record found - check if there's pending registration data
