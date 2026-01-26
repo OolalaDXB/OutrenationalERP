@@ -207,7 +207,11 @@ function AppRouter() {
     );
   }
 
-  return <BackofficeContent />;
+  return (
+    <Routes>
+      <Route path="/*" element={<BackofficeContent />} />
+    </Routes>
+  );
 }
 
 function App() {
