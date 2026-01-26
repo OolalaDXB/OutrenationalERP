@@ -100,7 +100,7 @@ const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   "/admin/settings": { title: "Paramètres", subtitle: "Configuration" },
 };
 
-function BackofficeContentInner() {
+function BackofficeLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -136,39 +136,41 @@ function BackofficeContentInner() {
       <div className="min-h-screen bg-background">
         <Sidebar currentPath={currentPath} onNavigate={handleNavigate} />
         <PageLayout title={pageInfo.title} subtitle={pageInfo.subtitle} onNavigate={handleNavigate}>
-          <Routes>
-            <Route index element={<Dashboard />} />
-            <Route path="orders" element={<OrdersPage />} />
-            <Route path="products" element={<ProductsPage />} />
-            <Route path="suppliers" element={<SuppliersPage />} />
-            <Route path="labels" element={<LabelsPage />} />
-            <Route path="inventory" element={<InventoryPage />} />
-            <Route path="customers" element={<CustomersPage />} />
-            <Route path="artists" element={<ArtistsPage />} />
-            <Route path="movements" element={<StockMovementsPage />} />
-            <Route path="reorder" element={<ReorderPage />} />
-            <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
-            <Route path="purchase-orders/new" element={<PurchaseOrderCreatePage />} />
-            <Route path="purchase-orders/:poId" element={<PurchaseOrderDetailPage />} />
-            <Route path="invoices" element={<InvoicesPage />} />
-            <Route path="finances" element={<FinancesPage />} />
-            <Route path="finances/journal" element={<PaymentJournalPage />} />
-            <Route path="finances/impayes" element={<OverdueInvoicesPage />} />
-            <Route path="analytics" element={<AnalyticsPage />} />
-            <Route path="supplier-sales" element={<SupplierSalesPage />} />
-            <Route path="admin/roles" element={<UserRolesPage />} />
-            <Route path="admin/settings" element={<SettingsPage />} />
-          </Routes>
+          {children}
         </PageLayout>
       </div>
     </NotificationProvider>
   );
 }
 
-function BackofficeContent() {
+function BackofficeRoutes() {
   return (
     <AuthProvider>
-      <BackofficeContentInner />
+      <BackofficeLayout>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/orders" element={<OrdersPage />} />
+          <Route path="/products" element={<ProductsPage />} />
+          <Route path="/suppliers" element={<SuppliersPage />} />
+          <Route path="/labels" element={<LabelsPage />} />
+          <Route path="/inventory" element={<InventoryPage />} />
+          <Route path="/customers" element={<CustomersPage />} />
+          <Route path="/artists" element={<ArtistsPage />} />
+          <Route path="/movements" element={<StockMovementsPage />} />
+          <Route path="/reorder" element={<ReorderPage />} />
+          <Route path="/purchase-orders" element={<PurchaseOrdersPage />} />
+          <Route path="/purchase-orders/new" element={<PurchaseOrderCreatePage />} />
+          <Route path="/purchase-orders/:poId" element={<PurchaseOrderDetailPage />} />
+          <Route path="/invoices" element={<InvoicesPage />} />
+          <Route path="/finances" element={<FinancesPage />} />
+          <Route path="/finances/journal" element={<PaymentJournalPage />} />
+          <Route path="/finances/impayes" element={<OverdueInvoicesPage />} />
+          <Route path="/analytics" element={<AnalyticsPage />} />
+          <Route path="/supplier-sales" element={<SupplierSalesPage />} />
+          <Route path="/admin/roles" element={<UserRolesPage />} />
+          <Route path="/admin/settings" element={<SettingsPage />} />
+        </Routes>
+      </BackofficeLayout>
     </AuthProvider>
   );
 }
@@ -207,11 +209,7 @@ function AppRouter() {
     );
   }
 
-  return (
-    <Routes>
-      <Route path="/*" element={<BackofficeContent />} />
-    </Routes>
-  );
+  return <BackofficeRoutes />;
 }
 
 function App() {
