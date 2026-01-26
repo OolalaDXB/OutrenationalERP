@@ -137,27 +137,27 @@ function BackofficeContentInner() {
         <Sidebar currentPath={currentPath} onNavigate={handleNavigate} />
         <PageLayout title={pageInfo.title} subtitle={pageInfo.subtitle} onNavigate={handleNavigate}>
           <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/orders" element={<OrdersPage />} />
-            <Route path="/products" element={<ProductsPage />} />
-            <Route path="/suppliers" element={<SuppliersPage />} />
-            <Route path="/labels" element={<LabelsPage />} />
-            <Route path="/inventory" element={<InventoryPage />} />
-            <Route path="/customers" element={<CustomersPage />} />
-            <Route path="/artists" element={<ArtistsPage />} />
-            <Route path="/movements" element={<StockMovementsPage />} />
-            <Route path="/reorder" element={<ReorderPage />} />
-            <Route path="/purchase-orders" element={<PurchaseOrdersPage />} />
-            <Route path="/purchase-orders/new" element={<PurchaseOrderCreatePage />} />
-            <Route path="/purchase-orders/:poId" element={<PurchaseOrderDetailPage />} />
-            <Route path="/invoices" element={<InvoicesPage />} />
-            <Route path="/finances" element={<FinancesPage />} />
-            <Route path="/finances/journal" element={<PaymentJournalPage />} />
-            <Route path="/finances/impayes" element={<OverdueInvoicesPage />} />
-            <Route path="/analytics" element={<AnalyticsPage />} />
-            <Route path="/supplier-sales" element={<SupplierSalesPage />} />
-            <Route path="/admin/roles" element={<UserRolesPage />} />
-            <Route path="/admin/settings" element={<SettingsPage />} />
+            <Route index element={<Dashboard />} />
+            <Route path="orders" element={<OrdersPage />} />
+            <Route path="products" element={<ProductsPage />} />
+            <Route path="suppliers" element={<SuppliersPage />} />
+            <Route path="labels" element={<LabelsPage />} />
+            <Route path="inventory" element={<InventoryPage />} />
+            <Route path="customers" element={<CustomersPage />} />
+            <Route path="artists" element={<ArtistsPage />} />
+            <Route path="movements" element={<StockMovementsPage />} />
+            <Route path="reorder" element={<ReorderPage />} />
+            <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
+            <Route path="purchase-orders/new" element={<PurchaseOrderCreatePage />} />
+            <Route path="purchase-orders/:poId" element={<PurchaseOrderDetailPage />} />
+            <Route path="invoices" element={<InvoicesPage />} />
+            <Route path="finances" element={<FinancesPage />} />
+            <Route path="finances/journal" element={<PaymentJournalPage />} />
+            <Route path="finances/impayes" element={<OverdueInvoicesPage />} />
+            <Route path="analytics" element={<AnalyticsPage />} />
+            <Route path="supplier-sales" element={<SupplierSalesPage />} />
+            <Route path="admin/roles" element={<UserRolesPage />} />
+            <Route path="admin/settings" element={<SettingsPage />} />
           </Routes>
         </PageLayout>
       </div>
