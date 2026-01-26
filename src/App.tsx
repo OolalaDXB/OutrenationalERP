@@ -150,7 +150,7 @@ function BackofficeRoutes() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/orders" element={<OrdersPage />} />
-          <Route path="/products" element={<ProductsPage />} />
+          <Route path="/products" element={<div>Test</div>} />
           <Route path="/suppliers" element={<SuppliersPage />} />
           <Route path="/labels" element={<LabelsPage />} />
           <Route path="/inventory" element={<InventoryPage />} />
