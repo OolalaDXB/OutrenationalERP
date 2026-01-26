@@ -150,7 +150,7 @@ function BackofficeRoutes() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/orders" element={<OrdersPage />} />
-          <Route path="/products" element={<div>Test</div>} />
+          <Route path="/products" element={<ProductsPage />} />
           <Route path="/suppliers" element={<SuppliersPage />} />
           <Route path="/labels" element={<LabelsPage />} />
           <Route path="/inventory" element={<InventoryPage />} />
@@ -177,7 +177,8 @@ function BackofficeRoutes() {
 
 function AppRouter() {
   const location = useLocation();
-  const isProRoute = location.pathname.startsWith('/pro');
+  // IMPORTANT: don't treat /products as a /pro route
+  const isProRoute = location.pathname === '/pro' || location.pathname.startsWith('/pro/');
   const isResetPasswordRoute = location.pathname === '/reset-password';
 
   if (isResetPasswordRoute) {

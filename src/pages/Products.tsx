@@ -61,8 +61,6 @@ const formatLabels: Record<string, string> = {
 const PAGE_SIZE = 50;
 
 export function ProductsPage() {
-  console.log('ProductsPage: Component rendering');
-  
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { toast } = useToast();
