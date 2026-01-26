@@ -48,6 +48,7 @@ export function ProductFormModal({ isOpen, onClose, product, focusField }: Produ
   
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [useSkuAsCatalog, setUseSkuAsCatalog] = useState(true);
   
   const [formData, setFormData] = useState<{
     sku: string;
@@ -107,14 +108,21 @@ export function ProductFormModal({ isOpen, onClose, product, focusField }: Produ
   useEffect(() => {
     if (product) {
       const productAny = product as any;
+      const productCatalog = product.catalog_number || "";
+      const productSku = product.sku || "";
+      
+      // Determine if catalog_number equals SKU (i.e., was using SKU as catalog)
+      const isCatalogSameAsSku = !productCatalog || productCatalog === productSku;
+      setUseSkuAsCatalog(isCatalogSameAsSku);
+      
       setFormData({
-        sku: product.sku || "",
+        sku: productSku,
         barcode: product.barcode || "",
         title: product.title || "",
         artist_name: product.artist_name || "",
         supplier_id: product.supplier_id || "",
         label_id: product.label_id || "",
-        catalog_number: product.catalog_number || "",
+        catalog_number: isCatalogSameAsSku ? productSku : productCatalog,
         format: product.format || "lp",
         selling_price: product.selling_price || 0,
         purchase_price: product.purchase_price || null,
@@ -142,6 +150,7 @@ export function ProductFormModal({ isOpen, onClose, product, focusField }: Produ
       setImageUrls(allImages);
     } else {
       // Reset form for create mode
+      setUseSkuAsCatalog(true);
       setFormData({
         sku: "",
         barcode: "",
@@ -412,7 +421,15 @@ export function ProductFormModal({ isOpen, onClose, product, focusField }: Produ
                 <Label className="text-sm font-medium text-muted-foreground">SKU</Label>
                 <Input
                   value={formData.sku}
-                  onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                  onChange={(e) => {
+                    const newSku = e.target.value;
+                    setFormData(prev => ({
+                      ...prev,
+                      sku: newSku,
+                      // Sync catalog_number with SKU when checkbox is checked
+                      catalog_number: useSkuAsCatalog ? newSku : prev.catalog_number,
+                    }));
+                  }}
                   placeholder="SF130"
                   className="mt-1.5"
                 />
@@ -490,14 +507,38 @@ export function ProductFormModal({ isOpen, onClose, product, focusField }: Produ
                 placeholder="Aucun label"
               />
 
-              <div>
-                <Label className="text-sm font-medium text-muted-foreground">Numéro de catalogue</Label>
-                <Input
-                  value={formData.catalog_number}
-                  onChange={(e) => setFormData({ ...formData, catalog_number: e.target.value })}
-                  placeholder="CAT001"
-                  className="mt-1.5"
-                />
+              <div className="col-span-2 space-y-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="useSkuAsCatalog"
+                    checked={useSkuAsCatalog}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUseSkuAsCatalog(checked);
+                      if (checked) {
+                        // Sync catalog_number with current SKU
+                        setFormData(prev => ({ ...prev, catalog_number: prev.sku }));
+                      }
+                    }}
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                  />
+                  <Label htmlFor="useSkuAsCatalog" className="text-sm font-medium cursor-pointer">
+                    Utiliser le SKU comme référence catalogue
+                  </Label>
+                </div>
+                
+                {!useSkuAsCatalog && (
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Référence catalogue</Label>
+                    <Input
+                      value={formData.catalog_number}
+                      onChange={(e) => setFormData({ ...formData, catalog_number: e.target.value })}
+                      placeholder="CAT001"
+                      className="mt-1.5"
+                    />
+                  </div>
+                )}
               </div>
 
               <div>

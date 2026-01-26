@@ -490,6 +490,7 @@ export function ProductsPage() {
                 <thead>
                   <tr>
                     <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Produit</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Réf. catalogue</th>
                     <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Fournisseur</th>
                     <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Label</th>
                     <th className="text-left px-6 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-secondary border-b border-border">Format</th>
@@ -528,6 +529,7 @@ export function ProductsPage() {
                           </div>
                         </div>
                       </td>
+                      <td className="px-6 py-4 text-sm font-mono text-muted-foreground">{product.catalog_number || product.sku}</td>
                       <td className="px-6 py-4 text-sm">{product.supplier_name || '—'}</td>
                       <td className="px-6 py-4 text-sm">{product.label_name || '—'}</td>
                       <td className="px-6 py-4 text-sm">{formatLabels[product.format] || product.format.toUpperCase()}</td>
