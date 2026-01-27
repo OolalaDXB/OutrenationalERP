@@ -14,6 +14,12 @@ import { AdminLayout } from "@/components/admin/AdminLayout";
 import { AdminDashboard } from "@/pages/admin/AdminDashboard";
 import { AdminTenants } from "@/pages/admin/AdminTenants";
 import { AdminRequests } from "@/pages/admin/AdminRequests";
+import { AdminUsers } from "@/pages/admin/AdminUsers";
+import { AdminPlans } from "@/pages/admin/AdminPlans";
+import { AdminAnalytics } from "@/pages/admin/AdminAnalytics";
+import { AdminAudit } from "@/pages/admin/AdminAudit";
+import { AdminTeam } from "@/pages/admin/AdminTeam";
+import { TenantDetail } from "@/pages/admin/TenantDetail";
 
 // Tenant router
 import { TenantRouter } from "@/components/tenant/TenantRouter";
@@ -70,7 +76,13 @@ function App() {
             <Route path="/admin" element={<AdminGuard><AdminLayout /></AdminGuard>}>
               <Route index element={<AdminDashboard />} />
               <Route path="tenants" element={<AdminTenants />} />
+              <Route path="tenants/:tenantId" element={<TenantDetail />} />
               <Route path="requests" element={<AdminRequests />} />
+              <Route path="users" element={<AdminUsers />} />
+              <Route path="plans" element={<AdminPlans />} />
+              <Route path="analytics" element={<AdminAnalytics />} />
+              <Route path="audit" element={<AdminAudit />} />
+              <Route path="team" element={<AdminTeam />} />
             </Route>
 
             {/* ========== Tenant-Scoped Routes ========== */}
