@@ -18,7 +18,8 @@ export function useTenant(slug: string | undefined) {
       // Get current user session
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) {
-        throw new Error('Not authenticated');
+        // No session - return null instead of throwing to prevent loading state
+        return null;
       }
 
       // SECURITY: Only fetch tenants the user has access to (prevents enumeration)

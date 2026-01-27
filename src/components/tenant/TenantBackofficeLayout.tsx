@@ -1,11 +1,10 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { useAuth } from '@/hooks/useAuth';
 import { useTenantContext } from '@/contexts/TenantContext';
 import { Loader2 } from 'lucide-react';
-import { LoginPage } from '@/pages/Login';
 
 const pageTitles: Record<string, { title: string; subtitle?: string }> = {
   "/": { title: "Dashboard", subtitle: "Vue d'ensemble" },
@@ -49,6 +48,13 @@ export function TenantBackofficeLayout({ children }: TenantBackofficeLayoutProps
     navigate(`${tenantBase}${path}`);
   };
 
+  // Redirect to login page when user signs out
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate('/login', { replace: true });
+    }
+  }, [user, loading, navigate]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -58,7 +64,12 @@ export function TenantBackofficeLayout({ children }: TenantBackofficeLayoutProps
   }
 
   if (!user) {
-    return <LoginPage />;
+    // Return loading while redirect happens
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   // Get page info - handle dynamic routes
