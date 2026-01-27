@@ -127,31 +127,42 @@ export function ProAuthProvider({ children }: { children: React.ReactNode }) {
   }, [user, fetchCustomer]);
 
   useEffect(() => {
+    let mounted = true;
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!mounted) return;
+
         setUser(session?.user ?? null);
-        
+
         if (session?.user) {
-          // Use setTimeout to avoid potential race conditions
-          setTimeout(() => fetchCustomer(session.user.id, session.user.email || undefined), 0);
+          await fetchCustomer(session.user.id, session.user.email || undefined);
         } else {
           setCustomer(null);
+          setNeedsProfile(false);
         }
-        
-        setIsLoading(false);
+
+        if (mounted) setIsLoading(false);
       }
     );
 
     // Check initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!mounted) return;
+
       setUser(session?.user ?? null);
+
       if (session?.user) {
-        fetchCustomer(session.user.id, session.user.email || undefined);
+        await fetchCustomer(session.user.id, session.user.email || undefined);
       }
-      setIsLoading(false);
+
+      if (mounted) setIsLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, [fetchCustomer]);
 
   const signIn = async (email: string, password: string) => {
