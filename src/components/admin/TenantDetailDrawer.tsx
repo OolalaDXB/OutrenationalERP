@@ -59,6 +59,8 @@ import {
   ShoppingCart,
   TrendingUp,
   Crown,
+  Store,
+  UserCheck,
 } from 'lucide-react';
 
 interface Tenant {
@@ -84,6 +86,17 @@ interface TenantUser {
   user_email?: string;
 }
 
+interface ProCustomer {
+  id: string;
+  auth_user_id: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  company_name: string | null;
+  approved: boolean;
+  created_at: string;
+}
+
 interface TenantDetailDrawerProps {
   tenant: Tenant | null;
   open: boolean;
@@ -98,7 +111,7 @@ export function TenantDetailDrawer({ tenant, open, onOpenChange }: TenantDetailD
     user: null,
   });
 
-  // Fetch tenant users with emails
+  // Fetch ERP users (staff/admin from tenant_users)
   const { data: tenantUsers, isLoading: loadingUsers } = useQuery({
     queryKey: ['admin-tenant-users', tenant?.id],
     queryFn: async () => {
@@ -109,12 +122,15 @@ export function TenantDetailDrawer({ tenant, open, onOpenChange }: TenantDetailD
         .from('tenant_users')
         .select('*')
         .eq('tenant_id', tenant.id)
+        .order('is_owner', { ascending: false })
         .order('created_at', { ascending: true });
 
       if (error) throw error;
 
       // Get emails from public.users table (if accessible)
       const userIds = users?.map((u) => u.user_id) || [];
+      if (userIds.length === 0) return [];
+      
       const { data: profiles } = await supabase
         .from('users')
         .select('id, email')
@@ -126,6 +142,27 @@ export function TenantDetailDrawer({ tenant, open, onOpenChange }: TenantDetailD
         ...u,
         user_email: emailMap.get(u.user_id) || 'Email inconnu',
       })) as TenantUser[];
+    },
+    enabled: !!tenant?.id && open,
+  });
+
+  // Fetch Pro customers (customers with auth_user_id)
+  const { data: proCustomers, isLoading: loadingProCustomers } = useQuery({
+    queryKey: ['admin-tenant-pro-customers', tenant?.id],
+    queryFn: async () => {
+      if (!tenant?.id) return [];
+
+      const { data, error } = await supabase
+        .from('customers')
+        .select('id, auth_user_id, email, first_name, last_name, company_name, approved, created_at')
+        .eq('tenant_id', tenant.id)
+        .not('auth_user_id', 'is', null)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      return (data || []) as ProCustomer[];
     },
     enabled: !!tenant?.id && open,
   });
@@ -312,100 +349,193 @@ export function TenantDetailDrawer({ tenant, open, onOpenChange }: TenantDetailD
             </TabsList>
 
             {/* Users Tab */}
-            <TabsContent value="users" className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-muted-foreground">
-                  {tenantUsers?.length || 0} utilisateur(s)
-                </h3>
+            <TabsContent value="users" className="space-y-6">
+              {/* ERP Users Section */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Store className="w-4 h-4 text-muted-foreground" />
+                  <h3 className="text-sm font-semibold">
+                    Équipe ERP ({tenantUsers?.length || 0})
+                  </h3>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Accès au backoffice (admin, staff, viewer)
+                </p>
+
+                <div className="border rounded-lg">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Rôle</TableHead>
+                        <TableHead>Depuis</TableHead>
+                        <TableHead className="w-10"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {loadingUsers ? (
+                        Array.from({ length: 2 }).map((_, i) => (
+                          <TableRow key={i}>
+                            <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-8" /></TableCell>
+                          </TableRow>
+                        ))
+                      ) : tenantUsers?.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center py-6 text-muted-foreground text-sm">
+                            Aucun utilisateur ERP
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        tenantUsers?.map((user) => (
+                          <TableRow key={user.user_id}>
+                            <TableCell className="font-medium text-sm">
+                              {user.user_email}
+                            </TableCell>
+                            <TableCell>
+                              {user.is_owner ? (
+                                getRoleBadge(user.role, true)
+                              ) : (
+                                <Select
+                                  value={user.role}
+                                  onValueChange={(value: 'admin' | 'staff' | 'viewer') =>
+                                    updateRoleMutation.mutate({ userId: user.user_id, newRole: value })
+                                  }
+                                >
+                                  <SelectTrigger className="h-7 w-24">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="admin">Admin</SelectItem>
+                                    <SelectItem value="staff">Staff</SelectItem>
+                                    <SelectItem value="viewer">Viewer</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-xs">
+                              {format(new Date(user.created_at), 'dd/MM/yy', { locale: fr })}
+                            </TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7">
+                                    <MoreHorizontal className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={() => handleResetPassword(user.user_email || '')}
+                                  >
+                                    <KeyRound className="w-4 h-4 mr-2" />
+                                    Reset mot de passe
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-destructive"
+                                    disabled={user.is_owner}
+                                    onClick={() => setDeleteDialog({ open: true, user })}
+                                  >
+                                    <UserMinus className="w-4 h-4 mr-2" />
+                                    Retirer l'accès
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
 
-              <div className="border rounded-lg">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Rôle</TableHead>
-                      <TableHead>Depuis</TableHead>
-                      <TableHead className="w-10"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {loadingUsers ? (
-                      Array.from({ length: 3 }).map((_, i) => (
-                        <TableRow key={i}>
-                          <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-8" /></TableCell>
-                        </TableRow>
-                      ))
-                    ) : tenantUsers?.length === 0 ? (
+              {/* Pro Customers Section */}
+              <div className="space-y-3 pt-4 border-t">
+                <div className="flex items-center gap-2">
+                  <UserCheck className="w-4 h-4 text-muted-foreground" />
+                  <h3 className="text-sm font-semibold">
+                    Clients Pro ({proCustomers?.length || 0})
+                  </h3>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Comptes clients avec accès au portail Pro
+                </p>
+
+                <div className="border rounded-lg">
+                  <Table>
+                    <TableHeader>
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                          Aucun utilisateur
-                        </TableCell>
+                        <TableHead>Client</TableHead>
+                        <TableHead>Statut</TableHead>
+                        <TableHead>Depuis</TableHead>
+                        <TableHead className="w-10"></TableHead>
                       </TableRow>
-                    ) : (
-                      tenantUsers?.map((user) => (
-                        <TableRow key={user.user_id}>
-                          <TableCell className="font-medium text-sm">
-                            {user.user_email}
-                          </TableCell>
-                          <TableCell>
-                            {user.is_owner ? (
-                              getRoleBadge(user.role, true)
-                            ) : (
-                              <Select
-                                value={user.role}
-                                onValueChange={(value: 'admin' | 'staff' | 'viewer') =>
-                                  updateRoleMutation.mutate({ userId: user.user_id, newRole: value })
-                                }
-                              >
-                                <SelectTrigger className="h-7 w-24">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="admin">Admin</SelectItem>
-                                  <SelectItem value="staff">Staff</SelectItem>
-                                  <SelectItem value="viewer">Viewer</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground text-xs">
-                            {format(new Date(user.created_at), 'dd/MM/yy', { locale: fr })}
-                          </TableCell>
-                          <TableCell>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7">
-                                  <MoreHorizontal className="w-4 h-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  onClick={() => handleResetPassword(user.user_email || '')}
-                                >
-                                  <KeyRound className="w-4 h-4 mr-2" />
-                                  Reset mot de passe
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  className="text-destructive"
-                                  disabled={user.is_owner}
-                                  onClick={() => setDeleteDialog({ open: true, user })}
-                                >
-                                  <UserMinus className="w-4 h-4 mr-2" />
-                                  Retirer l'accès
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                    </TableHeader>
+                    <TableBody>
+                      {loadingProCustomers ? (
+                        Array.from({ length: 2 }).map((_, i) => (
+                          <TableRow key={i}>
+                            <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-8" /></TableCell>
+                          </TableRow>
+                        ))
+                      ) : proCustomers?.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center py-6 text-muted-foreground text-sm">
+                            Aucun client Pro
                           </TableCell>
                         </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
+                      ) : (
+                        proCustomers?.map((customer) => (
+                          <TableRow key={customer.id}>
+                            <TableCell>
+                              <div className="flex flex-col">
+                                <span className="font-medium text-sm">
+                                  {customer.company_name || `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || 'Sans nom'}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  {customer.email}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {customer.approved ? (
+                                <Badge variant="default" className="bg-green-600">Approuvé</Badge>
+                              ) : (
+                                <Badge variant="secondary">En attente</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-xs">
+                              {format(new Date(customer.created_at), 'dd/MM/yy', { locale: fr })}
+                            </TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7">
+                                    <MoreHorizontal className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={() => handleResetPassword(customer.email)}
+                                  >
+                                    <KeyRound className="w-4 h-4 mr-2" />
+                                    Reset mot de passe
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             </TabsContent>
 
