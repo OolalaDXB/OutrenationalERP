@@ -12,7 +12,7 @@ export function ProLayout() {
   const location = useLocation();
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const tenant = useTenantContextOptional();
-  const { user, customer, isLoading, isApproved, isProfessional, needsProfile, signOut } = useProAuth();
+  const { user, customer, isLoading, isApproved, isProfessional, needsProfile, isBackofficeUser, signOut } = useProAuth();
   const { itemCount } = useCart();
 
   // Build base path for navigation (tenant-scoped or legacy)
@@ -73,6 +73,12 @@ export function ProLayout() {
   // Not logged in - redirect to login
   if (!user) {
     return <Navigate to={`${basePath}/login`} replace />;
+  }
+
+  // Admin/staff users should go to backoffice, not Pro portal
+  if (isBackofficeUser) {
+    const backofficeUrl = tenantSlug ? `/t/${tenantSlug}` : '/';
+    return <Navigate to={backofficeUrl} replace />;
   }
 
   // Logged in but customer profile not resolved yet (or needs completion)

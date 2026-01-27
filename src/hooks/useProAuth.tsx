@@ -28,6 +28,7 @@ interface ProAuthContextType {
   isApproved: boolean;
   isProfessional: boolean;
   needsProfile: boolean;
+  isBackofficeUser: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
@@ -42,6 +43,18 @@ export function ProAuthProvider({ children }: { children: React.ReactNode }) {
   const [customer, setCustomer] = useState<ProCustomer | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [needsProfile, setNeedsProfile] = useState(false);
+  const [isBackofficeUser, setIsBackofficeUser] = useState(false);
+
+  // Check if user has admin/staff role (backoffice user)
+  const checkBackofficeRole = async (userId: string): Promise<boolean> => {
+    const { data } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .maybeSingle();
+    
+    return data?.role === 'admin' || data?.role === 'staff';
+  };
 
   const fetchCustomer = async (userId: string, userEmail?: string): Promise<ProCustomer | null | 'needs_profile'> => {
     const { data, error } = await supabase
@@ -130,19 +143,32 @@ export function ProAuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null);
 
       if (session?.user) {
-        const result = await fetchCustomer(session.user.id, session.user.email || undefined);
+        // Check if user is admin/staff first
+        const hasBackofficeRole = await checkBackofficeRole(session.user.id);
         if (!mounted) return;
-        
-        if (result === 'needs_profile') {
+        setIsBackofficeUser(hasBackofficeRole);
+
+        // Only fetch customer if not a backoffice user
+        if (!hasBackofficeRole) {
+          const result = await fetchCustomer(session.user.id, session.user.email || undefined);
+          if (!mounted) return;
+          
+          if (result === 'needs_profile') {
+            setCustomer(null);
+            setNeedsProfile(true);
+          } else if (result) {
+            setCustomer(result);
+            setNeedsProfile(false);
+          }
+        } else {
+          // Backoffice users don't need customer profile
           setCustomer(null);
-          setNeedsProfile(true);
-        } else if (result) {
-          setCustomer(result);
           setNeedsProfile(false);
         }
       } else {
         setCustomer(null);
         setNeedsProfile(false);
+        setIsBackofficeUser(false);
       }
 
       if (mounted) setIsLoading(false);
@@ -205,6 +231,7 @@ export function ProAuthProvider({ children }: { children: React.ReactNode }) {
       isApproved,
       isProfessional,
       needsProfile,
+      isBackofficeUser,
       signIn,
       signOut,
       resetPassword,
