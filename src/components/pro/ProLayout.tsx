@@ -1,22 +1,34 @@
-import { Link, useLocation, Outlet, Navigate } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { ShoppingCart, Package, FileText, User, LogOut, Loader2 } from "lucide-react";
+import { Link, useLocation, Outlet, Navigate, useParams } from "react-router-dom";
+import { useEffect, useState, useMemo } from "react";
+import { ShoppingCart, Package, FileText, User, LogOut, Loader2, Disc3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useProAuth } from "@/hooks/useProAuth";
 import { useCart } from "@/hooks/useCart";
 import { cn } from "@/lib/utils";
+import { useTenantContextOptional } from "@/contexts/TenantContext";
 import outreNationalLogo from "@/assets/outre-national-logo.png";
-
-const NAV_ITEMS = [
-  { to: "/pro/catalog", label: "Catalogue", icon: Package },
-  { to: "/pro/orders", label: "Mes commandes", icon: FileText },
-  { to: "/pro/account", label: "Mon compte", icon: User },
-];
 
 export function ProLayout() {
   const location = useLocation();
+  const { tenantSlug } = useParams<{ tenantSlug: string }>();
+  const tenant = useTenantContextOptional();
   const { user, customer, isLoading, isApproved, isProfessional, needsProfile, signOut } = useProAuth();
   const { itemCount } = useCart();
+
+  // Build base path for navigation (tenant-scoped or legacy)
+  const basePath = tenantSlug ? `/t/${tenantSlug}/pro` : '/pro';
+
+  // Navigation items with dynamic paths
+  const NAV_ITEMS = useMemo(() => [
+    { to: `${basePath}/catalog`, label: "Catalogue", icon: Package },
+    { to: `${basePath}/orders`, label: "Mes commandes", icon: FileText },
+    { to: `${basePath}/account`, label: "Mon compte", icon: User },
+  ], [basePath]);
+
+  // Tenant branding with fallback to Sillon
+  const logoUrl = tenant?.settings?.logo_url || null;
+  const companyName = tenant?.settings?.company_name || tenant?.name || 'Sillon';
+  const contactEmail = tenant?.settings?.contact_email || 'contact@sillon.io';
   
   // Track whether we've completed customer resolution for this session
   const [customerResolved, setCustomerResolved] = useState(false);
@@ -60,13 +72,13 @@ export function ProLayout() {
 
   // Not logged in - redirect to login
   if (!user) {
-    return <Navigate to="/pro/login" replace />;
+    return <Navigate to={`${basePath}/login`} replace />;
   }
 
   // Logged in but customer profile not resolved yet (or needs completion)
   if (!customer) {
     if (needsProfile) {
-      return <Navigate to="/pro/complete-profile" replace />;
+      return <Navigate to={`${basePath}/complete-profile`} replace />;
     }
 
     // Still no customer after resolution - show restricted access
@@ -125,10 +137,16 @@ export function ProLayout() {
       <header className="sticky top-0 z-50 bg-card border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            {/* Logo */}
-            <Link to="/pro" className="flex items-center gap-2">
-              <img src={outreNationalLogo} alt="Outre-National" className="w-8 h-8 rounded" />
-              <span className="font-semibold text-lg hidden sm:block">Outre-National</span>
+            {/* Logo - fallback to Sillon if no tenant logo */}
+            <Link to={basePath} className="flex items-center gap-2">
+              {logoUrl ? (
+                <img src={logoUrl} alt={companyName} className="w-8 h-8 rounded object-contain" />
+              ) : (
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
+                  <Disc3 className="w-5 h-5 text-white" />
+                </div>
+              )}
+              <span className="font-semibold text-lg hidden sm:block">{companyName}</span>
             </Link>
 
             {/* Navigation */}
@@ -151,7 +169,7 @@ export function ProLayout() {
 
             {/* Right side */}
             <div className="flex items-center gap-3">
-              <Link to="/pro/cart" className="relative">
+              <Link to={`${basePath}/cart`} className="relative">
                 <Button variant="ghost" size="icon">
                   <ShoppingCart className="w-5 h-5" />
                   {itemCount > 0 && (
@@ -207,10 +225,9 @@ export function ProLayout() {
       <footer className="bg-card border-t border-border py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
-            <p>© 2025 Outre-National. Portail professionnel.</p>
+            <p>© 2026 {companyName}. Portail professionnel.</p>
             <div className="flex items-center gap-4">
-              <span>Contact: pro@outre-national.com</span>
-              <span>Tél: +33 1 23 45 67 89</span>
+              <span>Contact: {contactEmail}</span>
             </div>
           </div>
           <div className="text-center mt-4">

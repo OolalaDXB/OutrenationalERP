@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
-import { Link } from "react-router-dom";
-import { Loader2, UserPlus, AlertCircle, CheckCircle } from "lucide-react";
+import { Link, useParams } from "react-router-dom";
+import { Loader2, UserPlus, AlertCircle, CheckCircle, Disc3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTenantContextOptional } from "@/contexts/TenantContext";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -45,6 +46,16 @@ interface FormData {
 }
 
 export function ProRegister() {
+  const { tenantSlug } = useParams<{ tenantSlug: string }>();
+  const tenant = useTenantContextOptional();
+  
+  // Build base path for navigation
+  const basePath = tenantSlug ? `/t/${tenantSlug}/pro` : '/pro';
+  
+  // Tenant branding
+  const logoUrl = tenant?.settings?.logo_url || null;
+  const companyName = tenant?.settings?.company_name || tenant?.name || 'Sillon';
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState("");
@@ -221,7 +232,7 @@ export function ProRegister() {
           <p className="text-sm text-muted-foreground mb-6">
             Une fois votre compte approuvé, vous pourrez vous connecter avec vos identifiants.
           </p>
-          <Link to="/pro/login">
+          <Link to={`${basePath}/login`}>
             <Button>Aller à la connexion</Button>
           </Link>
         </div>
@@ -234,10 +245,14 @@ export function ProRegister() {
       <div className="w-full max-w-2xl mx-auto">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 mx-auto rounded-xl bg-primary flex items-center justify-center mb-4">
-            <span className="text-primary-foreground font-bold text-2xl">ON</span>
-          </div>
-          <h1 className="text-2xl font-bold">Outre-National Pro</h1>
+          {logoUrl ? (
+            <img src={logoUrl} alt={companyName} className="w-16 h-16 mx-auto rounded-xl object-contain mb-4" />
+          ) : (
+            <div className="w-16 h-16 mx-auto rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center mb-4">
+              <Disc3 className="w-9 h-9 text-white" />
+            </div>
+          )}
+          <h1 className="text-2xl font-bold">{companyName} Pro</h1>
           <p className="text-muted-foreground mt-1">Demande de compte professionnel</p>
         </div>
 
@@ -493,9 +508,19 @@ export function ProRegister() {
         <div className="text-center mt-6">
           <p className="text-sm text-muted-foreground">
             Déjà un compte ?{" "}
-            <Link to="/pro/login" className="text-primary hover:underline">
+            <Link to={`${basePath}/login`} className="text-primary hover:underline">
               Se connecter
             </Link>
+          </p>
+        </div>
+        
+        {/* Footer */}
+        <div className="text-center mt-4 space-y-1">
+          <p className="text-xs text-muted-foreground">
+            © 2026 {companyName}. Tous droits réservés.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Powered by Sillon
           </p>
         </div>
       </div>

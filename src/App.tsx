@@ -1,49 +1,18 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
-import { Sidebar } from "@/components/layout/Sidebar";
-import { PageLayout } from "@/components/layout/PageLayout";
-import { NotificationProvider } from "@/hooks/use-notifications";
-import { AuthProvider, useAuth } from "@/hooks/useAuth";
-import { ProAuthProvider } from "@/hooks/useProAuth";
-import { CartProvider } from "@/hooks/useCart";
-import { Dashboard } from "@/pages/Dashboard";
-import { OrdersPage } from "@/pages/Orders";
-import { SuppliersPage } from "@/pages/Suppliers";
-import { ProductsPage } from "@/pages/Products";
-import { InventoryPage } from "@/pages/Inventory";
-import { CustomersPage } from "@/pages/Customers";
-import { ArtistsPage } from "@/pages/Artists";
-import { LabelsPage } from "@/pages/Labels";
-import { SupplierSalesPage } from "@/pages/SupplierSales";
-import { ReorderPage } from "@/pages/Reorder";
-import { InvoicesPage } from "@/pages/Invoices";
-import { AnalyticsPage } from "@/pages/Analytics";
-import { StockMovementsPage } from "@/pages/StockMovements";
-import { UserRolesPage } from "@/pages/UserRoles";
-import FinancesPage from "@/pages/Finances";
-import PaymentJournalPage from "@/pages/finances/PaymentJournal";
-import OverdueInvoicesPage from "@/pages/finances/OverdueInvoices";
-import { PurchaseOrdersPage } from "@/pages/PurchaseOrders";
-import { PurchaseOrderCreatePage } from "@/pages/PurchaseOrderCreate";
-import { PurchaseOrderDetailPage } from "@/pages/PurchaseOrderDetail";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { ThemeProvider } from "next-themes";
 
-import { SettingsPage } from "@/pages/Settings";
-import { LoginPage } from "@/pages/Login";
+// Sillon pages
+import { SillonLanding } from "@/pages/SillonLanding";
+import { SillonLogin } from "@/pages/SillonLogin";
 import { ResetPasswordPage } from "@/pages/ResetPassword";
-import { ProLayout } from "@/components/pro/ProLayout";
-import { ProLogin } from "@/pages/pro/ProLogin";
-import { ProRegister } from "@/pages/pro/ProRegister";
-import { ProPendingApproval } from "@/pages/pro/ProPendingApproval";
-import { ProCompleteProfile } from "@/pages/pro/ProCompleteProfile";
-import { ProDashboard } from "@/pages/pro/ProDashboard";
-import { ProCatalog } from "@/pages/pro/ProCatalog";
-import { ProCart } from "@/pages/pro/ProCart";
-import { ProCheckout } from "@/pages/pro/ProCheckout";
-import { ProOrderSuccess } from "@/pages/pro/ProOrderSuccess";
-import { ProOrders } from "@/pages/pro/ProOrders";
-import { ProInvoices } from "@/pages/pro/ProInvoices";
-import { ProAccount } from "@/pages/pro/ProAccount";
-import { Loader2 } from "lucide-react";
+
+// Tenant router
+import { TenantRouter } from "@/components/tenant/TenantRouter";
+
+// Legacy redirects for backward compatibility
+import { RedirectToTenantPro, RedirectToTenantBackoffice } from "@/components/tenant/LegacyRedirects";
+
 import "@fontsource/inter/400.css";
 import "@fontsource/inter/500.css";
 import "@fontsource/inter/600.css";
@@ -77,149 +46,50 @@ const queryClient = new QueryClient({
   },
 });
 
-const pageTitles: Record<string, { title: string; subtitle?: string }> = {
-  "/": { title: "Dashboard", subtitle: "Vue d'ensemble" },
-  "/orders": { title: "Commandes", subtitle: "Gestion des commandes" },
-  "/products": { title: "Produits", subtitle: "Catalogue produits" },
-  "/suppliers": { title: "Fournisseurs", subtitle: "Gestion fournisseurs" },
-  "/labels": { title: "Labels", subtitle: "Catalogue labels" },
-  "/artists": { title: "Artistes", subtitle: "Catalogue artistes" },
-  "/inventory": { title: "Inventaire", subtitle: "État des stocks" },
-  "/movements": { title: "Mouvements", subtitle: "Historique stock" },
-  "/reorder": { title: "Réapprovisionnement", subtitle: "Suggestions réappro" },
-  "/purchase-orders": { title: "Achats fournisseurs", subtitle: "Commandes d'achat" },
-  "/purchase-orders/new": { title: "Nouvelle commande", subtitle: "Créer une commande fournisseur" },
-  "/customers": { title: "Clients", subtitle: "Base clients" },
-  "/invoices": { title: "Factures", subtitle: "Facturation" },
-  "/finances": { title: "Finances", subtitle: "Tableau de bord financier" },
-  "/finances/journal": { title: "Journal des paiements", subtitle: "Historique des transactions" },
-  "/finances/impayes": { title: "Factures impayées", subtitle: "Retards de paiement" },
-  "/analytics": { title: "Analytics", subtitle: "Statistiques" },
-  "/supplier-sales": { title: "Ventes par fournisseur", subtitle: "Rapports" },
-  "/admin/roles": { title: "Gestion des rôles", subtitle: "Administration" },
-  "/admin/settings": { title: "Paramètres", subtitle: "Configuration" },
-};
-
-function BackofficeLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const currentPath = location.pathname;
-
-  const handleNavigate = (path: string) => {
-    navigate(path);
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <LoginPage />;
-  }
-
-  // Get page info - handle dynamic routes
-  let pageInfo = pageTitles[currentPath];
-  if (!pageInfo && currentPath.startsWith('/purchase-orders/')) {
-    pageInfo = { title: "Commande fournisseur", subtitle: "Détail de la commande" };
-  }
-  if (!pageInfo) {
-    pageInfo = { title: "Dashboard" };
-  }
-
-  return (
-    <NotificationProvider>
-      <div className="min-h-screen bg-background">
-        <Sidebar currentPath={currentPath} onNavigate={handleNavigate} />
-        <PageLayout title={pageInfo.title} subtitle={pageInfo.subtitle} onNavigate={handleNavigate}>
-          {children}
-        </PageLayout>
-      </div>
-    </NotificationProvider>
-  );
-}
-
-function BackofficeRoutes() {
-  return (
-    <AuthProvider>
-      <BackofficeLayout>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/orders" element={<OrdersPage />} />
-          <Route path="/products" element={<ProductsPage />} />
-          <Route path="/suppliers" element={<SuppliersPage />} />
-          <Route path="/labels" element={<LabelsPage />} />
-          <Route path="/inventory" element={<InventoryPage />} />
-          <Route path="/customers" element={<CustomersPage />} />
-          <Route path="/artists" element={<ArtistsPage />} />
-          <Route path="/movements" element={<StockMovementsPage />} />
-          <Route path="/reorder" element={<ReorderPage />} />
-          <Route path="/purchase-orders" element={<PurchaseOrdersPage />} />
-          <Route path="/purchase-orders/new" element={<PurchaseOrderCreatePage />} />
-          <Route path="/purchase-orders/:poId" element={<PurchaseOrderDetailPage />} />
-          <Route path="/invoices" element={<InvoicesPage />} />
-          <Route path="/finances" element={<FinancesPage />} />
-          <Route path="/finances/journal" element={<PaymentJournalPage />} />
-          <Route path="/finances/impayes" element={<OverdueInvoicesPage />} />
-          <Route path="/analytics" element={<AnalyticsPage />} />
-          <Route path="/supplier-sales" element={<SupplierSalesPage />} />
-          <Route path="/admin/roles" element={<UserRolesPage />} />
-          <Route path="/admin/settings" element={<SettingsPage />} />
-        </Routes>
-      </BackofficeLayout>
-    </AuthProvider>
-  );
-}
-
-function AppRouter() {
-  const location = useLocation();
-  // IMPORTANT: don't treat /products as a /pro route
-  const isProRoute = location.pathname === '/pro' || location.pathname.startsWith('/pro/');
-  const isResetPasswordRoute = location.pathname === '/reset-password';
-
-  if (isResetPasswordRoute) {
-    return <ResetPasswordPage />;
-  }
-
-  if (isProRoute) {
-    return (
-      <ProAuthProvider>
-        <CartProvider>
-          <Routes>
-            <Route path="/pro/login" element={<ProLogin />} />
-            <Route path="/pro/register" element={<ProRegister />} />
-            <Route path="/pro/pending" element={<ProPendingApproval />} />
-            <Route path="/pro/complete-profile" element={<ProCompleteProfile />} />
-            <Route path="/pro" element={<ProLayout />}>
-              <Route index element={<ProDashboard />} />
-              <Route path="catalog" element={<ProCatalog />} />
-              <Route path="cart" element={<ProCart />} />
-              <Route path="checkout" element={<ProCheckout />} />
-              <Route path="order-success" element={<ProOrderSuccess />} />
-              <Route path="orders" element={<ProOrders />} />
-              <Route path="invoices" element={<ProInvoices />} />
-              <Route path="account" element={<ProAccount />} />
-            </Route>
-          </Routes>
-        </CartProvider>
-      </ProAuthProvider>
-    );
-  }
-
-  return <BackofficeRoutes />;
-}
-
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AppRouter />
-      </BrowserRouter>
-    </QueryClientProvider>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <Routes>
+            {/* ========== Sillon Public Pages ========== */}
+            <Route path="/" element={<SillonLanding />} />
+            <Route path="/login" element={<SillonLogin />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+
+            {/* ========== Tenant-Scoped Routes ========== */}
+            <Route path="/t/:tenantSlug/*" element={<TenantRouter />} />
+
+            {/* ========== Legacy Redirects (Backward Compatibility) ========== */}
+            {/* These will be removed once traffic logs show 0 usage for 30 days */}
+            
+            {/* Old Pro portal routes */}
+            <Route path="/pro/*" element={<RedirectToTenantPro />} />
+            <Route path="/pro" element={<RedirectToTenantPro />} />
+
+            {/* Old backoffice routes - redirect to outre-national tenant */}
+            <Route path="/orders" element={<RedirectToTenantBackoffice />} />
+            <Route path="/products" element={<RedirectToTenantBackoffice />} />
+            <Route path="/suppliers" element={<RedirectToTenantBackoffice />} />
+            <Route path="/labels" element={<RedirectToTenantBackoffice />} />
+            <Route path="/inventory" element={<RedirectToTenantBackoffice />} />
+            <Route path="/customers" element={<RedirectToTenantBackoffice />} />
+            <Route path="/artists" element={<RedirectToTenantBackoffice />} />
+            <Route path="/movements" element={<RedirectToTenantBackoffice />} />
+            <Route path="/reorder" element={<RedirectToTenantBackoffice />} />
+            <Route path="/purchase-orders/*" element={<RedirectToTenantBackoffice />} />
+            <Route path="/invoices" element={<RedirectToTenantBackoffice />} />
+            <Route path="/finances/*" element={<RedirectToTenantBackoffice />} />
+            <Route path="/analytics" element={<RedirectToTenantBackoffice />} />
+            <Route path="/supplier-sales" element={<RedirectToTenantBackoffice />} />
+            <Route path="/admin/*" element={<RedirectToTenantBackoffice />} />
+
+            {/* Catch-all redirect */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 

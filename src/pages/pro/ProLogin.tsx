@@ -1,18 +1,20 @@
-import { useState } from "react";
-import { useNavigate, Navigate, Link } from "react-router-dom";
-import { Loader2, LogIn, AlertCircle, Moon, Sun, ArrowLeft, Mail, RefreshCw } from "lucide-react";
+import { useState, useMemo } from "react";
+import { useNavigate, Navigate, Link, useParams } from "react-router-dom";
+import { Loader2, LogIn, AlertCircle, Moon, Sun, ArrowLeft, Mail, RefreshCw, Disc3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useProAuth } from "@/hooks/useProAuth";
 import { useTheme } from "next-themes";
 import { toast } from "@/hooks/use-toast";
-import logo from "@/assets/outre-national-logo.png";
+import { useTenantContextOptional } from "@/contexts/TenantContext";
 
 type ViewMode = 'login' | 'forgot-password' | 'resend-email';
 
 export function ProLogin() {
   const navigate = useNavigate();
+  const { tenantSlug } = useParams<{ tenantSlug: string }>();
+  const tenant = useTenantContextOptional();
   const { user, customer, isLoading, isProfessional, isApproved, needsProfile, signIn, resetPassword, resendConfirmationEmail } = useProAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -23,23 +25,30 @@ export function ProLogin() {
 
   const { theme, setTheme } = useTheme();
 
+  // Build base path for navigation (tenant-scoped or legacy)
+  const basePath = tenantSlug ? `/t/${tenantSlug}/pro` : '/pro';
+
+  // Tenant branding with fallback to Sillon
+  const logoUrl = tenant?.settings?.logo_url || null;
+  const companyName = tenant?.settings?.company_name || tenant?.name || 'Sillon';
+
   const toggleTheme = () => {
     setTheme(theme === 'dark' ? 'light' : 'dark');
   };
 
   // Already logged in and approved
   if (!isLoading && user && isProfessional && isApproved) {
-    return <Navigate to="/pro" replace />;
+    return <Navigate to={basePath} replace />;
   }
 
   // Logged in but needs to complete their profile (no customer record + no localStorage data)
   if (!isLoading && user && !customer && needsProfile) {
-    return <Navigate to="/pro/complete-profile" replace />;
+    return <Navigate to={`${basePath}/complete-profile`} replace />;
   }
 
   // Logged in but not approved - redirect to pending page
   if (!isLoading && user && customer && isProfessional && !isApproved) {
-    return <Navigate to="/pro/pending" replace />;
+    return <Navigate to={`${basePath}/pending`} replace />;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -82,7 +91,7 @@ export function ProLogin() {
           }
           return;
         }
-        navigate("/pro");
+        navigate(basePath);
       }
     } catch (err) {
       setError("Une erreur est survenue");
@@ -125,8 +134,14 @@ export function ProLogin() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <img src={logo} alt="Outre-National" className="h-16 w-16 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold">Outre-National Pro</h1>
+          {logoUrl ? (
+            <img src={logoUrl} alt={companyName} className="h-16 w-16 mx-auto mb-4 object-contain" />
+          ) : (
+            <div className="w-16 h-16 mx-auto rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center mb-4">
+              <Disc3 className="w-9 h-9 text-white" />
+            </div>
+          )}
+          <h1 className="text-2xl font-bold">{companyName} Pro</h1>
           <p className="text-muted-foreground mt-1">
             {viewMode === 'forgot-password' 
               ? 'Réinitialisation du mot de passe' 
@@ -242,7 +257,7 @@ export function ProLogin() {
             <div className="mt-6 pt-6 border-t border-border text-center text-sm text-muted-foreground">
               <p>Pas encore de compte professionnel ?</p>
               <Link 
-                to="/pro/register" 
+                to={`${basePath}/register`}
                 className="inline-block mt-2 text-primary hover:underline font-medium"
               >
                 Créer un compte
@@ -261,7 +276,7 @@ export function ProLogin() {
         {/* Footer */}
         <div className="text-center mt-4 space-y-1">
           <p className="text-xs text-muted-foreground">
-            © 2026 Outre-National. Tous droits réservés.
+            © 2026 {companyName}. Tous droits réservés.
           </p>
           <p className="text-xs text-muted-foreground">
             Powered by Sillon
