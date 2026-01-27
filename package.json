@@ -98,8 +98,3 @@
     }
   }
 }
-```
-
-Envoie ça à Lovable avec le message :
-```
-Remplace le package.json par ce contenu. L'override jspdf est nécessaire pour la sécurité (CVE-2025-68428). Note en mémoire projet : NE JAMAIS downgrader jspdf en dessous de 4.0.0.
