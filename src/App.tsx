@@ -19,6 +19,7 @@ import { AdminPlans } from "@/pages/admin/AdminPlans";
 import { AdminAnalytics } from "@/pages/admin/AdminAnalytics";
 import { AdminAudit } from "@/pages/admin/AdminAudit";
 import { AdminTeam } from "@/pages/admin/AdminTeam";
+import { AdminBilling } from "@/pages/admin/AdminBilling";
 import { TenantDetail } from "@/pages/admin/TenantDetail";
 
 // Tenant router
@@ -82,6 +83,7 @@ function App() {
               <Route path="plans" element={<AdminPlans />} />
               <Route path="analytics" element={<AdminAnalytics />} />
               <Route path="audit" element={<AdminAudit />} />
+              <Route path="billing" element={<AdminBilling />} />
               <Route path="team" element={<AdminTeam />} />
             </Route>
 

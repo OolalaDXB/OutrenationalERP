@@ -2481,6 +2481,290 @@ export type Database = {
           },
         ]
       }
+      tenant_billing_events: {
+        Row: {
+          created_at: string
+          data: Json | null
+          event_source: string
+          event_type: string
+          id: string
+          invoice_id: string | null
+          payment_method_id: string | null
+          stripe_event_id: string | null
+          subscription_id: string | null
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json | null
+          event_source?: string
+          event_type: string
+          id?: string
+          invoice_id?: string | null
+          payment_method_id?: string | null
+          stripe_event_id?: string | null
+          subscription_id?: string | null
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json | null
+          event_source?: string
+          event_type?: string
+          id?: string
+          invoice_id?: string | null
+          payment_method_id?: string | null
+          stripe_event_id?: string | null
+          subscription_id?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_billing_events_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_billing_events_payment_method_id_fkey"
+            columns: ["payment_method_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_payment_methods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_billing_events_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_billing_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenant_invoices: {
+        Row: {
+          amount_due: number | null
+          amount_paid: number | null
+          billing_info: Json | null
+          created_at: string
+          crypto_network: string | null
+          crypto_tx_hash: string | null
+          currency: string
+          discount_amount: number | null
+          due_date: string | null
+          id: string
+          internal_notes: string | null
+          invoice_number: string
+          issue_date: string
+          line_items: Json | null
+          notes: string | null
+          paid_at: string | null
+          payment_method_id: string | null
+          payment_method_type:
+            | Database["public"]["Enums"]["payment_method_type"]
+            | null
+          payment_reference: string | null
+          pdf_generated_at: string | null
+          pdf_url: string | null
+          period_end: string | null
+          period_start: string | null
+          status: Database["public"]["Enums"]["tenant_invoice_status"]
+          stripe_hosted_invoice_url: string | null
+          stripe_invoice_id: string | null
+          stripe_payment_intent_id: string | null
+          subscription_id: string | null
+          subtotal: number
+          tax_amount: number | null
+          tax_rate: number | null
+          tenant_id: string
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          amount_due?: number | null
+          amount_paid?: number | null
+          billing_info?: Json | null
+          created_at?: string
+          crypto_network?: string | null
+          crypto_tx_hash?: string | null
+          currency?: string
+          discount_amount?: number | null
+          due_date?: string | null
+          id?: string
+          internal_notes?: string | null
+          invoice_number: string
+          issue_date?: string
+          line_items?: Json | null
+          notes?: string | null
+          paid_at?: string | null
+          payment_method_id?: string | null
+          payment_method_type?:
+            | Database["public"]["Enums"]["payment_method_type"]
+            | null
+          payment_reference?: string | null
+          pdf_generated_at?: string | null
+          pdf_url?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          status?: Database["public"]["Enums"]["tenant_invoice_status"]
+          stripe_hosted_invoice_url?: string | null
+          stripe_invoice_id?: string | null
+          stripe_payment_intent_id?: string | null
+          subscription_id?: string | null
+          subtotal?: number
+          tax_amount?: number | null
+          tax_rate?: number | null
+          tenant_id: string
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          amount_due?: number | null
+          amount_paid?: number | null
+          billing_info?: Json | null
+          created_at?: string
+          crypto_network?: string | null
+          crypto_tx_hash?: string | null
+          currency?: string
+          discount_amount?: number | null
+          due_date?: string | null
+          id?: string
+          internal_notes?: string | null
+          invoice_number?: string
+          issue_date?: string
+          line_items?: Json | null
+          notes?: string | null
+          paid_at?: string | null
+          payment_method_id?: string | null
+          payment_method_type?:
+            | Database["public"]["Enums"]["payment_method_type"]
+            | null
+          payment_reference?: string | null
+          pdf_generated_at?: string | null
+          pdf_url?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          status?: Database["public"]["Enums"]["tenant_invoice_status"]
+          stripe_hosted_invoice_url?: string | null
+          stripe_invoice_id?: string | null
+          stripe_payment_intent_id?: string | null
+          subscription_id?: string | null
+          subtotal?: number
+          tax_amount?: number | null
+          tax_rate?: number | null
+          tenant_id?: string
+          total?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_invoices_payment_method_id_fkey"
+            columns: ["payment_method_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_payment_methods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_invoices_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_invoices_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenant_payment_methods: {
+        Row: {
+          bank_iban_last4: string | null
+          bank_name: string | null
+          created_at: string
+          crypto_address: string | null
+          crypto_network: string | null
+          id: string
+          is_active: boolean | null
+          is_default: boolean | null
+          label: string | null
+          stripe_card_brand: string | null
+          stripe_card_exp_month: number | null
+          stripe_card_exp_year: number | null
+          stripe_card_last4: string | null
+          stripe_payment_method_id: string | null
+          stripe_sepa_bank_code: string | null
+          stripe_sepa_last4: string | null
+          tenant_id: string
+          type: Database["public"]["Enums"]["payment_method_type"]
+          updated_at: string
+          verified_at: string | null
+        }
+        Insert: {
+          bank_iban_last4?: string | null
+          bank_name?: string | null
+          created_at?: string
+          crypto_address?: string | null
+          crypto_network?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          label?: string | null
+          stripe_card_brand?: string | null
+          stripe_card_exp_month?: number | null
+          stripe_card_exp_year?: number | null
+          stripe_card_last4?: string | null
+          stripe_payment_method_id?: string | null
+          stripe_sepa_bank_code?: string | null
+          stripe_sepa_last4?: string | null
+          tenant_id: string
+          type: Database["public"]["Enums"]["payment_method_type"]
+          updated_at?: string
+          verified_at?: string | null
+        }
+        Update: {
+          bank_iban_last4?: string | null
+          bank_name?: string | null
+          created_at?: string
+          crypto_address?: string | null
+          crypto_network?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          label?: string | null
+          stripe_card_brand?: string | null
+          stripe_card_exp_month?: number | null
+          stripe_card_exp_year?: number | null
+          stripe_card_last4?: string | null
+          stripe_payment_method_id?: string | null
+          stripe_sepa_bank_code?: string | null
+          stripe_sepa_last4?: string | null
+          tenant_id?: string
+          type?: Database["public"]["Enums"]["payment_method_type"]
+          updated_at?: string
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_payment_methods_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_requests: {
         Row: {
           company_name: string
@@ -2534,6 +2818,125 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      tenant_subscriptions: {
+        Row: {
+          addons: string[] | null
+          addons_total: number | null
+          base_price: number
+          billing_address: Json | null
+          billing_email: string | null
+          billing_name: string | null
+          cancel_at_period_end: boolean | null
+          canceled_at: string | null
+          created_at: string
+          crypto_network: string | null
+          crypto_wallet_address: string | null
+          current_period_end: string | null
+          current_period_start: string | null
+          default_payment_method_id: string | null
+          discount_amount: number | null
+          discount_expires_at: string | null
+          discount_percent: number | null
+          discount_reason: string | null
+          id: string
+          monthly_total: number | null
+          payment_method_type:
+            | Database["public"]["Enums"]["payment_method_type"]
+            | null
+          plan_code: string
+          plan_version: string
+          status: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id: string | null
+          stripe_price_id: string | null
+          stripe_subscription_id: string | null
+          tenant_id: string
+          trial_ends_at: string | null
+          updated_at: string
+          vat_number: string | null
+          vat_validated: boolean | null
+        }
+        Insert: {
+          addons?: string[] | null
+          addons_total?: number | null
+          base_price?: number
+          billing_address?: Json | null
+          billing_email?: string | null
+          billing_name?: string | null
+          cancel_at_period_end?: boolean | null
+          canceled_at?: string | null
+          created_at?: string
+          crypto_network?: string | null
+          crypto_wallet_address?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          default_payment_method_id?: string | null
+          discount_amount?: number | null
+          discount_expires_at?: string | null
+          discount_percent?: number | null
+          discount_reason?: string | null
+          id?: string
+          monthly_total?: number | null
+          payment_method_type?:
+            | Database["public"]["Enums"]["payment_method_type"]
+            | null
+          plan_code: string
+          plan_version?: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id?: string | null
+          stripe_price_id?: string | null
+          stripe_subscription_id?: string | null
+          tenant_id: string
+          trial_ends_at?: string | null
+          updated_at?: string
+          vat_number?: string | null
+          vat_validated?: boolean | null
+        }
+        Update: {
+          addons?: string[] | null
+          addons_total?: number | null
+          base_price?: number
+          billing_address?: Json | null
+          billing_email?: string | null
+          billing_name?: string | null
+          cancel_at_period_end?: boolean | null
+          canceled_at?: string | null
+          created_at?: string
+          crypto_network?: string | null
+          crypto_wallet_address?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          default_payment_method_id?: string | null
+          discount_amount?: number | null
+          discount_expires_at?: string | null
+          discount_percent?: number | null
+          discount_reason?: string | null
+          id?: string
+          monthly_total?: number | null
+          payment_method_type?:
+            | Database["public"]["Enums"]["payment_method_type"]
+            | null
+          plan_code?: string
+          plan_version?: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          stripe_customer_id?: string | null
+          stripe_price_id?: string | null
+          stripe_subscription_id?: string | null
+          tenant_id?: string
+          trial_ends_at?: string | null
+          updated_at?: string
+          vat_number?: string | null
+          vat_validated?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_subscriptions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tenant_users: {
         Row: {
@@ -3118,6 +3521,14 @@ export type Database = {
         }
         Returns: string
       }
+      create_tenant_subscription: {
+        Args: {
+          p_plan_code: string
+          p_tenant_id: string
+          p_trial_days?: number
+        }
+        Returns: string
+      }
       current_tenant_id: { Args: never; Returns: string }
       debug_admin_ctx: {
         Args: never
@@ -3128,6 +3539,7 @@ export type Database = {
           users_count: number
         }[]
       }
+      generate_tenant_invoice_number: { Args: never; Returns: string }
       get_auth_users_for_admin: {
         Args: never
         Returns: {
@@ -3246,6 +3658,13 @@ export type Database = {
         | "delivered"
         | "cancelled"
         | "refunded"
+      payment_method_type:
+        | "stripe_card"
+        | "stripe_sepa"
+        | "crypto_usdc"
+        | "crypto_usdt"
+        | "bank_transfer"
+        | "manual"
       payment_status: "pending" | "paid" | "partial" | "refunded" | "failed"
       po_status:
         | "draft"
@@ -3279,7 +3698,21 @@ export type Database = {
         | "consignment_out"
         | "sale_reversal"
         | "sale_adjustment"
+      subscription_status:
+        | "trialing"
+        | "active"
+        | "past_due"
+        | "canceled"
+        | "unpaid"
+        | "paused"
       supplier_type: "consignment" | "purchase" | "own" | "depot_vente"
+      tenant_invoice_status:
+        | "draft"
+        | "pending"
+        | "paid"
+        | "overdue"
+        | "canceled"
+        | "refunded"
       vinyl_condition: "M" | "NM" | "VG+" | "VG" | "G+" | "G" | "F" | "P"
     }
     CompositeTypes: {
@@ -3421,6 +3854,14 @@ export const Constants = {
         "cancelled",
         "refunded",
       ],
+      payment_method_type: [
+        "stripe_card",
+        "stripe_sepa",
+        "crypto_usdc",
+        "crypto_usdt",
+        "bank_transfer",
+        "manual",
+      ],
       payment_status: ["pending", "paid", "partial", "refunded", "failed"],
       po_status: [
         "draft",
@@ -3457,7 +3898,23 @@ export const Constants = {
         "sale_reversal",
         "sale_adjustment",
       ],
+      subscription_status: [
+        "trialing",
+        "active",
+        "past_due",
+        "canceled",
+        "unpaid",
+        "paused",
+      ],
       supplier_type: ["consignment", "purchase", "own", "depot_vente"],
+      tenant_invoice_status: [
+        "draft",
+        "pending",
+        "paid",
+        "overdue",
+        "canceled",
+        "refunded",
+      ],
       vinyl_condition: ["M", "NM", "VG+", "VG", "G+", "G", "F", "P"],
     },
   },
