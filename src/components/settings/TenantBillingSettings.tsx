@@ -264,7 +264,6 @@ export function TenantBillingSettings() {
   const queryClient = useQueryClient();
   const [showAddPaymentMethod, setShowAddPaymentMethod] = useState(false);
   const [paymentMethodToDelete, setPaymentMethodToDelete] = useState<any>(null);
-  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
 
   // Fetch subscription
   const { data: subscription, isLoading: subscriptionLoading } = useQuery({
@@ -387,6 +386,27 @@ export function TenantBillingSettings() {
     },
   });
 
+  // Select/change plan mutation
+  const selectPlanMutation = useMutation({
+    mutationFn: async (planCode: string) => {
+      const { data, error } = await supabase.rpc('create_tenant_subscription', {
+        p_tenant_id: tenant?.id,
+        p_plan_code: planCode,
+        p_trial_days: subscription ? 0 : 14,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tenant-subscription', tenant?.id] });
+      toast.success(subscription ? 'Plan modifié avec succès' : 'Abonnement créé avec essai de 14 jours');
+    },
+    onError: (error) => {
+      console.error('Error changing plan:', error);
+      toast.error('Erreur lors du changement de plan');
+    },
+  });
+
   if (subscriptionLoading) {
     return (
       <div className="p-6 space-y-6">
@@ -489,7 +509,7 @@ export function TenantBillingSettings() {
               )}
             </CardContent>
             <CardFooter className="flex gap-3">
-              <Button variant="outline" onClick={() => setShowUpgradeDialog(true)}>
+              <Button variant="outline" onClick={() => document.getElementById('available-plans')?.scrollIntoView({ behavior: 'smooth' })}>
                 Changer de plan
               </Button>
               {subscription?.status === 'active' && (
@@ -501,33 +521,41 @@ export function TenantBillingSettings() {
           </Card>
 
           {/* Available Plans */}
-          <div>
+          <div id="available-plans">
             <h3 className="text-lg font-semibold mb-4">Plans disponibles</h3>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 items-stretch">
               {plans?.map((plan) => {
                 const isCurrent = plan.code === subscription?.plan_code;
                 return (
-                  <Card key={plan.id} className={isCurrent ? 'border-primary' : ''}>
+                  <Card key={plan.id} className={`flex flex-col ${isCurrent ? 'border-primary' : ''}`}>
                     <CardHeader className="pb-2">
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-base">{plan.name}</CardTitle>
                         {isCurrent && <Badge>Actuel</Badge>}
                       </div>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="flex-1">
                       <div className="text-2xl font-bold mb-2">
                         {plan.base_price_monthly}€
                         <span className="text-sm font-normal text-muted-foreground">/mois</span>
                       </div>
                       <p className="text-sm text-muted-foreground">{plan.description}</p>
                     </CardContent>
-                    {!isCurrent && (
-                      <CardFooter>
-                        <Button variant="outline" className="w-full" size="sm">
-                          Sélectionner
+                    <CardFooter className="mt-auto pt-4">
+                      {isCurrent ? (
+                        <Badge variant="outline" className="w-full justify-center h-9 flex items-center">Plan actuel</Badge>
+                      ) : (
+                        <Button 
+                          variant="outline" 
+                          className="w-full" 
+                          size="sm"
+                          onClick={() => selectPlanMutation.mutate(plan.code)}
+                          disabled={selectPlanMutation.isPending}
+                        >
+                          {selectPlanMutation.isPending ? 'Sélection...' : 'Sélectionner'}
                         </Button>
-                      </CardFooter>
-                    )}
+                      )}
+                    </CardFooter>
                   </Card>
                 );
               })}
