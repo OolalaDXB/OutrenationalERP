@@ -63,31 +63,31 @@ export function SillonLogin() {
     const tenants = await fetchUserTenants();
     const isAdmin = isSillonAdmin(user.email);
     
-    // If user is Sillon admin OR has multiple tenants, show selector
-    if (isAdmin || tenants.length > 1) {
+    // Scenario 1: Sillon Admin WITH tenants → show choice
+    if (isAdmin && tenants.length > 0) {
       setUserTenants(tenants);
       setViewMode('select-tenant');
       setIsLoading(false);
       return;
     }
     
-    if (tenants.length === 0) {
-      // No tenant access - if admin, show selector anyway
-      if (isAdmin) {
-        setUserTenants([]);
-        setViewMode('select-tenant');
-        setIsLoading(false);
-        return;
-      }
-      setError('Aucun accès configuré pour ce compte. Contactez votre administrateur.');
-      await supabase.auth.signOut();
-      setLoggedInUser(null);
-      setIsLoading(false);
+    // Scenario 2: Sillon Admin with NO tenants → redirect /admin/
+    if (isAdmin && tenants.length === 0) {
+      navigate('/admin', { replace: true });
       return;
     }
     
-    // Single tenant, not admin - redirect directly
-    navigate(`/t/${tenants[0].tenant_slug}/`, { replace: true });
+    // Scenario 3: Not admin WITH tenants → redirect to first tenant
+    if (!isAdmin && tenants.length > 0) {
+      navigate(`/t/${tenants[0].tenant_slug}/`, { replace: true });
+      return;
+    }
+    
+    // Fallback: Not admin, no tenants → error
+    setError('Aucun accès configuré pour ce compte. Contactez votre administrateur.');
+    await supabase.auth.signOut();
+    setLoggedInUser(null);
+    setIsLoading(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
