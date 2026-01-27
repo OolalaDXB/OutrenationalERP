@@ -14,10 +14,11 @@ const NAV_ITEMS = [
 
 export function ProLayout() {
   const location = useLocation();
-  const { user, customer, isLoading, isApproved, isProfessional, signOut } = useProAuth();
+  const { user, customer, isLoading, isApproved, isProfessional, needsProfile, signOut } = useProAuth();
   const { itemCount } = useCart();
 
-  if (isLoading) {
+  // Show loader while auth is loading OR while customer data is being fetched
+  if (isLoading || (user && !customer && !needsProfile)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
