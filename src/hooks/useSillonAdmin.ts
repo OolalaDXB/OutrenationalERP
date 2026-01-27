@@ -1,148 +1,126 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import type { User } from '@supabase/supabase-js';
 
-type SillonAdminRole = 'super_admin' | 'admin' | 'staff' | 'viewer';
+export type SillonAdminRole = 'super_admin' | 'admin' | 'staff' | 'viewer';
 
-interface SillonAdminData {
+interface SillonAdmin {
   id: string;
+  user_id: string;
   email: string;
   role: SillonAdminRole;
   display_name: string | null;
   is_active: boolean;
-  user_id: string | null;
   last_login_at: string | null;
   created_at: string;
 }
 
-type Permission = 
-  | 'canViewTenants'
-  | 'canEditTenant'
-  | 'canSuspendTenant'
-  | 'canViewUsers'
-  | 'canResetPassword'
-  | 'canResendEmail'
-  | 'canDeleteUser'
-  | 'canChangeUserRole'
-  | 'canViewPlans'
-  | 'canEditPlans'
-  | 'canEditAddons'
-  | 'canAssignPlan'
-  | 'canAddOverride'
-  | 'canViewAnalytics'
-  | 'canViewAuditLogs'
-  | 'canManageSillonAdmins'
-  | 'canImpersonate';
+interface SillonAdminPermissions {
+  canViewTenants: boolean;
+  canViewUsers: boolean;
+  canViewAnalytics: boolean;
+  canViewAuditLogs: boolean;
+  canViewPlans: boolean;
+  canCreateTenant: boolean;
+  canEditTenant: boolean;
+  canSuspendTenant: boolean;
+  canDeleteTenant: boolean;
+  canAssignPlan: boolean;
+  canResetPassword: boolean;
+  canResendEmail: boolean;
+  canDeleteUser: boolean;
+  canChangeUserRole: boolean;
+  canAddOverride: boolean;
+  canRemoveOverride: boolean;
+  canEditPlans: boolean;
+  canEditAddons: boolean;
+  canImpersonate: boolean;
+  canManageSillonAdmins: boolean;
+  canExportData: boolean;
+}
 
-// Permission matrix by role
-const PERMISSIONS: Record<SillonAdminRole, Permission[]> = {
-  super_admin: [
-    'canViewTenants', 'canEditTenant', 'canSuspendTenant',
-    'canViewUsers', 'canResetPassword', 'canResendEmail', 'canDeleteUser', 'canChangeUserRole',
-    'canViewPlans', 'canEditPlans', 'canEditAddons', 'canAssignPlan', 'canAddOverride',
-    'canViewAnalytics', 'canViewAuditLogs',
-    'canManageSillonAdmins', 'canImpersonate',
-  ],
-  admin: [
-    'canViewTenants', 'canEditTenant', 'canSuspendTenant',
-    'canViewUsers', 'canResetPassword', 'canResendEmail', 'canChangeUserRole',
-    'canViewPlans', 'canAssignPlan',
-    'canViewAnalytics', 'canViewAuditLogs',
-  ],
-  staff: [
-    'canViewTenants',
-    'canViewUsers', 'canResetPassword', 'canResendEmail',
-    'canViewPlans',
-    'canViewAuditLogs',
-  ],
-  viewer: [
-    'canViewTenants',
-    'canViewUsers',
-    'canViewPlans',
-  ],
+const ROLE_PERMISSIONS: Record<SillonAdminRole, SillonAdminPermissions> = {
+  super_admin: {
+    canViewTenants: true, canViewUsers: true, canViewAnalytics: true, canViewAuditLogs: true, canViewPlans: true,
+    canCreateTenant: true, canEditTenant: true, canSuspendTenant: true, canDeleteTenant: true, canAssignPlan: true,
+    canResetPassword: true, canResendEmail: true, canDeleteUser: true, canChangeUserRole: true,
+    canAddOverride: true, canRemoveOverride: true, canEditPlans: true, canEditAddons: true,
+    canImpersonate: true, canManageSillonAdmins: true, canExportData: true,
+  },
+  admin: {
+    canViewTenants: true, canViewUsers: true, canViewAnalytics: true, canViewAuditLogs: true, canViewPlans: true,
+    canCreateTenant: true, canEditTenant: true, canSuspendTenant: true, canDeleteTenant: false, canAssignPlan: true,
+    canResetPassword: true, canResendEmail: true, canDeleteUser: true, canChangeUserRole: true,
+    canAddOverride: true, canRemoveOverride: true, canEditPlans: true, canEditAddons: true,
+    canImpersonate: false, canManageSillonAdmins: false, canExportData: true,
+  },
+  staff: {
+    canViewTenants: true, canViewUsers: true, canViewAnalytics: true, canViewAuditLogs: true, canViewPlans: true,
+    canCreateTenant: false, canEditTenant: false, canSuspendTenant: false, canDeleteTenant: false, canAssignPlan: false,
+    canResetPassword: true, canResendEmail: true, canDeleteUser: false, canChangeUserRole: false,
+    canAddOverride: false, canRemoveOverride: false, canEditPlans: false, canEditAddons: false,
+    canImpersonate: false, canManageSillonAdmins: false, canExportData: false,
+  },
+  viewer: {
+    canViewTenants: true, canViewUsers: true, canViewAnalytics: true, canViewAuditLogs: false, canViewPlans: true,
+    canCreateTenant: false, canEditTenant: false, canSuspendTenant: false, canDeleteTenant: false, canAssignPlan: false,
+    canResetPassword: false, canResendEmail: false, canDeleteUser: false, canChangeUserRole: false,
+    canAddOverride: false, canRemoveOverride: false, canEditPlans: false, canEditAddons: false,
+    canImpersonate: false, canManageSillonAdmins: false, canExportData: false,
+  },
 };
 
+const HARDCODED_ADMINS = ['mickael.thomas@pm.me'];
+
 export function useSillonAdmin() {
-  const [user, setUser] = useState<User | null>(null);
-  const [adminData, setAdminData] = useState<SillonAdminData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: session } = useQuery({
+    queryKey: ['auth-session'],
+    queryFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      return session;
+    },
+  });
 
-  useEffect(() => {
-    // Set up auth listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setUser(session?.user ?? null);
-      }
-    );
+  const user = session?.user;
 
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // Fetch admin data when user changes
-  useEffect(() => {
-    async function fetchAdminData() {
-      if (!user?.email) {
-        setAdminData(null);
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        const { data, error } = await supabase
-          .from('sillon_admins')
-          .select('*')
-          .eq('email', user.email.toLowerCase())
-          .eq('is_active', true)
-          .maybeSingle();
-
-        if (error) {
-          console.error('Error fetching admin data:', error);
-          setAdminData(null);
-        } else {
-          setAdminData(data as SillonAdminData | null);
+  const { data: adminData, isLoading, error } = useQuery({
+    queryKey: ['sillon-admin', user?.id],
+    queryFn: async (): Promise<SillonAdmin | null> => {
+      if (!user?.id) return null;
+      
+      const { data, error } = await supabase
+        .from('sillon_admins')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+      
+      if (error || !data) {
+        // Fallback to hardcoded
+        if (user.email && HARDCODED_ADMINS.includes(user.email.toLowerCase())) {
+          return {
+            id: 'hardcoded', user_id: user.id, email: user.email,
+            role: 'super_admin', display_name: null,
+            is_active: true, last_login_at: null, created_at: new Date().toISOString(),
+          };
         }
-      } catch (err) {
-        console.error('Error in fetchAdminData:', err);
-        setAdminData(null);
-      } finally {
-        setIsLoading(false);
+        return null;
       }
-    }
-
-    fetchAdminData();
-  }, [user?.email]);
-
+      
+      return data as SillonAdmin;
+    },
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+  
+  const isAdmin = !!adminData;
   const role = adminData?.role ?? null;
-  const isAdmin = !!adminData && adminData.is_active;
-  const isSuperAdmin = role === 'super_admin';
-
-  // Check if user has a specific permission
-  const can = useMemo(() => {
-    return (permission: Permission): boolean => {
-      if (!role) return false;
-      return PERMISSIONS[role]?.includes(permission) ?? false;
-    };
-  }, [role]);
-
-  // Get all permissions for current role
-  const permissions = useMemo(() => {
-    if (!role) return [];
-    return PERMISSIONS[role] ?? [];
-  }, [role]);
-
+  const permissions = role ? ROLE_PERMISSIONS[role] : null;
+  
   return {
-    user,
-    adminData,
-    isLoading,
-    isAdmin,
-    isSuperAdmin,
-    role,
-    can,
-    permissions,
+    isLoading, error, isAdmin, adminData, role, permissions,
+    isSuperAdmin: role === 'super_admin',
+    isAdminOrHigher: role === 'super_admin' || role === 'admin',
+    isStaffOrHigher: role === 'super_admin' || role === 'admin' || role === 'staff',
+    can: (permission: keyof SillonAdminPermissions): boolean => permissions?.[permission] ?? false,
   };
 }
