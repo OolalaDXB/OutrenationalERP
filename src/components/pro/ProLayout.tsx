@@ -31,6 +31,20 @@ export function ProLayout() {
     return <Navigate to="/pro/login" replace />;
   }
 
+  // Logged in but customer profile not resolved yet (or needs completion)
+  // => never show the restricted screen during this transient state.
+  if (!customer) {
+    if (needsProfile) {
+      return <Navigate to="/pro/complete-profile" replace />;
+    }
+
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   // Not a professional customer or not approved
   if (!isProfessional || !isApproved) {
     return (
