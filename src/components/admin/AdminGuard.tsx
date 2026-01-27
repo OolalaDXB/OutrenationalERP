@@ -1,48 +1,30 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { isSillonAdmin } from '@/config/sillonAdmins';
-import type { User } from '@supabase/supabase-js';
+import { useSillonAdmin } from '@/hooks/useSillonAdmin';
 
 interface AdminGuardProps {
   children: React.ReactNode;
+  /** Require specific permission (optional) */
+  requiredPermission?: string;
 }
 
-export function AdminGuard({ children }: AdminGuardProps) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+export function AdminGuard({ children, requiredPermission }: AdminGuardProps) {
   const navigate = useNavigate();
+  const { isLoading, isAdmin, can } = useSillonAdmin();
 
   useEffect(() => {
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setUser(session?.user ?? null);
-        setLoading(false);
-      }
-    );
-
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        navigate('/login', { replace: true });
-      } else if (!isSillonAdmin(user.email)) {
+    if (!isLoading) {
+      if (!isAdmin) {
         navigate('/', { replace: true });
+      } else if (requiredPermission && !can(requiredPermission as any)) {
+        // Has admin access but not this specific permission
+        navigate('/admin', { replace: true });
       }
     }
-  }, [user, loading, navigate]);
+  }, [isAdmin, isLoading, navigate, requiredPermission, can]);
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -50,7 +32,11 @@ export function AdminGuard({ children }: AdminGuardProps) {
     );
   }
 
-  if (!user || !isSillonAdmin(user.email)) {
+  if (!isAdmin) {
+    return null;
+  }
+
+  if (requiredPermission && !can(requiredPermission as any)) {
     return null;
   }
 
