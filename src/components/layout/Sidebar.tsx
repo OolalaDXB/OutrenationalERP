@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useSettings } from "@/hooks/useSettings";
 import { toast } from "@/hooks/use-toast";
+import { useTenantContextOptional } from "@/contexts/TenantContext";
 import { 
   LayoutDashboard, 
   ShoppingCart, 
@@ -24,10 +25,10 @@ import {
   ShieldCheck,
   Eye,
   Settings,
-  TrendingUp
+  TrendingUp,
+  Disc3
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import outreNationalLogo from "@/assets/outre-national-logo.png";
 
 interface NavItem {
   icon: React.ElementType;
@@ -119,7 +120,12 @@ interface SidebarProps {
 export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
   const { user, signOut, hasRole, refreshRole } = useAuth();
   const { data: settings } = useSettings();
+  const tenant = useTenantContextOptional();
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Tenant branding with fallback
+  const logoUrl = tenant?.settings?.logo_url || null;
+  const companyName = tenant?.settings?.company_name || tenant?.name || 'Sillon';
 
   const handleLogout = async () => {
     await signOut();
@@ -163,8 +169,14 @@ export function Sidebar({ currentPath, onNavigate }: SidebarProps) {
       {/* Header */}
       <div className="px-6 py-5 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <img src={outreNationalLogo} alt="Outre-National" className="w-10 h-10 rounded invert" />
-          <span className="text-lg font-bold text-white">Outre-National</span>
+          {logoUrl ? (
+            <img src={logoUrl} alt={companyName} className="w-10 h-10 rounded object-contain invert" />
+          ) : (
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
+              <Disc3 className="w-6 h-6 text-white" />
+            </div>
+          )}
+          <span className="text-lg font-bold text-white">{companyName}</span>
         </div>
         <div className="mt-2 flex items-center gap-2">
           <Badge variant="outline" className={cn("text-[0.6rem] font-semibold uppercase", roleColors[userRole])}>

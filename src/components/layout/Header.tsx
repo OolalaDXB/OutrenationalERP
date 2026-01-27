@@ -1,6 +1,6 @@
-import { Search } from "lucide-react";
+import { Search, Disc3 } from "lucide-react";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
-import outreNationalLogo from "@/assets/outre-national-logo.png";
+import { useTenantContextOptional } from "@/contexts/TenantContext";
 
 interface HeaderProps {
   title: string;
@@ -9,14 +9,27 @@ interface HeaderProps {
 }
 
 export function Header({ title, subtitle, onNavigate }: HeaderProps) {
+  const tenant = useTenantContextOptional();
+  
+  // Tenant branding with fallback
+  const logoUrl = tenant?.settings?.logo_url || null;
+  const companyName = tenant?.settings?.company_name || tenant?.name || 'Sillon';
+
   return (
     <header className="h-16 bg-card border-b border-border flex items-center justify-between px-8 sticky top-0 z-40">
       <div className="flex items-center gap-4">
-        <img 
-          src={outreNationalLogo} 
-          alt="Outre National" 
-          className="w-8 h-8 rounded dark:invert"
-        />
+        {/* Logo - fallback to Sillon disc icon */}
+        {logoUrl ? (
+          <img 
+            src={logoUrl} 
+            alt={companyName} 
+            className="w-8 h-8 rounded object-contain dark:invert"
+          />
+        ) : (
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
+            <Disc3 className="w-5 h-5 text-white" />
+          </div>
+        )}
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-semibold text-foreground">{title}</h1>
           {subtitle && (
