@@ -1,76 +1,119 @@
 import { useQuery } from '@tanstack/react-query';
-import { BarChart3, TrendingUp, Users, Building2, AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Users, TrendingUp, Building2, CreditCard, Package, ShoppingCart } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useNavigate } from 'react-router-dom';
 
 export function AdminAnalytics() {
-  // Fetch all tenants
+  const navigate = useNavigate();
+
+  // Fetch tenants
   const { data: tenants, isLoading: tenantsLoading } = useQuery({
     queryKey: ['analytics-tenants'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('tenants')
-        .select('id, name, status, created_at, settings')
-        .order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('tenants').select('*');
       if (error) throw error;
-      return data;
+      return data || [];
     },
   });
 
   // Fetch users count
   const { data: usersCount } = useQuery({
-    queryKey: ['analytics-users-count'],
+    queryKey: ['analytics-users'],
     queryFn: async () => {
-      const { count, error } = await supabase
-        .from('tenant_users')
-        .select('*', { count: 'exact', head: true });
-      if (error) return 0;
+      const { count } = await supabase.from('tenant_users').select('*', { count: 'exact', head: true });
       return count || 0;
     },
   });
 
-  // Fetch pending requests
-  const { data: requestsPending } = useQuery({
-    queryKey: ['analytics-requests-pending'],
+  // Fetch plans
+  const { data: plans } = useQuery({
+    queryKey: ['sillon-plans'],
     queryFn: async () => {
-      const { count, error } = await supabase
-        .from('tenant_requests' as any)
+      const { data } = await supabase.from('sillon_plans').select('code, name, base_price_monthly');
+      return data || [];
+    },
+  });
+
+  // Fetch platform-wide stats
+  const { data: platformStats } = useQuery({
+    queryKey: ['platform-stats'],
+    queryFn: async () => {
+      // Total products across all tenants
+      const { count: productsCount } = await supabase
+        .from('products')
         .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
-      if (error) return 0;
-      return count || 0;
+        .is('deleted_at', null);
+
+      // Total orders
+      const { count: ordersCount } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .is('deleted_at', null);
+
+      // Total revenue (sum of all orders)
+      const { data: ordersData } = await supabase
+        .from('orders')
+        .select('total')
+        .is('deleted_at', null);
+      
+      const totalRevenue = ordersData?.reduce((sum, o) => sum + (Number(o.total) || 0), 0) || 0;
+
+      // Orders last 30 days
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const { data: recentOrders } = await supabase
+        .from('orders')
+        .select('total')
+        .is('deleted_at', null)
+        .gte('created_at', thirtyDaysAgo.toISOString());
+      
+      const revenue30d = recentOrders?.reduce((sum, o) => sum + (Number(o.total) || 0), 0) || 0;
+
+      return {
+        productsCount: productsCount || 0,
+        ordersCount: ordersCount || 0,
+        totalRevenue,
+        revenue30d,
+        orders30d: recentOrders?.length || 0,
+      };
     },
   });
 
-  // Calculate stats
-  const planPrices: Record<string, number> = { PRO: 149, BUSINESS: 249, BUSINESS_PLUS: 399, ENTERPRISE: 349 };
+  // Calculate metrics
+  const planPrices = plans?.reduce((acc, p) => ({ ...acc, [p.code]: Number(p.base_price_monthly) }), {} as Record<string, number>) || {};
   
-  const plansDistribution = tenants?.reduce((acc: Record<string, number>, t) => {
-    const plan = (t.settings as any)?.plan_code || 'NONE';
+  const planCounts = tenants?.reduce((acc, t) => {
+    const plan = t.plan_code || 'NONE';
     acc[plan] = (acc[plan] || 0) + 1;
     return acc;
-  }, {}) || {};
+  }, {} as Record<string, number>) || {};
 
-  const mrr = Object.entries(plansDistribution).reduce((sum, [plan, count]) => {
+  const mrr = Object.entries(planCounts).reduce((sum, [plan, count]) => {
     return sum + (planPrices[plan] || 0) * count;
   }, 0);
 
-  const tenantsTotal = tenants?.length || 0;
-  const tenantsActive = tenants?.filter(t => t.status === 'active').length || 0;
+  const activeTenants = tenants?.filter(t => t.status === 'active').length || 0;
+  const arpu = activeTenants > 0 ? Math.round(mrr / activeTenants) : 0;
+  const ltv = arpu * 24; // Hypothèse 24 mois
 
-  // Tenants without plan
-  const tenantsWithoutPlan = tenants?.filter(t => !(t.settings as any)?.plan_code) || [];
+  // Tenants without proper plan
+  const tenantsWithoutPlan = tenants?.filter(t => !t.plan_code || t.plan_code === 'starter') || [];
 
-  const isLoading = tenantsLoading;
+  // New tenants this month
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const newTenants30d = tenants?.filter(t => new Date(t.created_at) > thirtyDaysAgo).length || 0;
 
-  if (isLoading) {
+  if (tenantsLoading) {
     return (
       <div className="p-8">
         <Skeleton className="h-8 w-64 mb-8" />
         <div className="grid gap-6 md:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32" />)}
+          {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-32" />)}
         </div>
       </div>
     );
@@ -85,15 +128,18 @@ export function AdminAnalytics() {
 
       {/* Revenue Section */}
       <div className="mb-8">
-        <h2 className="text-lg font-semibold mb-4">Revenue</h2>
+        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <CreditCard className="w-5 h-5 text-green-500" />
+          Revenue
+        </h2>
         <div className="grid gap-6 md:grid-cols-4">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">MRR</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{mrr.toLocaleString('fr-FR')}€</div>
-              <p className="text-xs text-muted-foreground mt-1">Basé sur les plans actifs</p>
+              <div className="text-3xl font-bold text-green-600">{mrr.toLocaleString('fr-FR')}€</div>
+              <p className="text-xs text-muted-foreground mt-1">Revenus récurrents mensuels</p>
             </CardContent>
           </Card>
           <Card>
@@ -110,10 +156,8 @@ export function AdminAnalytics() {
               <CardTitle className="text-sm font-medium text-muted-foreground">ARPU</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">
-                {tenantsActive ? Math.round(mrr / tenantsActive) : 0}€
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">Par tenant actif</p>
+              <div className="text-3xl font-bold">{arpu}€</div>
+              <p className="text-xs text-muted-foreground mt-1">Par tenant actif/mois</p>
             </CardContent>
           </Card>
           <Card>
@@ -121,9 +165,7 @@ export function AdminAnalytics() {
               <CardTitle className="text-sm font-medium text-muted-foreground">LTV estimé</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">
-                {tenantsActive ? Math.round((mrr / tenantsActive) * 24) : 0}€
-              </div>
+              <div className="text-3xl font-bold">{ltv.toLocaleString('fr-FR')}€</div>
               <p className="text-xs text-muted-foreground mt-1">Hypothèse 24 mois</p>
             </CardContent>
           </Card>
@@ -132,14 +174,18 @@ export function AdminAnalytics() {
 
       {/* Growth Section */}
       <div className="mb-8">
-        <h2 className="text-lg font-semibold mb-4">Growth</h2>
+        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <TrendingUp className="w-5 h-5 text-blue-500" />
+          Growth
+        </h2>
         <div className="grid gap-6 md:grid-cols-4">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Tenants total</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{tenantsTotal}</div>
+              <div className="text-3xl font-bold">{tenants?.length || 0}</div>
+              <p className="text-xs text-muted-foreground mt-1">{activeTenants} actifs</p>
             </CardContent>
           </Card>
           <Card>
@@ -147,7 +193,8 @@ export function AdminAnalytics() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Nouveaux (30j)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-green-600">+0</div>
+              <div className="text-3xl font-bold text-green-600">+{newTenants30d}</div>
+              <p className="text-xs text-muted-foreground mt-1">Ce mois</p>
             </CardContent>
           </Card>
           <Card>
@@ -155,17 +202,65 @@ export function AdminAnalytics() {
               <CardTitle className="text-sm font-medium text-muted-foreground">Utilisateurs</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{usersCount || 0}</div>
-              <p className="text-xs text-muted-foreground mt-1">Total</p>
+              <div className="text-3xl font-bold">{usersCount}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                ~{activeTenants ? Math.round(usersCount! / activeTenants) : 0} par tenant
+              </p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Demandes</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Taux rétention</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{requestsPending || 0}</div>
-              <p className="text-xs text-muted-foreground mt-1">En attente</p>
+              <div className="text-3xl font-bold">
+                {tenants?.length ? Math.round((activeTenants / tenants.length) * 100) : 0}%
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Tenants actifs</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Platform Activity */}
+      <div className="mb-8">
+        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          <ShoppingCart className="w-5 h-5 text-purple-500" />
+          Activité plateforme
+        </h2>
+        <div className="grid gap-6 md:grid-cols-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Produits total</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{(platformStats?.productsCount || 0).toLocaleString('fr-FR')}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Commandes total</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{(platformStats?.ordersCount || 0).toLocaleString('fr-FR')}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">GMV total</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{(platformStats?.totalRevenue || 0).toLocaleString('fr-FR')}€</div>
+              <p className="text-xs text-muted-foreground mt-1">Volume brut marchandises</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">GMV (30j)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{(platformStats?.revenue30d || 0).toLocaleString('fr-FR')}€</div>
+              <p className="text-xs text-muted-foreground mt-1">{platformStats?.orders30d || 0} commandes</p>
             </CardContent>
           </Card>
         </div>
@@ -176,25 +271,30 @@ export function AdminAnalytics() {
         <h2 className="text-lg font-semibold mb-4">Répartition par plan</h2>
         <Card>
           <CardContent className="pt-6">
-            {Object.keys(plansDistribution).length > 0 ? (
+            {Object.entries(planCounts).length > 0 ? (
               <div className="space-y-4">
-                {Object.entries(plansDistribution)
+                {Object.entries(planCounts)
                   .sort(([, a], [, b]) => b - a)
                   .map(([plan, count]) => {
-                    const total = Object.values(plansDistribution).reduce((a, b) => a + b, 0);
+                    const total = Object.values(planCounts).reduce((a, b) => a + b, 0);
                     const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
                     const revenue = (planPrices[plan] || 0) * count;
+                    const planName = plans?.find(p => p.code === plan)?.name || plan;
                     return (
                       <div key={plan} className="flex items-center gap-4">
-                        <div className="w-32 font-medium">{plan === 'NONE' ? 'Sans plan' : plan}</div>
+                        <div className="w-32 font-medium">
+                          {plan === 'NONE' || plan === 'starter' ? 'Sans plan' : planName}
+                        </div>
                         <div className="flex-1 h-4 bg-muted rounded-full overflow-hidden">
                           <div 
-                            className="h-full bg-primary rounded-full"
+                            className="h-full bg-primary rounded-full transition-all"
                             style={{ width: `${percentage}%` }}
                           />
                         </div>
-                        <div className="w-20 text-right">{count} ({percentage}%)</div>
-                        <div className="w-24 text-right text-muted-foreground">{revenue}€/m</div>
+                        <div className="w-20 text-right text-sm">{count} ({percentage}%)</div>
+                        <div className="w-24 text-right text-sm text-muted-foreground">
+                          {revenue > 0 ? `${revenue}€/m` : '-'}
+                        </div>
                       </div>
                     );
                   })}
@@ -210,19 +310,25 @@ export function AdminAnalytics() {
       <div>
         <h2 className="text-lg font-semibold mb-4">Santé</h2>
         <div className="grid gap-6 md:grid-cols-2">
-          <Card>
+          <Card className={tenantsWithoutPlan.length > 0 ? 'border-amber-500/50' : ''}>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-500" />
-                Tenants sans plan
+                <AlertTriangle className={`w-4 h-4 ${tenantsWithoutPlan.length > 0 ? 'text-amber-500' : 'text-green-500'}`} />
+                Tenants sans plan payant
               </CardTitle>
-              <CardDescription>{tenantsWithoutPlan.length} tenant(s) n'ont pas de plan assigné</CardDescription>
+              <CardDescription>
+                {tenantsWithoutPlan.length} tenant(s) n'ont pas de plan payant assigné
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {tenantsWithoutPlan.length > 0 ? (
                 <div className="space-y-2 max-h-48 overflow-y-auto">
                   {tenantsWithoutPlan.slice(0, 10).map(t => (
-                    <div key={t.id} className="flex items-center justify-between text-sm">
+                    <div 
+                      key={t.id} 
+                      className="flex items-center justify-between text-sm cursor-pointer hover:bg-muted p-2 rounded"
+                      onClick={() => navigate(`/admin/tenants/${t.id}`)}
+                    >
                       <span>{t.name}</span>
                       <Badge variant="outline">Sans plan</Badge>
                     </div>
@@ -232,7 +338,7 @@ export function AdminAnalytics() {
                   )}
                 </div>
               ) : (
-                <p className="text-sm text-green-600">Tous les tenants ont un plan ✓</p>
+                <p className="text-sm text-green-600">Tous les tenants ont un plan payant ✓</p>
               )}
             </CardContent>
           </Card>
@@ -243,24 +349,22 @@ export function AdminAnalytics() {
                 <Users className="w-4 h-4 text-blue-500" />
                 Engagement utilisateurs
               </CardTitle>
-              <CardDescription>Activité des utilisateurs sur 7 jours</CardDescription>
+              <CardDescription>Distribution des rôles</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div className="flex justify-between text-sm">
                   <span>Utilisateurs total</span>
-                  <span className="font-medium">{usersCount || 0}</span>
+                  <span className="font-medium">{usersCount}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span>Tenants actifs</span>
-                  <span className="font-medium">{tenantsActive}</span>
+                  <span className="font-medium">{activeTenants}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span>Ratio utilisateurs/tenant</span>
+                  <span>Moyenne users/tenant</span>
                   <span className="font-medium">
-                    {tenantsActive 
-                      ? (usersCount ? (usersCount / tenantsActive).toFixed(1) : 0)
-                      : 0}
+                    {activeTenants ? Math.round(usersCount! / activeTenants) : 0}
                   </span>
                 </div>
               </div>

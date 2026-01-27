@@ -17,59 +17,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import type { Json } from '@/integrations/supabase/types';
-
-interface TenantSettings {
-  discount_percent?: number;
-  dedicated_database?: boolean;
-  [key: string]: Json | undefined;
-}
-
-interface Tenant {
-  id: string;
-  name: string;
-  slug: string;
-  status: string;
-  plan_code: string | null;
-  plan_version: string | null;
-  capabilities: Record<string, Json>;
-  capability_overrides: Record<string, Json>;
-  settings: TenantSettings | null;
-  created_at: string;
-}
-
-interface ERPUser {
-  id: string;
-  user_id: string;
-  tenant_id: string;
-  role: 'admin' | 'staff' | 'viewer';
-  is_owner: boolean;
-  created_at: string;
-  email: string;
-  first_name: string;
-  last_name: string;
-  is_active: boolean;
-}
-
-interface ProCustomer {
-  id: string;
-  company_name: string | null;
-  email: string;
-  first_name: string | null;
-  last_name: string | null;
-  customer_type: string | null;
-  auth_user_id: string | null;
-  created_at: string;
-}
-
-interface Plan {
-  id: string;
-  code: string;
-  name: string;
-  base_price_monthly: number;
-  version: string;
-  capabilities: Record<string, Json>;
-}
+import { Switch } from '@/components/ui/switch';
 
 export function TenantDetail() {
   const { tenantId } = useParams<{ tenantId: string }>();
@@ -77,7 +25,6 @@ export function TenantDetail() {
   const queryClient = useQueryClient();
   const { can } = useSillonAdmin();
   const [activeTab, setActiveTab] = useState('overview');
-  const [selectedPlanCode, setSelectedPlanCode] = useState<string | null>(null);
 
   // Fetch tenant
   const { data: tenant, isLoading } = useQuery({
@@ -85,7 +32,7 @@ export function TenantDetail() {
     queryFn: async () => {
       const { data, error } = await supabase.from('tenants').select('*').eq('id', tenantId).single();
       if (error) throw error;
-      return data as unknown as Tenant;
+      return data;
     },
     enabled: !!tenantId,
   });
@@ -110,15 +57,10 @@ export function TenantDetail() {
         .select('id, email, first_name, last_name, active')
         .in('id', userIds);
 
-      return tenantUsers.map((tu): ERPUser => {
+      return tenantUsers.map(tu => {
         const userData = usersData?.find(u => u.id === tu.user_id);
         return {
-          id: tu.id,
-          user_id: tu.user_id,
-          tenant_id: tu.tenant_id,
-          role: tu.role,
-          is_owner: tu.is_owner || false,
-          created_at: tu.created_at,
+          ...tu,
           email: userData?.email || 'Email non disponible',
           first_name: userData?.first_name || '',
           last_name: userData?.last_name || '',
@@ -140,7 +82,7 @@ export function TenantDetail() {
         .eq('customer_type', 'wholesale')
         .is('deleted_at', null)
         .order('created_at', { ascending: false });
-      return (data || []) as ProCustomer[];
+      return data || [];
     },
     enabled: !!tenantId,
   });
@@ -150,7 +92,7 @@ export function TenantDetail() {
     queryKey: ['sillon-plans'],
     queryFn: async () => {
       const { data } = await supabase.from('sillon_plans').select('*').eq('is_active', true).order('display_order');
-      return (data || []) as Plan[];
+      return data || [];
     },
   });
 
@@ -231,7 +173,7 @@ export function TenantDetail() {
   const assignPlanMutation = useMutation({
     mutationFn: async (planCode: string) => {
       const plan = plans?.find(p => p.code === planCode);
-      if (!plan) throw new Error('Plan non trouvé');
+      if (!plan) throw new Error('Plan not found');
       const { error } = await supabase.from('tenants').update({
         plan_code: plan.code,
         plan_version: plan.version,
@@ -259,7 +201,7 @@ export function TenantDetail() {
   });
 
   const updateTenantMutation = useMutation({
-    mutationFn: async (updates: Record<string, unknown>) => {
+    mutationFn: async (updates: Record<string, any>) => {
       const { error } = await supabase.from('tenants').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', tenantId);
       if (error) throw error;
     },
@@ -267,6 +209,41 @@ export function TenantDetail() {
       queryClient.invalidateQueries({ queryKey: ['admin-tenant', tenantId] });
       toast.success('Tenant mis à jour');
     },
+    onError: () => toast.error('Erreur lors de la mise à jour'),
+  });
+
+  const updateDiscountMutation = useMutation({
+    mutationFn: async (discountPercent: number) => {
+      const currentSettings = typeof tenant?.settings === 'object' && tenant?.settings !== null ? tenant.settings : {};
+      const newSettings = { ...currentSettings, discount_percent: discountPercent };
+      const { error } = await supabase
+        .from('tenants')
+        .update({ settings: newSettings, updated_at: new Date().toISOString() })
+        .eq('id', tenantId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-tenant', tenantId] });
+      toast.success('Discount mis à jour');
+    },
+    onError: () => toast.error('Erreur lors de la mise à jour du discount'),
+  });
+
+  const updateDedicatedDatabaseMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const currentSettings = typeof tenant?.settings === 'object' && tenant?.settings !== null ? tenant.settings : {};
+      const newSettings = { ...currentSettings, dedicated_database: enabled };
+      const { error } = await supabase
+        .from('tenants')
+        .update({ settings: newSettings, updated_at: new Date().toISOString() })
+        .eq('id', tenantId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-tenant', tenantId] });
+      toast.success('Option database dédiée mise à jour');
+    },
+    onError: () => toast.error('Erreur lors de la mise à jour'),
   });
 
   if (isLoading) return <div className="p-8"><Skeleton className="h-96 w-full" /></div>;
@@ -274,7 +251,8 @@ export function TenantDetail() {
 
   const capabilities = tenant.capabilities || {};
   const overrides = tenant.capability_overrides || {};
-  const discount = tenant.settings?.discount_percent || 0;
+  const tenantSettings = typeof tenant.settings === 'object' && tenant.settings !== null ? (tenant.settings as Record<string, any>) : {};
+  const discount = tenantSettings.discount_percent || 0;
 
   return (
     <div className="p-8">
@@ -303,10 +281,10 @@ export function TenantDetail() {
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-6">
-          <TabsTrigger value="overview"><Building2 className="w-4 h-4 mr-2" />Aperçu</TabsTrigger>
+          <TabsTrigger value="overview"><Building2 className="w-4 h-4 mr-2" />Overview</TabsTrigger>
           <TabsTrigger value="users"><Users className="w-4 h-4 mr-2" />Utilisateurs ({(erpUsers?.length || 0) + (proCustomers?.length || 0)})</TabsTrigger>
-          <TabsTrigger value="analytics"><Activity className="w-4 h-4 mr-2" />Analytique</TabsTrigger>
-          <TabsTrigger value="capabilities"><Shield className="w-4 h-4 mr-2" />Capacités</TabsTrigger>
+          <TabsTrigger value="analytics"><Activity className="w-4 h-4 mr-2" />Analytics</TabsTrigger>
+          <TabsTrigger value="capabilities"><Shield className="w-4 h-4 mr-2" />Capabilities</TabsTrigger>
           <TabsTrigger value="settings"><Settings className="w-4 h-4 mr-2" />Paramètres</TabsTrigger>
         </TabsList>
 
@@ -345,28 +323,13 @@ export function TenantDetail() {
             </Card>
             <Card>
               <CardHeader><CardTitle>Changer le plan</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                <Select 
-                  value={selectedPlanCode ?? tenant.plan_code ?? ''} 
-                  onValueChange={(v) => setSelectedPlanCode(v)}
-                >
+              <CardContent>
+                <Select value={tenant.plan_code || ''} onValueChange={(v) => assignPlanMutation.mutate(v)} disabled={!can('canAssignPlan')}>
                   <SelectTrigger><SelectValue placeholder="Sélectionner un plan" /></SelectTrigger>
                   <SelectContent>
                     {plans?.map((p) => <SelectItem key={p.code} value={p.code}>{p.name} — {p.base_price_monthly}€/mois</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Button 
-                  onClick={() => {
-                    if (selectedPlanCode) {
-                      assignPlanMutation.mutate(selectedPlanCode);
-                      setSelectedPlanCode(null);
-                    }
-                  }}
-                  disabled={!selectedPlanCode || selectedPlanCode === tenant.plan_code || assignPlanMutation.isPending}
-                  className="w-full"
-                >
-                  {assignPlanMutation.isPending ? 'Enregistrement...' : 'Enregistrer le plan'}
-                </Button>
               </CardContent>
             </Card>
           </div>
@@ -431,7 +394,7 @@ export function TenantDetail() {
                                 <Button variant="ghost" size="icon"><MoreHorizontal className="w-4 h-4" /></Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent>
-                                <DropdownMenuItem disabled={!can('canResetPassword')}>Reset mot de passe</DropdownMenuItem>
+                                <DropdownMenuItem disabled={!can('canResetPassword')}>Reset password</DropdownMenuItem>
                                 <DropdownMenuItem disabled={!can('canResendEmail')}>Renvoyer email</DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem className="text-destructive" disabled={!can('canDeleteUser') || user.is_owner}>Supprimer</DropdownMenuItem>
@@ -593,14 +556,14 @@ export function TenantDetail() {
         <TabsContent value="capabilities">
           <Card>
             <CardHeader>
-              <CardTitle>Capacités</CardTitle>
+              <CardTitle>Capabilities</CardTitle>
               <CardDescription>Plan: {tenant.plan_code || 'Aucun'} v{tenant.plan_version || '-'}</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Capacité</TableHead>
+                    <TableHead>Capability</TableHead>
                     <TableHead>Valeur plan</TableHead>
                     <TableHead>Override</TableHead>
                     <TableHead>Effectif</TableHead>
@@ -660,32 +623,50 @@ export function TenantDetail() {
             <Card>
               <CardHeader><CardTitle>Facturation</CardTitle></CardHeader>
               <CardContent>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div className="space-y-2">
                     <Label>Discount (%)</Label>
-                    <Input 
-                      type="number" 
-                      min="0" 
-                      max="100" 
-                      defaultValue={discount} 
-                      disabled={!can('canEditTenant')}
-                      onChange={(e) => {
-                        const newDiscount = parseInt(e.target.value) || 0;
-                        updateTenantMutation.mutate({
-                          settings: { ...tenant.settings, discount_percent: newDiscount }
-                        });
-                      }}
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">Réduction appliquée sur le prix du plan</p>
-                  </div>
-                  <div>
-                    <Label>Database dédiée</Label>
-                    <div className="flex items-center gap-2 mt-2">
-                      <Badge variant={tenant.settings?.dedicated_database ? 'default' : 'secondary'}>
-                        {tenant.settings?.dedicated_database ? 'Oui' : 'Non'}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">(Enterprise only)</span>
+                    <div className="flex gap-2">
+                      <Input 
+                        type="number" 
+                        min="0" 
+                        max="100" 
+                        defaultValue={discount}
+                        disabled={!can('canEditTenant')}
+                        id="discount-input"
+                        className="w-24"
+                      />
+                      <Button 
+                        variant="outline"
+                        disabled={!can('canEditTenant') || updateDiscountMutation.isPending}
+                        onClick={() => {
+                          const input = document.getElementById('discount-input') as HTMLInputElement;
+                          const newDiscount = parseInt(input.value) || 0;
+                          updateDiscountMutation.mutate(newDiscount);
+                        }}
+                      >
+                        {updateDiscountMutation.isPending ? 'Saving...' : 'Sauvegarder'}
+                      </Button>
                     </div>
+                    <p className="text-xs text-muted-foreground">Réduction appliquée sur le prix du plan</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Database dédiée</Label>
+                    <div className="flex items-center gap-3 mt-2">
+                      <Switch
+                        checked={tenantSettings.dedicated_database || false}
+                        onCheckedChange={(checked) => updateDedicatedDatabaseMutation.mutate(checked)}
+                        disabled={!can('canEditTenant') || tenant.plan_code !== 'ENTERPRISE'}
+                      />
+                      <span className="text-sm">
+                        {tenantSettings.dedicated_database ? 'Activé' : 'Désactivé'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {tenant.plan_code === 'ENTERPRISE' 
+                        ? 'Disponible pour ce plan Enterprise' 
+                        : 'Réservé au plan Enterprise'}
+                    </p>
                   </div>
                 </div>
               </CardContent>
