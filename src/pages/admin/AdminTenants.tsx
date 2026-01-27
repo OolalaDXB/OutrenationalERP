@@ -1,8 +1,9 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Building2, Users, MoreHorizontal } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Building2, Users, MoreHorizontal, Eye } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,10 +18,12 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
+import { TenantDetailDrawer } from '@/components/admin/TenantDetailDrawer';
 
 interface Tenant {
   id: string;
@@ -28,12 +31,17 @@ interface Tenant {
   slug: string;
   status: string;
   created_at: string;
+  plan_code?: string;
+  plan_version?: string;
   settings: {
     plan_code?: string;
   } | null;
 }
 
 export function AdminTenants() {
+  const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
   const { data: tenants, isLoading, refetch } = useQuery({
     queryKey: ['admin-tenants'],
     queryFn: async () => {
@@ -168,11 +176,18 @@ export function AdminTenants() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedTenant(tenant);
+                              setDrawerOpen(true);
+                            }}
+                          >
+                            <Eye className="w-4 h-4 mr-2" />
+                            Voir les détails
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => window.open(`/t/${tenant.slug}/`, '_blank')}>
                             Accéder au backoffice
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            Modifier les paramètres
                           </DropdownMenuItem>
                           <DropdownMenuItem className="text-destructive">
                             Suspendre
@@ -187,6 +202,12 @@ export function AdminTenants() {
           </Table>
         </CardContent>
       </Card>
+
+      <TenantDetailDrawer
+        tenant={selectedTenant}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+      />
     </div>
   );
 }
