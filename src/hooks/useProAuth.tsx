@@ -47,13 +47,30 @@ export function ProAuthProvider({ children }: { children: React.ReactNode }) {
 
   // Check if user has admin/staff role (backoffice user)
   const checkBackofficeRole = async (userId: string): Promise<boolean> => {
-    const { data } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId)
-      .maybeSingle();
-    
-    return data?.role === 'admin' || data?.role === 'staff';
+    try {
+      // Check tenant_users table (multi-tenant architecture)
+      const { data: tenantData } = await supabase
+        .from('tenant_users')
+        .select('role')
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      if (tenantData?.role === 'admin' || tenantData?.role === 'staff') {
+        return true;
+      }
+
+      // Fallback: check user_roles table (legacy)
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      return roleData?.role === 'admin' || roleData?.role === 'staff';
+    } catch (error) {
+      console.error('Error checking backoffice role:', error);
+      return false;
+    }
   };
 
   const fetchCustomer = async (userId: string, userEmail?: string): Promise<ProCustomer | null | 'needs_profile'> => {
@@ -140,9 +157,19 @@ export function ProAuthProvider({ children }: { children: React.ReactNode }) {
     const handleAuthChange = async (session: { user: User } | null) => {
       if (!mounted) return;
 
-      setUser(session?.user ?? null);
+      // On sign out, clear state immediately without making DB queries
+      if (!session?.user) {
+        setUser(null);
+        setCustomer(null);
+        setNeedsProfile(false);
+        setIsBackofficeUser(false);
+        if (mounted) setIsLoading(false);
+        return;
+      }
 
-      if (session?.user) {
+      setUser(session.user);
+
+      try {
         // Check if user is admin/staff first
         const hasBackofficeRole = await checkBackofficeRole(session.user.id);
         if (!mounted) return;
@@ -165,17 +192,32 @@ export function ProAuthProvider({ children }: { children: React.ReactNode }) {
           setCustomer(null);
           setNeedsProfile(false);
         }
-      } else {
-        setCustomer(null);
-        setNeedsProfile(false);
-        setIsBackofficeUser(false);
+      } catch (error) {
+        console.error('Error in auth change handler:', error);
+        // On error, clear state to prevent stuck states
+        if (mounted) {
+          setCustomer(null);
+          setNeedsProfile(false);
+          setIsBackofficeUser(false);
+        }
       }
 
       if (mounted) setIsLoading(false);
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
+        // Skip processing for sign out - state is cleared above
+        if (event === 'SIGNED_OUT') {
+          if (mounted) {
+            setUser(null);
+            setCustomer(null);
+            setNeedsProfile(false);
+            setIsBackofficeUser(false);
+            setIsLoading(false);
+          }
+          return;
+        }
         await handleAuthChange(session);
       }
     );
