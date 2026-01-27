@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -43,6 +44,40 @@ serve(async (req) => {
   }
 
   try {
+    // Initialize Supabase client to verify user and check role
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Verify the token and get user
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: verifyError } = await supabaseAdmin.auth.getUser(token);
+
+    if (verifyError || !user) {
+      console.error('Token verification failed:', verifyError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid authentication token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check if user has staff, admin, or viewer role (internal users only)
+    const { data: isStaff, error: roleError } = await supabaseAdmin.rpc('has_any_role', {
+      _user_id: user.id,
+      _roles: ['admin', 'staff', 'viewer']
+    });
+
+    if (roleError || !isStaff) {
+      console.log(`User ${user.id} denied access - not staff/admin/viewer`);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Insufficient permissions',
+          message: 'This feature is restricted to internal staff users'
+        }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const DISCOGS_TOKEN = Deno.env.get('DISCOGS_TOKEN');
     
     if (!DISCOGS_TOKEN) {
@@ -55,9 +90,39 @@ serve(async (req) => {
 
     const { barcode, query, type = 'release' } = await req.json();
 
+    // Input validation
     if (!barcode && !query) {
       return new Response(
         JSON.stringify({ error: 'barcode or query is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate barcode format (EAN-8, UPC-A, EAN-13)
+    if (barcode) {
+      if (typeof barcode !== 'string' || !/^\d{8,13}$/.test(barcode)) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid barcode format. Must be 8-13 digits.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Validate query length
+    if (query) {
+      if (typeof query !== 'string' || query.length > 500) {
+        return new Response(
+          JSON.stringify({ error: 'Query too long. Maximum 500 characters.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Validate type parameter
+    const validTypes = ['release', 'master', 'artist', 'label'];
+    if (typeof type !== 'string' || !validTypes.includes(type)) {
+      return new Response(
+        JSON.stringify({ error: `Invalid search type. Must be one of: ${validTypes.join(', ')}` }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
