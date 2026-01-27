@@ -1,4 +1,5 @@
 import { Link, useLocation, Outlet, Navigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { ShoppingCart, Package, FileText, User, LogOut, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useProAuth } from "@/hooks/useProAuth";
@@ -16,6 +17,26 @@ export function ProLayout() {
   const location = useLocation();
   const { user, customer, isLoading, isApproved, isProfessional, needsProfile, signOut } = useProAuth();
   const { itemCount } = useCart();
+  const [canShowRestricted, setCanShowRestricted] = useState(false);
+
+  // Avoid flashing the restricted screen during brief transitional states
+  useEffect(() => {
+    // If access is valid, never show restricted
+    if (user && customer && isProfessional && isApproved) {
+      setCanShowRestricted(false);
+      return;
+    }
+
+    // If we don't have a customer yet, keep restricted hidden
+    if (!customer) {
+      setCanShowRestricted(false);
+      return;
+    }
+
+    // Customer exists but access not validated => wait a tiny bit before showing restricted
+    const t = window.setTimeout(() => setCanShowRestricted(true), 350);
+    return () => window.clearTimeout(t);
+  }, [user, customer, isProfessional, isApproved]);
 
   // Show loader while auth is loading OR while customer data is being fetched
   if (isLoading || (user && !customer && !needsProfile)) {
@@ -38,6 +59,15 @@ export function ProLayout() {
       return <Navigate to="/pro/complete-profile" replace />;
     }
 
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Not a professional customer or not approved
+  if ((!isProfessional || !isApproved) && !canShowRestricted) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
