@@ -37,7 +37,7 @@ export type Database = {
           entity_type: string
           id?: string
           ip_address?: unknown
-          tenant_id: string
+          tenant_id?: string
           user_agent?: string | null
           user_id?: string | null
         }
@@ -90,7 +90,7 @@ export type Database = {
           products_count?: number | null
           slug?: string | null
           sort_name?: string | null
-          tenant_id: string
+          tenant_id?: string
           updated_at?: string | null
         }
         Update: {
@@ -139,7 +139,7 @@ export type Database = {
           iban: string
           id?: string
           is_default?: boolean | null
-          tenant_id: string
+          tenant_id?: string
           updated_at?: string | null
         }
         Update: {
@@ -187,7 +187,7 @@ export type Database = {
           new_value?: Json | null
           old_value?: Json | null
           reason?: string | null
-          tenant_id: string
+          tenant_id?: string
         }
         Update: {
           action?: string
@@ -277,7 +277,7 @@ export type Database = {
           preferred_currency?: string | null
           state?: string | null
           tags?: string[] | null
-          tenant_id: string
+          tenant_id?: string
           total_spent?: number | null
           updated_at?: string | null
           updated_by?: string | null
@@ -345,7 +345,7 @@ export type Database = {
           name: string
           parent_id?: string | null
           slug?: string | null
-          tenant_id: string
+          tenant_id?: string
         }
         Update: {
           created_at?: string | null
@@ -387,7 +387,7 @@ export type Database = {
           id?: string
           import_id: string
           record_id: string
-          tenant_id: string
+          tenant_id?: string
         }
         Update: {
           created_at?: string
@@ -437,7 +437,7 @@ export type Database = {
           records_updated?: number
           rolled_back_at?: string | null
           status?: string
-          tenant_id: string
+          tenant_id?: string
           user_email?: string | null
           user_id?: string | null
         }
@@ -481,7 +481,7 @@ export type Database = {
           created_at?: string
           id?: string
           invoice_id: string
-          tenant_id: string
+          tenant_id?: string
           user_email?: string | null
           user_id?: string | null
         }
@@ -531,7 +531,7 @@ export type Database = {
           invoice_id: string
           product_id?: string | null
           quantity?: number
-          tenant_id: string
+          tenant_id?: string
           total_price: number
           unit_price: number
         }
@@ -637,7 +637,7 @@ export type Database = {
           subtotal: number
           supplier_id?: string | null
           tax_amount?: number | null
-          tenant_id: string
+          tenant_id?: string
           total: number
           type: Database["public"]["Enums"]["invoice_type"]
           updated_at?: string | null
@@ -731,7 +731,7 @@ export type Database = {
           name: string
           slug?: string | null
           supplier_id?: string | null
-          tenant_id: string
+          tenant_id?: string
           updated_at?: string | null
           website?: string | null
         }
@@ -798,7 +798,7 @@ export type Database = {
           orders_skipped?: number
           orders_updated?: number
           source?: string | null
-          tenant_id: string
+          tenant_id?: string
           user_email?: string | null
           user_id?: string | null
         }
@@ -874,7 +874,7 @@ export type Database = {
           supplier_id?: string | null
           supplier_name?: string | null
           supplier_type?: Database["public"]["Enums"]["supplier_type"] | null
-          tenant_id: string
+          tenant_id?: string
           title: string
           total_price: number
           unit_cost?: number | null
@@ -1052,7 +1052,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["order_status"] | null
           subtotal?: number
           tax_amount?: number | null
-          tenant_id: string
+          tenant_id?: string
           total?: number
           tracking_number?: string | null
           tracking_url?: string | null
@@ -1152,7 +1152,7 @@ export type Database = {
           icon?: string | null
           id?: string
           name: string
-          tenant_id: string
+          tenant_id?: string
           updated_at?: string | null
         }
         Update: {
@@ -1188,7 +1188,7 @@ export type Database = {
         Insert: {
           genre_id: string
           product_id: string
-          tenant_id: string
+          tenant_id?: string
         }
         Update: {
           genre_id?: string
@@ -1332,7 +1332,7 @@ export type Database = {
           supplier_id: string
           supplier_name?: string | null
           supplier_type?: Database["public"]["Enums"]["supplier_type"] | null
-          tenant_id: string
+          tenant_id?: string
           title: string
           total_revenue?: number | null
           total_sold?: number | null
@@ -1454,7 +1454,7 @@ export type Database = {
           quantity_ordered: number
           quantity_received?: number | null
           sku?: string | null
-          tenant_id: string
+          tenant_id?: string
           title: string
           total_cost: number
           unit_cost: number
@@ -1557,7 +1557,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["po_status"]
           subtotal?: number | null
           supplier_id: string
-          tenant_id: string
+          tenant_id?: string
           total?: number | null
           tracking_events?: Json | null
           tracking_last_update?: string | null
@@ -1634,7 +1634,7 @@ export type Database = {
           new_role: Database["public"]["Enums"]["app_role"]
           old_role?: Database["public"]["Enums"]["app_role"] | null
           reason?: string | null
-          tenant_id: string
+          tenant_id?: string
           user_id: string
         }
         Update: {
@@ -1812,7 +1812,7 @@ export type Database = {
           per_kg_price?: number | null
           price: number
           rate_type?: string
-          tenant_id: string
+          tenant_id?: string
           zone_id?: string | null
         }
         Update: {
@@ -1859,7 +1859,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           name: string
-          tenant_id: string
+          tenant_id?: string
         }
         Update: {
           countries?: string[]
@@ -1907,7 +1907,7 @@ export type Database = {
           stock_after: number
           stock_before: number
           supplier_id?: string | null
-          tenant_id: string
+          tenant_id?: string
           type: Database["public"]["Enums"]["stock_movement_type"]
           unit_cost?: number | null
         }
@@ -1992,7 +1992,7 @@ export type Database = {
           id?: string
           label_id: string
           supplier_id: string
-          tenant_id: string
+          tenant_id?: string
         }
         Update: {
           created_at?: string
@@ -2062,7 +2062,7 @@ export type Database = {
           period_start: string
           status?: string | null
           supplier_id: string
-          tenant_id: string
+          tenant_id?: string
           updated_at?: string | null
         }
         Update: {
@@ -2171,7 +2171,7 @@ export type Database = {
           products_count?: number | null
           slug?: string | null
           state?: string | null
-          tenant_id: string
+          tenant_id?: string
           total_revenue?: number | null
           type?: Database["public"]["Enums"]["supplier_type"]
           updated_at?: string | null
@@ -2366,7 +2366,7 @@ export type Database = {
           raw_event?: Json | null
           status: string
           status_code?: string | null
-          tenant_id: string
+          tenant_id?: string
         }
         Update: {
           created_at?: string
@@ -2861,6 +2861,27 @@ export type Database = {
         }[]
       }
       get_cbac: { Args: never; Returns: Json }
+      get_current_tenant: {
+        Args: never
+        Returns: {
+          id: string
+          name: string
+          plan_code: string
+          plan_version: string
+          slug: string
+          status: string
+        }[]
+      }
+      get_user_tenants: {
+        Args: never
+        Returns: {
+          is_owner: boolean
+          role: Database["public"]["Enums"]["app_role"]
+          tenant_id: string
+          tenant_name: string
+          tenant_slug: string
+        }[]
+      }
       has_any_role: {
         Args: {
           _roles: Database["public"]["Enums"]["app_role"][]
@@ -2898,6 +2919,7 @@ export type Database = {
         Args: { p_id: string; p_table_name: string }
         Returns: boolean
       }
+      set_active_tenant: { Args: { _tenant_id: string }; Returns: boolean }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       soft_delete: {
