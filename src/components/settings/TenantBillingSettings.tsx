@@ -60,6 +60,205 @@ const PAYMENT_METHOD_ICONS: Record<string, any> = {
   manual: FileText,
 };
 
+// Add Payment Method Dialog Component
+interface AddPaymentMethodDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  tenantId: string | undefined;
+  paymentMethodsCount: number;
+  onSuccess: () => void;
+}
+
+function AddPaymentMethodDialog({ open, onOpenChange, tenantId, paymentMethodsCount, onSuccess }: AddPaymentMethodDialogProps) {
+  const [activeTab, setActiveTab] = useState<'card' | 'sepa' | 'crypto'>('card');
+  const [label, setLabel] = useState('');
+  const [iban, setIban] = useState('');
+  const [walletAddress, setWalletAddress] = useState('');
+  const [cryptoNetwork, setCryptoNetwork] = useState('ethereum');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const resetForm = () => {
+    setLabel('');
+    setIban('');
+    setWalletAddress('');
+    setCryptoNetwork('ethereum');
+    setActiveTab('card');
+  };
+
+  const handleSubmit = async () => {
+    if (!tenantId) return;
+    
+    let type = '';
+    let crypto_wallet_address: string | undefined;
+    let crypto_network: string | undefined;
+    
+    switch (activeTab) {
+      case 'card':
+        if (!label.trim()) {
+          toast.error('Veuillez entrer un libellé');
+          return;
+        }
+        type = 'stripe_card';
+        break;
+      case 'sepa':
+        if (!label.trim() || !iban.trim()) {
+          toast.error('Veuillez remplir tous les champs');
+          return;
+        }
+        type = 'stripe_sepa';
+        break;
+      case 'crypto':
+        if (!label.trim() || !walletAddress.trim()) {
+          toast.error('Veuillez remplir tous les champs');
+          return;
+        }
+        type = 'crypto_usdc';
+        crypto_wallet_address = walletAddress;
+        crypto_network = cryptoNetwork;
+        break;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from('tenant_payment_methods')
+        .insert({
+          tenant_id: tenantId,
+          type,
+          label: label.trim(),
+          crypto_wallet_address,
+          crypto_network,
+          is_active: true,
+          is_default: paymentMethodsCount === 0,
+        } as any);
+      
+      if (error) throw error;
+      
+      toast.success('Moyen de paiement ajouté');
+      resetForm();
+      onSuccess();
+    } catch (error) {
+      console.error('Error adding payment method:', error);
+      toast.error('Erreur lors de l\'ajout');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) resetForm(); onOpenChange(v); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Ajouter un moyen de paiement</DialogTitle>
+          <DialogDescription>
+            Choisissez votre méthode de paiement préférée
+          </DialogDescription>
+        </DialogHeader>
+
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'card' | 'sepa' | 'crypto')}>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="card">Carte</TabsTrigger>
+            <TabsTrigger value="sepa">SEPA</TabsTrigger>
+            <TabsTrigger value="crypto">Crypto</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="card" className="space-y-4 pt-4">
+            <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+              <CreditCard className="w-5 h-5 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Visa, Mastercard, American Express</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="card-label">Libellé</Label>
+              <Input 
+                id="card-label" 
+                placeholder="Ma carte principale" 
+                value={label} 
+                onChange={(e) => setLabel(e.target.value)} 
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Note: L'intégration Stripe complète redirigera vers Stripe Checkout pour saisir les informations de carte de manière sécurisée.
+            </p>
+          </TabsContent>
+
+          <TabsContent value="sepa" className="space-y-4 pt-4">
+            <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+              <Building2 className="w-5 h-5 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Prélèvement SEPA depuis votre compte bancaire</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sepa-label">Libellé</Label>
+              <Input 
+                id="sepa-label" 
+                placeholder="Compte principal" 
+                value={label} 
+                onChange={(e) => setLabel(e.target.value)} 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="iban">IBAN</Label>
+              <Input 
+                id="iban" 
+                placeholder="FR76 1234 5678 9012 3456 7890 123" 
+                value={iban} 
+                onChange={(e) => setIban(e.target.value)} 
+              />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="crypto" className="space-y-4 pt-4">
+            <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+              <Wallet className="w-5 h-5 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Stablecoins USDC / USDT</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="crypto-label">Libellé</Label>
+              <Input 
+                id="crypto-label" 
+                placeholder="Mon wallet crypto" 
+                value={label} 
+                onChange={(e) => setLabel(e.target.value)} 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="wallet">Adresse wallet</Label>
+              <Input 
+                id="wallet" 
+                placeholder="0x..." 
+                value={walletAddress} 
+                onChange={(e) => setWalletAddress(e.target.value)} 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="network">Réseau</Label>
+              <Select value={cryptoNetwork} onValueChange={setCryptoNetwork}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ethereum">Ethereum (ERC-20)</SelectItem>
+                  <SelectItem value="polygon">Polygon</SelectItem>
+                  <SelectItem value="arbitrum">Arbitrum</SelectItem>
+                  <SelectItem value="base">Base</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        <DialogFooter className="gap-3">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Annuler
+          </Button>
+          <Button onClick={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting ? 'Ajout...' : 'Ajouter'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function TenantBillingSettings() {
   const tenant = useTenantContext();
   const queryClient = useQueryClient();
@@ -651,68 +850,16 @@ export function TenantBillingSettings() {
       </Tabs>
 
       {/* Add Payment Method Dialog */}
-      <Dialog open={showAddPaymentMethod} onOpenChange={setShowAddPaymentMethod}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Ajouter un moyen de paiement</DialogTitle>
-            <DialogDescription>
-              Choisissez votre méthode de paiement préférée
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3">
-            <button 
-              className="w-full p-4 border rounded-lg hover:bg-muted/50 text-left flex items-center gap-3"
-              onClick={() => {
-                // TODO: Redirect to Stripe Checkout
-                toast.info('Redirection vers Stripe...');
-              }}
-            >
-              <CreditCard className="w-6 h-6" />
-              <div>
-                <p className="font-medium">Carte bancaire</p>
-                <p className="text-sm text-muted-foreground">Visa, Mastercard, American Express</p>
-              </div>
-            </button>
-
-            <button 
-              className="w-full p-4 border rounded-lg hover:bg-muted/50 text-left flex items-center gap-3"
-              onClick={() => {
-                // TODO: Redirect to Stripe SEPA
-                toast.info('Redirection vers Stripe...');
-              }}
-            >
-              <Building2 className="w-6 h-6" />
-              <div>
-                <p className="font-medium">Prélèvement SEPA</p>
-                <p className="text-sm text-muted-foreground">Débit direct depuis votre compte bancaire</p>
-              </div>
-            </button>
-
-            <Separator />
-
-            <button 
-              className="w-full p-4 border rounded-lg hover:bg-muted/50 text-left flex items-center gap-3"
-              onClick={() => {
-                // TODO: Show crypto wallet input
-                toast.info('Configuration crypto à venir');
-              }}
-            >
-              <Wallet className="w-6 h-6" />
-              <div>
-                <p className="font-medium">Stablecoins (USDC / USDT)</p>
-                <p className="text-sm text-muted-foreground">Ethereum, Polygon, Base</p>
-              </div>
-            </button>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddPaymentMethod(false)}>
-              Annuler
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AddPaymentMethodDialog
+        open={showAddPaymentMethod}
+        onOpenChange={setShowAddPaymentMethod}
+        tenantId={tenant?.id}
+        paymentMethodsCount={paymentMethods?.length || 0}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['tenant-payment-methods', tenant?.id] });
+          setShowAddPaymentMethod(false);
+        }}
+      />
 
       {/* Delete Payment Method Confirmation */}
       <AlertDialog open={!!paymentMethodToDelete} onOpenChange={() => setPaymentMethodToDelete(null)}>
