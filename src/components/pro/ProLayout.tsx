@@ -1,5 +1,5 @@
 import { Link, useLocation, Outlet, Navigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { ShoppingCart, Package, FileText, User, LogOut, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useProAuth } from "@/hooks/useProAuth";
@@ -17,29 +17,41 @@ export function ProLayout() {
   const location = useLocation();
   const { user, customer, isLoading, isApproved, isProfessional, needsProfile, signOut } = useProAuth();
   const { itemCount } = useCart();
-  const [canShowRestricted, setCanShowRestricted] = useState(false);
+  
+  // Track whether we've completed customer resolution for this session
+  const [customerResolved, setCustomerResolved] = useState(false);
+  const initialCheckDone = useRef(false);
 
-  // Avoid flashing the restricted screen during brief transitional states
+  // Mark customer as resolved once we have definitive data
   useEffect(() => {
-    // If access is valid, never show restricted
-    if (user && customer && isProfessional && isApproved) {
-      setCanShowRestricted(false);
+    // Skip if auth still loading
+    if (isLoading) return;
+    
+    // If user is not logged in, resolution is complete (no customer expected)
+    if (!user) {
+      setCustomerResolved(true);
       return;
     }
-
-    // If we don't have a customer yet, keep restricted hidden
-    if (!customer) {
-      setCanShowRestricted(false);
+    
+    // If we have customer data OR needsProfile flag, resolution is complete
+    if (customer || needsProfile) {
+      setCustomerResolved(true);
       return;
     }
-
-    // Customer exists but access not validated => wait a tiny bit before showing restricted
-    const t = window.setTimeout(() => setCanShowRestricted(true), 350);
-    return () => window.clearTimeout(t);
-  }, [user, customer, isProfessional, isApproved]);
+    
+    // User exists but no customer yet - wait for async fetch
+    // Only set resolved after a reasonable delay to avoid false negatives
+    if (!initialCheckDone.current) {
+      initialCheckDone.current = true;
+      const timer = setTimeout(() => {
+        setCustomerResolved(true);
+      }, 1500); // 1.5s max wait for customer resolution
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, user, customer, needsProfile]);
 
   // Show loader while auth is loading OR while customer data is being fetched
-  if (isLoading || (user && !customer && !needsProfile)) {
+  if (isLoading || !customerResolved) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -53,24 +65,28 @@ export function ProLayout() {
   }
 
   // Logged in but customer profile not resolved yet (or needs completion)
-  // => never show the restricted screen during this transient state.
   if (!customer) {
     if (needsProfile) {
       return <Navigate to="/pro/complete-profile" replace />;
     }
 
+    // Still no customer after resolution - show restricted access
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  // Not a professional customer or not approved
-  if ((!isProfessional || !isApproved) && !canShowRestricted) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="max-w-md w-full text-center space-y-4">
+          <div className="w-16 h-16 mx-auto rounded-full bg-warning/20 flex items-center justify-center">
+            <User className="w-8 h-8 text-warning" />
+          </div>
+          <h1 className="text-2xl font-bold">Accès restreint</h1>
+          <p className="text-muted-foreground">
+            Ce portail est réservé aux clients professionnels. 
+            Veuillez contacter notre équipe commerciale pour créer un compte professionnel.
+          </p>
+          <Button variant="outline" onClick={signOut}>
+            <LogOut className="w-4 h-4 mr-2" />
+            Déconnexion
+          </Button>
+        </div>
       </div>
     );
   }
