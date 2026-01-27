@@ -2263,6 +2263,60 @@ export type Database = {
           },
         ]
       }
+      tenant_requests: {
+        Row: {
+          company_name: string
+          contact_email: string
+          contact_name: string | null
+          country: string | null
+          created_at: string | null
+          estimated_orders_month: string | null
+          estimated_products: string | null
+          id: string
+          message: string | null
+          notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          role: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          company_name: string
+          contact_email: string
+          contact_name?: string | null
+          country?: string | null
+          created_at?: string | null
+          estimated_orders_month?: string | null
+          estimated_products?: string | null
+          id?: string
+          message?: string | null
+          notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          role?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          company_name?: string
+          contact_email?: string
+          contact_name?: string | null
+          country?: string | null
+          created_at?: string | null
+          estimated_orders_month?: string | null
+          estimated_products?: string | null
+          id?: string
+          message?: string | null
+          notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          role?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       tenant_users: {
         Row: {
           created_at: string
