@@ -189,7 +189,7 @@ export function SillonLogin() {
               {/* Sillon Admin option - shown first for admins */}
               {isSillonAdmin(loggedInUser?.email) && (
                 <button
-                  onClick={() => navigate('/admin')}
+                  onClick={() => navigate('/admin', { replace: true })}
                   className="w-full flex items-center gap-3 p-4 rounded-lg border-2 border-primary bg-primary/5 hover:bg-primary/10 transition-colors text-left mb-3"
                 >
                   <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
