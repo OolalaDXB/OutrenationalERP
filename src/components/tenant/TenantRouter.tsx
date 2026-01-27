@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Routes, Route, useParams, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { TenantProvider } from '@/contexts/TenantContext';
@@ -52,12 +53,18 @@ import { TenantBackofficeLayout } from '@/components/tenant/TenantBackofficeLayo
 function TenantContent() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const navigate = useNavigate();
-  const { data: tenant, isLoading, error } = useTenant(tenantSlug);
   const { loading: authLoading, user } = useAuth();
+  const { data: tenant, isLoading, error } = useTenant(tenantSlug);
 
   // Redirect to login when user signs out
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/login', { replace: true });
+    }
+  }, [authLoading, user, navigate]);
+
+  // Show loader while redirecting or loading
   if (!authLoading && !user) {
-    navigate('/login', { replace: true });
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
