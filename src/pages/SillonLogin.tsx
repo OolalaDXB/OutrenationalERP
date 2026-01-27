@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Loader2, Disc3, ArrowLeft, Building2, Shield, Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { isSillonAdmin } from '@/config/sillonAdmins';
+import type { User } from '@supabase/supabase-js';
 
 interface UserTenant {
   tenant_id: string;
@@ -29,14 +30,16 @@ export function SillonLogin() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [userTenants, setUserTenants] = useState<UserTenant[]>([]);
+  const [loggedInUser, setLoggedInUser] = useState<User | null>(null);
 
   // Check existing session on mount
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
+        setLoggedInUser(session.user);
         // User already logged in, check their tenants
-        await handlePostLogin();
+        await handlePostLogin(session.user);
       }
       setIsCheckingSession(false);
     };
@@ -55,25 +58,36 @@ export function SillonLogin() {
     return data || [];
   };
 
-  const handlePostLogin = async () => {
+  const handlePostLogin = async (user: User) => {
+    setLoggedInUser(user);
     const tenants = await fetchUserTenants();
+    const isAdmin = isSillonAdmin(user.email);
     
-    if (tenants.length === 0) {
-      setError('Aucun accès configuré pour ce compte. Contactez votre administrateur.');
-      await supabase.auth.signOut();
+    // If user is Sillon admin OR has multiple tenants, show selector
+    if (isAdmin || tenants.length > 1) {
+      setUserTenants(tenants);
+      setViewMode('select-tenant');
       setIsLoading(false);
       return;
     }
     
-    if (tenants.length === 1) {
-      // Single tenant - redirect directly
-      navigate(`/t/${tenants[0].tenant_slug}/`, { replace: true });
-    } else {
-      // Multiple tenants - show selector
-      setUserTenants(tenants);
-      setViewMode('select-tenant');
+    if (tenants.length === 0) {
+      // No tenant access - if admin, show selector anyway
+      if (isAdmin) {
+        setUserTenants([]);
+        setViewMode('select-tenant');
+        setIsLoading(false);
+        return;
+      }
+      setError('Aucun accès configuré pour ce compte. Contactez votre administrateur.');
+      await supabase.auth.signOut();
+      setLoggedInUser(null);
       setIsLoading(false);
+      return;
     }
+    
+    // Single tenant, not admin - redirect directly
+    navigate(`/t/${tenants[0].tenant_slug}/`, { replace: true });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -97,7 +111,7 @@ export function SillonLogin() {
       }
 
       // Login
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -108,7 +122,9 @@ export function SillonLogin() {
         return;
       }
 
-      await handlePostLogin();
+      if (data.user) {
+        await handlePostLogin(data.user);
+      }
     } catch (err) {
       setError('Une erreur est survenue');
       setIsLoading(false);
@@ -163,26 +179,57 @@ export function SillonLogin() {
               <div className="text-center mb-6">
                 <h2 className="text-lg font-semibold">Choisir un espace</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Vous avez accès à plusieurs organisations
+                  {isSillonAdmin(loggedInUser?.email) 
+                    ? 'Sélectionnez votre destination'
+                    : 'Vous avez accès à plusieurs organisations'
+                  }
                 </p>
               </div>
-              <div className="space-y-3">
-                {userTenants.map((tenant) => (
-                  <button
-                    key={tenant.tenant_id}
-                    onClick={() => handleTenantSelect(tenant)}
-                    className="w-full flex items-center gap-3 p-4 rounded-lg border border-border hover:border-primary hover:bg-primary/5 transition-colors text-left"
-                  >
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                      <Building2 className="w-5 h-5 text-primary" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-medium text-foreground">{tenant.tenant_name}</div>
-                      <div className="text-xs text-muted-foreground capitalize">{tenant.role}</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
+              
+              {/* Sillon Admin option - shown first for admins */}
+              {isSillonAdmin(loggedInUser?.email) && (
+                <button
+                  onClick={() => navigate('/admin')}
+                  className="w-full flex items-center gap-3 p-4 rounded-lg border-2 border-primary bg-primary/5 hover:bg-primary/10 transition-colors text-left mb-3"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
+                    <Shield className="w-5 h-5 text-primary-foreground" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium text-foreground">Admin Sillon</div>
+                    <div className="text-xs text-muted-foreground">Gestion de la plateforme</div>
+                  </div>
+                </button>
+              )}
+
+              {/* Tenant list */}
+              {userTenants.length > 0 && (
+                <div className="space-y-3">
+                  {userTenants.map((tenant) => (
+                    <button
+                      key={tenant.tenant_id}
+                      onClick={() => handleTenantSelect(tenant)}
+                      className="w-full flex items-center gap-3 p-4 rounded-lg border border-border hover:border-primary hover:bg-primary/5 transition-colors text-left"
+                    >
+                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <Building2 className="w-5 h-5 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium text-foreground">{tenant.tenant_name}</div>
+                        <div className="text-xs text-muted-foreground capitalize">{tenant.role}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* No tenants message for admins */}
+              {userTenants.length === 0 && isSillonAdmin(loggedInUser?.email) && (
+                <p className="text-sm text-muted-foreground text-center py-2">
+                  Aucun tenant associé à ce compte.
+                </p>
+              )}
+
               <div className="mt-6 text-center">
                 <button
                   type="button"
@@ -190,6 +237,7 @@ export function SillonLogin() {
                     await supabase.auth.signOut();
                     setViewMode('login');
                     setUserTenants([]);
+                    setLoggedInUser(null);
                   }}
                   className="text-sm text-muted-foreground hover:text-primary hover:underline"
                 >
@@ -298,19 +346,7 @@ export function SillonLogin() {
           )}
         </div>
 
-        <div className="text-center mt-4 space-y-2">
-          {/* Admin link - only shown to admins after login or with email hint */}
-          {(userTenants.length > 0 || viewMode === 'select-tenant') && isSillonAdmin(email) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/admin')}
-              className="text-muted-foreground hover:text-primary"
-            >
-              <Shield className="w-3 h-3 mr-1" />
-              Admin Sillon
-            </Button>
-          )}
+        <div className="text-center mt-4">
           <p className="text-xs text-muted-foreground">
             © 2026 Sillon. Powered by Oolala.
           </p>
