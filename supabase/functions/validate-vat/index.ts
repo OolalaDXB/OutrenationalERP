@@ -45,9 +45,18 @@ serve(async (req) => {
   try {
     const { vatNumber } = await req.json();
 
+    // Input validation: type check and length limit
     if (!vatNumber || typeof vatNumber !== 'string') {
       return new Response(
         JSON.stringify({ error: 'VAT number is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Maximum length check to prevent abuse (EU VAT numbers are max ~15 chars)
+    if (vatNumber.length > 20) {
+      return new Response(
+        JSON.stringify({ error: 'VAT number too long. Maximum 20 characters.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
