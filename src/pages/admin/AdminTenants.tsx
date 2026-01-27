@@ -1,5 +1,5 @@
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Building2, Users, MoreHorizontal, Eye } from 'lucide-react';
@@ -23,7 +23,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
-import { TenantDetailDrawer } from '@/components/admin/TenantDetailDrawer';
 
 interface Tenant {
   id: string;
@@ -39,8 +38,7 @@ interface Tenant {
 }
 
 export function AdminTenants() {
-  const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const navigate = useNavigate();
 
   const { data: tenants, isLoading, refetch } = useQuery({
     queryKey: ['admin-tenants'],
@@ -177,10 +175,7 @@ export function AdminTenants() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
-                            onClick={() => {
-                              setSelectedTenant(tenant);
-                              setDrawerOpen(true);
-                            }}
+                            onClick={() => navigate(`/admin/tenants/${tenant.id}`)}
                           >
                             <Eye className="w-4 h-4 mr-2" />
                             Voir les détails
@@ -203,11 +198,6 @@ export function AdminTenants() {
         </CardContent>
       </Card>
 
-      <TenantDetailDrawer
-        tenant={selectedTenant}
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-      />
     </div>
   );
 }
