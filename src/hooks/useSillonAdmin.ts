@@ -74,7 +74,7 @@ const HARDCODED_ADMINS = ['mickael.thomas@pm.me'];
 
 export function useSillonAdmin() {
   // Get current session
-  const { data: session } = useQuery({
+  const { data: session, isLoading: isSessionLoading } = useQuery({
     queryKey: ['auth-session'],
     queryFn: async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -85,7 +85,7 @@ export function useSillonAdmin() {
   const user = session?.user;
 
   // Query admin data with auto-link logic
-  const { data: adminData, isLoading, error } = useQuery({
+  const { data: adminData, isLoading: isAdminQueryLoading, error } = useQuery({
     queryKey: ['sillon-admin', user?.id],
     queryFn: async (): Promise<SillonAdmin | null> => {
       if (!user?.id || !user?.email) return null;
@@ -170,6 +170,10 @@ export function useSillonAdmin() {
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
+
+  // Important: keep the guard in a loading state until we know whether a session exists.
+  // Otherwise AdminGuard may redirect before the session query resolves.
+  const isLoading = isSessionLoading || (!!user?.id && isAdminQueryLoading);
   
   const isAdmin = !!adminData;
   const role = adminData?.role ?? null;
