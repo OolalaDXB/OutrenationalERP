@@ -43,7 +43,7 @@ export function ProAuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [needsProfile, setNeedsProfile] = useState(false);
 
-  const fetchCustomer = useCallback(async (userId: string, userEmail?: string): Promise<ProCustomer | null | 'needs_profile'> => {
+  const fetchCustomer = async (userId: string, userEmail?: string): Promise<ProCustomer | null | 'needs_profile'> => {
     const { data, error } = await supabase
       .from('customers')
       .select('*')
@@ -64,8 +64,6 @@ export function ProAuthProvider({ children }: { children: React.ReactNode }) {
           if (isExpired) {
             console.log('Pending registration data expired, removing');
             localStorage.removeItem('pendingProRegistration');
-            setCustomer(null);
-            setNeedsProfile(true);
             return 'needs_profile';
           }
           
@@ -90,80 +88,82 @@ export function ProAuthProvider({ children }: { children: React.ReactNode }) {
 
           if (insertError) {
             console.error('Error creating customer from pending data:', insertError);
-            setCustomer(null);
-            setNeedsProfile(true);
             return 'needs_profile';
           }
 
           // Successfully created customer - remove pending data
           localStorage.removeItem('pendingProRegistration');
-          setCustomer(newCustomer as ProCustomer);
-          setNeedsProfile(false);
           return newCustomer as ProCustomer;
         } catch (parseError) {
           console.error('Error parsing pending registration data:', parseError);
           localStorage.removeItem('pendingProRegistration');
-          setCustomer(null);
-          setNeedsProfile(true);
           return 'needs_profile';
         }
       }
       
       // No pending data - user needs to complete their profile
-      setCustomer(null);
-      setNeedsProfile(true);
       return 'needs_profile';
     }
 
-    setCustomer(data as ProCustomer);
-    setNeedsProfile(false);
     return data as ProCustomer;
-  }, []);
+  };
 
   const refreshCustomer = useCallback(async () => {
     if (user) {
-      await fetchCustomer(user.id, user.email || undefined);
+      const result = await fetchCustomer(user.id, user.email || undefined);
+      if (result === 'needs_profile') {
+        setCustomer(null);
+        setNeedsProfile(true);
+      } else if (result) {
+        setCustomer(result);
+        setNeedsProfile(false);
+      }
     }
-  }, [user, fetchCustomer]);
+  }, [user]);
 
   useEffect(() => {
     let mounted = true;
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!mounted) return;
-
-        setUser(session?.user ?? null);
-
-        if (session?.user) {
-          await fetchCustomer(session.user.id, session.user.email || undefined);
-        } else {
-          setCustomer(null);
-          setNeedsProfile(false);
-        }
-
-        if (mounted) setIsLoading(false);
-      }
-    );
-
-    // Check initial session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    const handleAuthChange = async (session: { user: User } | null) => {
       if (!mounted) return;
 
       setUser(session?.user ?? null);
 
       if (session?.user) {
-        await fetchCustomer(session.user.id, session.user.email || undefined);
+        const result = await fetchCustomer(session.user.id, session.user.email || undefined);
+        if (!mounted) return;
+        
+        if (result === 'needs_profile') {
+          setCustomer(null);
+          setNeedsProfile(true);
+        } else if (result) {
+          setCustomer(result);
+          setNeedsProfile(false);
+        }
+      } else {
+        setCustomer(null);
+        setNeedsProfile(false);
       }
 
       if (mounted) setIsLoading(false);
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        await handleAuthChange(session);
+      }
+    );
+
+    // Check initial session
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      await handleAuthChange(session);
     });
 
     return () => {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [fetchCustomer]);
+  }, []);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
