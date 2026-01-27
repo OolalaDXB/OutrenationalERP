@@ -51,8 +51,19 @@ import { TenantBackofficeLayout } from '@/components/tenant/TenantBackofficeLayo
 
 function TenantContent() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
+  const navigate = useNavigate();
   const { data: tenant, isLoading, error } = useTenant(tenantSlug);
-  const { loading: authLoading } = useAuth();
+  const { loading: authLoading, user } = useAuth();
+
+  // Redirect to login when user signs out
+  if (!authLoading && !user) {
+    navigate('/login', { replace: true });
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (isLoading || authLoading) {
     return (
