@@ -38,10 +38,8 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   },
 });
 
-// DEV ONLY: expose supabase only when explicitly enabled
-if (import.meta.env.DEV && import.meta.env.VITE_DEBUG_SUPABASE === "true") {
-  (window as any).supabase = supabase;
-}
+// DEBUG ONLY (to use Safari console)
+if (typeof window !== "undefined") (window as any).supabase = supabase;
 
 // Helper to check if session is valid
 export async function isSessionValid(): Promise<boolean> {
