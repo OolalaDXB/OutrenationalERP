@@ -141,7 +141,7 @@ export function InvoiceFormModal({ open, onOpenChange }: InvoiceFormModalProps) 
           tax_amount: taxAmount,
           total,
           status: "draft",
-        })
+        } as any)
         .select()
         .single();
 
@@ -158,7 +158,7 @@ export function InvoiceFormModal({ open, onOpenChange }: InvoiceFormModalProps) 
 
       const { error: itemsError } = await supabase
         .from("invoice_items")
-        .insert(invoiceItems);
+        .insert(invoiceItems as any);
 
       if (itemsError) throw itemsError;
 

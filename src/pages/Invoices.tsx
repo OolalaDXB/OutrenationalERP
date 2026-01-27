@@ -282,7 +282,7 @@ export function InvoicesPage() {
           tax_amount: invoice.tax_amount,
           total: invoice.total,
           status: "draft",
-        })
+        } as any)
         .select()
         .single();
 
@@ -299,7 +299,7 @@ export function InvoicesPage() {
 
       const { error: itemsError } = await supabase
         .from("invoice_items")
-        .insert(newItems);
+        .insert(newItems as any);
 
       if (itemsError) throw itemsError;
 

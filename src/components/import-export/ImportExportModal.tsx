@@ -316,7 +316,7 @@ export function ImportExportModal({ isOpen, onClose, entityType, data, onImportS
         const dataToInsert = rowsToInsert.map(r => transformRow(r.data));
         const { data: insertedData, error } = await supabase
           .from(entityType)
-          .insert(dataToInsert)
+          .insert(dataToInsert as any)
           .select('id');
         if (error) throw error;
         insertedCount = rowsToInsert.length;

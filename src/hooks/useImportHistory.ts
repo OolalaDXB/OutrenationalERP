@@ -107,7 +107,7 @@ export function useCreateImportHistory() {
           records_updated: recordsUpdated,
           user_id: user?.id,
           user_email: user?.email,
-        })
+        } as any)
         .select()
         .single();
 
@@ -123,7 +123,7 @@ export function useCreateImportHistory() {
 
         const { error: recordsError } = await supabase
           .from('import_created_records')
-          .insert(recordsToInsert);
+          .insert(recordsToInsert as any);
 
         if (recordsError) throw recordsError;
       }

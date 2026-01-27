@@ -189,7 +189,7 @@ export function ProRegister() {
         notes: formData.notes
           ? `Demande d'inscription: ${formData.notes}`
           : "Demande d'inscription via portail pro",
-      });
+      } as any);
 
       if (insertError) {
         console.error("Customer insert error:", insertError);

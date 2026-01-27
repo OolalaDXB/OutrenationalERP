@@ -168,7 +168,7 @@ export function InvoiceEditModal({ open, onOpenChange, invoice }: InvoiceEditMod
 
       const { error: itemsError } = await supabase
         .from("invoice_items")
-        .insert(invoiceItems);
+        .insert(invoiceItems as any);
 
       if (itemsError) throw itemsError;
 

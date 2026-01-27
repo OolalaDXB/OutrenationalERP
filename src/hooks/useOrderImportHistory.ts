@@ -64,7 +64,7 @@ export function useCreateOrderImportHistory() {
           errors: input.errors,
           user_id: user?.id || null,
           user_email: user?.email || null,
-        })
+        } as any)
         .select()
         .single();
       

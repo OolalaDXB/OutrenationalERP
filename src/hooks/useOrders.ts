@@ -4,8 +4,8 @@ import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase
 
 export type Order = Tables<'orders'>;
 export type OrderItem = Tables<'order_items'>;
-export type OrderInsert = TablesInsert<'orders'>;
-export type OrderItemInsert = TablesInsert<'order_items'>;
+export type OrderInsert = Omit<TablesInsert<'orders'>, 'tenant_id'>;
+export type OrderItemInsert = Omit<TablesInsert<'order_items'>, 'tenant_id'>;
 export type OrderUpdate = TablesUpdate<'orders'>;
 
 export interface PaginatedOrderResult {
@@ -152,7 +152,7 @@ export function useCreateOrder() {
       // Insert order first
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
-        .insert(order)
+        .insert(order as TablesInsert<'orders'>)
         .select()
         .single();
       if (orderError) {
@@ -169,7 +169,7 @@ export function useCreateOrder() {
         }));
         const { error: itemsError } = await supabase
           .from('order_items')
-          .insert(itemsWithOrderId);
+          .insert(itemsWithOrderId as TablesInsert<'order_items'>[]);
         if (itemsError) {
           console.error('Order items error:', itemsError);
           throw itemsError;
@@ -370,7 +370,7 @@ export function useUpdateOrderItems() {
       if (itemsToCreate.length > 0) {
         const { error: createError } = await supabase
           .from('order_items')
-          .insert(itemsToCreate);
+          .insert(itemsToCreate as any);
         if (createError) throw createError;
       }
 

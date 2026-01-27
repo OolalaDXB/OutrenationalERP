@@ -4,7 +4,7 @@ import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase
 import { withTimeout } from '@/lib/withTimeout';
 
 export type Supplier = Tables<'suppliers'>;
-export type SupplierInsert = TablesInsert<'suppliers'>;
+export type SupplierInsert = Omit<TablesInsert<'suppliers'>, 'tenant_id'>;
 export type SupplierUpdate = TablesUpdate<'suppliers'>;
 
 export function useSuppliers() {
@@ -76,7 +76,7 @@ export function useCreateSupplier() {
     mutationFn: async (supplier: SupplierInsert) => {
       const { data, error } = await supabase
         .from('suppliers')
-        .insert(supplier)
+        .insert(supplier as TablesInsert<'suppliers'>)
         .select()
         .single();
       if (error) throw error;

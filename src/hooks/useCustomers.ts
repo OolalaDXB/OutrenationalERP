@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
 export type Customer = Tables<'customers'>;
-export type CustomerInsert = TablesInsert<'customers'>;
+export type CustomerInsert = Omit<TablesInsert<'customers'>, 'tenant_id'>;
 export type CustomerUpdate = TablesUpdate<'customers'>;
 
 export interface PaginatedCustomerResult {
@@ -88,7 +88,7 @@ export function useCreateCustomer() {
     mutationFn: async (customer: CustomerInsert) => {
       const { data, error } = await supabase
         .from('customers')
-        .insert(customer)
+        .insert(customer as TablesInsert<'customers'>)
         .select()
         .single();
       if (error) throw error;

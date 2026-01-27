@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { TablesInsert } from '@/integrations/supabase/types';
 
-export type InvoiceInsert = TablesInsert<'invoices'>;
+export type InvoiceInsert = Omit<TablesInsert<'invoices'>, 'tenant_id'>;
 
 /**
  * Get next invoice number and increment
@@ -101,7 +101,7 @@ export function useCreateInvoiceFromOrder() {
           total,
           currency: currency || 'EUR',
           status: 'sent'
-        })
+        } as any)
         .select()
         .single();
       
@@ -147,7 +147,7 @@ export function useCreateInvoiceItems() {
       
       const { data, error } = await supabase
         .from('invoice_items')
-        .insert(invoiceItems)
+        .insert(invoiceItems as any)
         .select();
       
       if (error) throw error;

@@ -76,7 +76,7 @@ export function useCreateOrderItem() {
           image_url: imageUrl ?? null,
           consignment_rate: consignmentRate ?? null,
           status: 'active'
-        })
+        } as any)
         .select()
         .single();
 

@@ -25,7 +25,7 @@ export function useInvoiceHistory(invoiceId: string | null) {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return data as InvoiceHistoryEntry[];
+      return data as unknown as InvoiceHistoryEntry[];
     },
   });
 }
@@ -44,7 +44,7 @@ export async function addInvoiceHistory(
     changes: changes ? JSON.parse(JSON.stringify(changes)) : null,
     user_id: user?.id || null,
     user_email: userEmail || user?.email || null,
-  }]);
+  }] as any);
 
   if (error) {
     console.error("Error adding invoice history:", error);
