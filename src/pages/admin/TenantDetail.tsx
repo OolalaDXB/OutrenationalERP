@@ -20,13 +20,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import type { Json } from '@/integrations/supabase/types';
 
 interface TenantSettings {
-  plan_code?: string;
-  plan_version?: string;
-  capabilities?: Record<string, Json>;
-  capability_overrides?: Record<string, Json>;
   discount_percent?: number;
-  contact_email?: string;
-  contact_phone?: string;
   dedicated_database?: boolean;
   [key: string]: Json | undefined;
 }
@@ -36,24 +30,25 @@ interface Tenant {
   name: string;
   slug: string;
   status: string;
-  created_at: string;
+  plan_code: string | null;
+  plan_version: string | null;
+  capabilities: Record<string, Json>;
+  capability_overrides: Record<string, Json>;
   settings: TenantSettings | null;
+  created_at: string;
 }
 
-interface TenantUser {
+interface ERPUser {
   id: string;
   user_id: string;
-  role: 'admin' | 'staff' | 'viewer';
-  created_at: string;
-  is_owner: boolean;
   tenant_id: string;
-  updated_at: string;
-}
-
-interface ERPUser extends TenantUser {
+  role: 'admin' | 'staff' | 'viewer';
+  is_owner: boolean;
+  created_at: string;
   email: string;
   first_name: string;
   last_name: string;
+  is_active: boolean;
 }
 
 interface ProCustomer {
@@ -83,6 +78,7 @@ export function TenantDetail() {
   const { can } = useSillonAdmin();
   const [activeTab, setActiveTab] = useState('overview');
 
+  // Fetch tenant
   const { data: tenant, isLoading } = useQuery({
     queryKey: ['admin-tenant', tenantId],
     queryFn: async () => {
@@ -93,6 +89,7 @@ export function TenantDetail() {
     enabled: !!tenantId,
   });
 
+  // Fetch tenant users with user details from public.users table
   const { data: erpUsers, isLoading: usersLoading } = useQuery({
     queryKey: ['admin-tenant-erp-users', tenantId],
     queryFn: async () => {
@@ -104,16 +101,34 @@ export function TenantDetail() {
       
       if (!tenantUsers?.length) return [];
 
-      return tenantUsers.map((tu): ERPUser => ({
-        ...tu,
-        email: 'Email non disponible',
-        first_name: '',
-        last_name: '',
-      }));
+      const userIds = tenantUsers.map(u => u.user_id);
+      
+      // Get user details from public.users table
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('id, email, first_name, last_name, active')
+        .in('id', userIds);
+
+      return tenantUsers.map((tu): ERPUser => {
+        const userData = usersData?.find(u => u.id === tu.user_id);
+        return {
+          id: tu.id,
+          user_id: tu.user_id,
+          tenant_id: tu.tenant_id,
+          role: tu.role,
+          is_owner: tu.is_owner || false,
+          created_at: tu.created_at,
+          email: userData?.email || 'Email non disponible',
+          first_name: userData?.first_name || '',
+          last_name: userData?.last_name || '',
+          is_active: userData?.active ?? true,
+        };
+      });
     },
     enabled: !!tenantId,
   });
 
+  // Fetch pro customers (customer_type = 'wholesale')
   const { data: proCustomers } = useQuery({
     queryKey: ['admin-tenant-pro-customers', tenantId],
     queryFn: async () => {
@@ -121,7 +136,7 @@ export function TenantDetail() {
         .from('customers')
         .select('id, company_name, email, first_name, last_name, customer_type, auth_user_id, created_at')
         .eq('tenant_id', tenantId)
-        .eq('customer_type', 'pro')
+        .eq('customer_type', 'wholesale')
         .is('deleted_at', null)
         .order('created_at', { ascending: false });
       return (data || []) as ProCustomer[];
@@ -129,6 +144,7 @@ export function TenantDetail() {
     enabled: !!tenantId,
   });
 
+  // Fetch plans
   const { data: plans } = useQuery({
     queryKey: ['sillon-plans'],
     queryFn: async () => {
@@ -137,15 +153,18 @@ export function TenantDetail() {
     },
   });
 
+  // Analytics queries
   const { data: analytics } = useQuery({
     queryKey: ['admin-tenant-analytics', tenantId],
     queryFn: async () => {
+      // Products count
       const { count: productsCount } = await supabase
         .from('products')
         .select('*', { count: 'exact', head: true })
         .eq('tenant_id', tenantId)
         .is('deleted_at', null);
 
+      // Orders last 30 days
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       
@@ -160,27 +179,31 @@ export function TenantDetail() {
       const revenue30d = recentOrders?.reduce((sum, o) => sum + (Number(o.total) || 0), 0) || 0;
       const pendingOrders = recentOrders?.filter(o => o.status === 'pending').length || 0;
 
+      // Stock value (stock * purchase_price)
       const { data: stockData } = await supabase
         .from('products')
-        .select('stock, cost_price')
+        .select('stock, purchase_price')
         .eq('tenant_id', tenantId)
         .is('deleted_at', null);
       
-      const stockValue = stockData?.reduce((sum, p) => sum + ((p.stock || 0) * (Number(p.cost_price) || 0)), 0) || 0;
+      const stockValue = stockData?.reduce((sum, p) => sum + ((p.stock || 0) * (Number(p.purchase_price) || 0)), 0) || 0;
 
+      // Pro customers count (wholesale)
       const { count: proCustomersCount } = await supabase
         .from('customers')
         .select('*', { count: 'exact', head: true })
         .eq('tenant_id', tenantId)
-        .eq('customer_type', 'pro')
+        .eq('customer_type', 'wholesale')
         .is('deleted_at', null);
 
+      // Total orders count
       const { count: totalOrdersCount } = await supabase
         .from('orders')
         .select('*', { count: 'exact', head: true })
         .eq('tenant_id', tenantId)
         .is('deleted_at', null);
 
+      // Total revenue
       const { data: allOrders } = await supabase
         .from('orders')
         .select('total')
@@ -203,29 +226,30 @@ export function TenantDetail() {
     enabled: !!tenantId,
   });
 
+  // Mutations
   const assignPlanMutation = useMutation({
     mutationFn: async (planCode: string) => {
       const plan = plans?.find(p => p.code === planCode);
       if (!plan) throw new Error('Plan non trouvé');
-      const newSettings = { 
-        ...(tenant?.settings || {}), 
-        plan_code: plan.code, 
-        plan_version: plan.version, 
-        capabilities: plan.capabilities 
-      };
-      await supabase.from('tenants').update({
-        settings: newSettings
+      const { error } = await supabase.from('tenants').update({
+        plan_code: plan.code,
+        plan_version: plan.version,
+        capabilities: plan.capabilities,
+        updated_at: new Date().toISOString(),
       }).eq('id', tenantId);
+      if (error) throw error;
     },
     onSuccess: () => { 
       queryClient.invalidateQueries({ queryKey: ['admin-tenant', tenantId] }); 
       toast.success('Plan assigné'); 
     },
+    onError: () => toast.error('Erreur lors de l\'assignation du plan'),
   });
 
   const updateUserRoleMutation = useMutation({
     mutationFn: async ({ id, role }: { id: string; role: 'admin' | 'staff' | 'viewer' }) => {
-      await supabase.from('tenant_users').update({ role }).eq('id', id);
+      const { error } = await supabase.from('tenant_users').update({ role, updated_at: new Date().toISOString() }).eq('id', id);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-tenant-erp-users', tenantId] });
@@ -233,15 +257,27 @@ export function TenantDetail() {
     },
   });
 
-  if (isLoading) return <div className="p-8"><Skeleton className="h-96 w-full" /></div>;
-  if (!tenant) return <div className="p-8 text-center"><p>Tenant non trouvé</p></div>;
+  const updateTenantMutation = useMutation({
+    mutationFn: async (updates: Record<string, unknown>) => {
+      const { error } = await supabase.from('tenants').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', tenantId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-tenant', tenantId] });
+      toast.success('Tenant mis à jour');
+    },
+  });
 
-  const capabilities = tenant.settings?.capabilities || {};
-  const overrides = tenant.settings?.capability_overrides || {};
+  if (isLoading) return <div className="p-8"><Skeleton className="h-96 w-full" /></div>;
+  if (!tenant) return <div className="p-8 text-center"><p className="text-muted-foreground">Tenant non trouvé</p><Button variant="link" onClick={() => navigate('/admin/tenants')}>Retour</Button></div>;
+
+  const capabilities = tenant.capabilities || {};
+  const overrides = tenant.capability_overrides || {};
   const discount = tenant.settings?.discount_percent || 0;
 
   return (
     <div className="p-8">
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate('/admin/tenants')}><ArrowLeft className="w-4 h-4" /></Button>
@@ -263,6 +299,7 @@ export function TenantDetail() {
         </Button>
       </div>
 
+      {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-6">
           <TabsTrigger value="overview"><Building2 className="w-4 h-4 mr-2" />Aperçu</TabsTrigger>
@@ -272,6 +309,7 @@ export function TenantDetail() {
           <TabsTrigger value="settings"><Settings className="w-4 h-4 mr-2" />Paramètres</TabsTrigger>
         </TabsList>
 
+        {/* Overview Tab */}
         <TabsContent value="overview">
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-6">
             <Card>
@@ -297,8 +335,8 @@ export function TenantDetail() {
               <CardHeader><CardTitle>Informations</CardTitle></CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div><p className="text-muted-foreground">Plan</p><p className="font-medium">{tenant.settings?.plan_code || 'Aucun'}</p></div>
-                  <div><p className="text-muted-foreground">Version</p><p className="font-medium">{tenant.settings?.plan_version || '-'}</p></div>
+                  <div><p className="text-muted-foreground">Plan</p><p className="font-medium">{tenant.plan_code || 'Aucun'}</p></div>
+                  <div><p className="text-muted-foreground">Version</p><p className="font-medium">{tenant.plan_version || '-'}</p></div>
                   <div><p className="text-muted-foreground">Utilisateurs ERP</p><p className="font-medium">{erpUsers?.length || 0}</p></div>
                   <div><p className="text-muted-foreground">Clients Pro</p><p className="font-medium">{proCustomers?.length || 0}</p></div>
                 </div>
@@ -307,7 +345,7 @@ export function TenantDetail() {
             <Card>
               <CardHeader><CardTitle>Changer le plan</CardTitle></CardHeader>
               <CardContent>
-                <Select value={tenant.settings?.plan_code || ''} onValueChange={(v) => assignPlanMutation.mutate(v)} disabled={!can('canAssignPlan')}>
+                <Select value={tenant.plan_code || ''} onValueChange={(v) => assignPlanMutation.mutate(v)} disabled={!can('canAssignPlan')}>
                   <SelectTrigger><SelectValue placeholder="Sélectionner un plan" /></SelectTrigger>
                   <SelectContent>
                     {plans?.map((p) => <SelectItem key={p.code} value={p.code}>{p.name} — {p.base_price_monthly}€/mois</SelectItem>)}
@@ -318,8 +356,10 @@ export function TenantDetail() {
           </div>
         </TabsContent>
 
+        {/* Users Tab */}
         <TabsContent value="users">
           <div className="space-y-6">
+            {/* ERP Users */}
             <Card>
               <CardHeader>
                 <CardTitle>Équipe ERP</CardTitle>
@@ -332,21 +372,22 @@ export function TenantDetail() {
                       <TableHead>Utilisateur</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Rôle</TableHead>
+                      <TableHead>Owner</TableHead>
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {usersLoading ? (
-                      <TableRow><TableCell colSpan={4}><Skeleton className="h-8" /></TableCell></TableRow>
+                      <TableRow><TableCell colSpan={5}><Skeleton className="h-8" /></TableCell></TableRow>
                     ) : erpUsers?.length === 0 ? (
-                      <TableRow><TableCell colSpan={4} className="text-center py-4 text-muted-foreground">Aucun utilisateur</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={5} className="text-center py-4 text-muted-foreground">Aucun utilisateur</TableCell></TableRow>
                     ) : (
                       erpUsers?.map((user) => (
                         <TableRow key={user.id}>
                           <TableCell>
                             <div className="font-medium">
                               {user.first_name || user.last_name 
-                                ? `${user.first_name} ${user.last_name}`.trim() 
+                                ? `${user.first_name || ''} ${user.last_name || ''}`.trim() 
                                 : 'Nom non renseigné'}
                             </div>
                           </TableCell>
@@ -355,7 +396,7 @@ export function TenantDetail() {
                             <Select 
                               value={user.role} 
                               onValueChange={(r) => updateUserRoleMutation.mutate({ id: user.id, role: r as 'admin' | 'staff' | 'viewer' })}
-                              disabled={!can('canChangeUserRole')}
+                              disabled={!can('canChangeUserRole') || user.is_owner}
                             >
                               <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
                               <SelectContent>
@@ -366,6 +407,9 @@ export function TenantDetail() {
                             </Select>
                           </TableCell>
                           <TableCell>
+                            {user.is_owner && <Badge variant="outline">Owner</Badge>}
+                          </TableCell>
+                          <TableCell>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="icon"><MoreHorizontal className="w-4 h-4" /></Button>
@@ -374,7 +418,7 @@ export function TenantDetail() {
                                 <DropdownMenuItem disabled={!can('canResetPassword')}>Reset mot de passe</DropdownMenuItem>
                                 <DropdownMenuItem disabled={!can('canResendEmail')}>Renvoyer email</DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem className="text-destructive" disabled={!can('canDeleteUser')}>Supprimer</DropdownMenuItem>
+                                <DropdownMenuItem className="text-destructive" disabled={!can('canDeleteUser') || user.is_owner}>Supprimer</DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
@@ -386,9 +430,10 @@ export function TenantDetail() {
               </CardContent>
             </Card>
 
+            {/* Pro Customers (wholesale) */}
             <Card>
               <CardHeader>
-                <CardTitle>Clients Pro</CardTitle>
+                <CardTitle>Clients Pro (Wholesale)</CardTitle>
                 <CardDescription>Clients avec accès au portail B2B</CardDescription>
               </CardHeader>
               <CardContent>
@@ -431,13 +476,14 @@ export function TenantDetail() {
           </div>
         </TabsContent>
 
+        {/* Analytics Tab */}
         <TabsContent value="analytics">
           <div className="space-y-6">
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm text-muted-foreground">Produits actifs</CardTitle>
-                  <Package className="w-4 h-4 text-primary" />
+                  <Package className="w-4 h-4 text-blue-500" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold">{analytics?.productsCount || 0}</div>
@@ -447,7 +493,7 @@ export function TenantDetail() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm text-muted-foreground">Valeur stock</CardTitle>
-                  <Boxes className="w-4 h-4 text-primary" />
+                  <Boxes className="w-4 h-4 text-purple-500" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold">{(analytics?.stockValue || 0).toLocaleString('fr-FR')}€</div>
@@ -457,7 +503,7 @@ export function TenantDetail() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm text-muted-foreground">Commandes totales</CardTitle>
-                  <ShoppingCart className="w-4 h-4 text-primary" />
+                  <ShoppingCart className="w-4 h-4 text-green-500" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold">{analytics?.totalOrdersCount || 0}</div>
@@ -470,7 +516,7 @@ export function TenantDetail() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm text-muted-foreground">CA total</CardTitle>
-                  <Euro className="w-4 h-4 text-primary" />
+                  <Euro className="w-4 h-4 text-emerald-500" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold">{(analytics?.totalRevenue || 0).toLocaleString('fr-FR')}€</div>
@@ -507,7 +553,7 @@ export function TenantDetail() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <UserCheck className="w-5 h-5 text-primary" />
+                  <UserCheck className="w-5 h-5 text-blue-500" />
                   Clients Pro
                 </CardTitle>
               </CardHeader>
@@ -527,11 +573,12 @@ export function TenantDetail() {
           </div>
         </TabsContent>
 
+        {/* Capabilities Tab */}
         <TabsContent value="capabilities">
           <Card>
             <CardHeader>
               <CardTitle>Capacités</CardTitle>
-              <CardDescription>Plan: {tenant.settings?.plan_code || 'Aucun'} v{tenant.settings?.plan_version || '-'}</CardDescription>
+              <CardDescription>Plan: {tenant.plan_code || 'Aucun'} v{tenant.plan_version || '-'}</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
@@ -546,7 +593,8 @@ export function TenantDetail() {
                 <TableBody>
                   {Object.entries(capabilities).map(([key, value]) => {
                     const override = overrides[key];
-                    const effective = override !== undefined ? override : value;
+                    const hasOverride = override !== undefined;
+                    const effective = hasOverride ? override : value;
                     return (
                       <TableRow key={key}>
                         <TableCell className="font-mono text-sm">{key}</TableCell>
@@ -554,13 +602,13 @@ export function TenantDetail() {
                           {typeof value === 'boolean' ? (
                             <Badge variant={value ? 'default' : 'secondary'}>{value ? '✓' : '✗'}</Badge>
                           ) : Array.isArray(value) ? (
-                            <code className="text-xs">{JSON.stringify(value)}</code>
+                            <code className="text-xs bg-muted px-1 rounded">{value.length} items</code>
                           ) : (
-                            String(value)
+                            <span>{String(value)}</span>
                           )}
                         </TableCell>
                         <TableCell>
-                          {override !== undefined ? (
+                          {hasOverride ? (
                             <Badge variant="outline" className="text-amber-600">Override</Badge>
                           ) : '—'}
                         </TableCell>
@@ -580,6 +628,7 @@ export function TenantDetail() {
           </Card>
         </TabsContent>
 
+        {/* Settings Tab */}
         <TabsContent value="settings">
           <div className="space-y-6">
             <Card>
@@ -588,8 +637,6 @@ export function TenantDetail() {
                 <div className="grid gap-4 md:grid-cols-2">
                   <div><Label>Nom</Label><Input defaultValue={tenant.name} disabled={!can('canEditTenant')} /></div>
                   <div><Label>Slug</Label><Input value={tenant.slug} disabled /></div>
-                  <div><Label>Email contact</Label><Input defaultValue={tenant.settings?.contact_email || ''} disabled={!can('canEditTenant')} /></div>
-                  <div><Label>Téléphone</Label><Input defaultValue={tenant.settings?.contact_phone || ''} disabled={!can('canEditTenant')} /></div>
                 </div>
               </CardContent>
             </Card>
@@ -599,19 +646,53 @@ export function TenantDetail() {
               <CardContent>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
-                    <Label>Remise (%)</Label>
-                    <Input type="number" min="0" max="100" defaultValue={discount} disabled={!can('canEditTenant')} />
+                    <Label>Discount (%)</Label>
+                    <Input 
+                      type="number" 
+                      min="0" 
+                      max="100" 
+                      defaultValue={discount} 
+                      disabled={!can('canEditTenant')}
+                      onChange={(e) => {
+                        const newDiscount = parseInt(e.target.value) || 0;
+                        updateTenantMutation.mutate({
+                          settings: { ...tenant.settings, discount_percent: newDiscount }
+                        });
+                      }}
+                    />
                     <p className="text-xs text-muted-foreground mt-1">Réduction appliquée sur le prix du plan</p>
                   </div>
                   <div>
-                    <Label>Base de données dédiée</Label>
+                    <Label>Database dédiée</Label>
                     <div className="flex items-center gap-2 mt-2">
                       <Badge variant={tenant.settings?.dedicated_database ? 'default' : 'secondary'}>
                         {tenant.settings?.dedicated_database ? 'Oui' : 'Non'}
                       </Badge>
-                      <span className="text-xs text-muted-foreground">(Enterprise uniquement)</span>
+                      <span className="text-xs text-muted-foreground">(Enterprise only)</span>
                     </div>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-destructive/50">
+              <CardHeader>
+                <CardTitle className="text-destructive">Zone de danger</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div>
+                    <p className="font-medium">Suspendre le tenant</p>
+                    <p className="text-sm text-muted-foreground">Le tenant ne pourra plus accéder à la plateforme</p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    className="text-amber-600 border-amber-600"
+                    disabled={!can('canSuspendTenant') || tenant.status === 'suspended'}
+                    onClick={() => updateTenantMutation.mutate({ status: 'suspended' })}
+                  >
+                    {tenant.status === 'suspended' ? 'Déjà suspendu' : 'Suspendre'}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
