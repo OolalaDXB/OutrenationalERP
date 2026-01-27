@@ -21,19 +21,19 @@ import { toast } from 'sonner';
 import { useSillonAdmin } from '@/hooks/useSillonAdmin';
 
 const mainNavItems = [
-  { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/admin', label: 'Tableau de bord', icon: LayoutDashboard, end: true },
   { to: '/admin/tenants', label: 'Tenants', icon: Building2 },
   { to: '/admin/users', label: 'Utilisateurs', icon: Users, permission: 'canViewUsers' },
   { to: '/admin/requests', label: 'Demandes', icon: FileText },
 ];
 
 const configNavItems = [
-  { to: '/admin/plans', label: 'Plans & Pricing', icon: CreditCard, permission: 'canViewPlans' },
+  { to: '/admin/plans', label: 'Plans & Tarifs', icon: CreditCard, permission: 'canViewPlans' },
 ];
 
 const insightNavItems = [
-  { to: '/admin/analytics', label: 'Analytics', icon: BarChart3, permission: 'canViewAnalytics' },
-  { to: '/admin/audit', label: 'Audit Logs', icon: ScrollText, permission: 'canViewAuditLogs' },
+  { to: '/admin/analytics', label: 'Analytique', icon: BarChart3, permission: 'canViewAnalytics' },
+  { to: '/admin/audit', label: 'Journaux d\'audit', icon: ScrollText, permission: 'canViewAuditLogs' },
 ];
 
 const adminNavItems = [
