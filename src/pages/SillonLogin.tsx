@@ -4,9 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Disc3, ArrowLeft, Building2 } from 'lucide-react';
+import { Loader2, Disc3, ArrowLeft, Building2, Shield, Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { Moon, Sun } from 'lucide-react';
+import { isSillonAdmin } from '@/config/sillonAdmins';
 
 interface UserTenant {
   tenant_id: string;
@@ -298,7 +298,19 @@ export function SillonLogin() {
           )}
         </div>
 
-        <div className="text-center mt-4 space-y-1">
+        <div className="text-center mt-4 space-y-2">
+          {/* Admin link - only shown to admins after login or with email hint */}
+          {(userTenants.length > 0 || viewMode === 'select-tenant') && isSillonAdmin(email) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/admin')}
+              className="text-muted-foreground hover:text-primary"
+            >
+              <Shield className="w-3 h-3 mr-1" />
+              Admin Sillon
+            </Button>
+          )}
           <p className="text-xs text-muted-foreground">
             © 2026 Sillon. Powered by Oolala.
           </p>

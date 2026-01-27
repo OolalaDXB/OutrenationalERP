@@ -8,6 +8,13 @@ import { SillonLogin } from "@/pages/SillonLogin";
 import { RequestAccess } from "@/pages/RequestAccess";
 import { ResetPasswordPage } from "@/pages/ResetPassword";
 
+// Admin
+import { AdminGuard } from "@/components/admin/AdminGuard";
+import { AdminLayout } from "@/components/admin/AdminLayout";
+import { AdminDashboard } from "@/pages/admin/AdminDashboard";
+import { AdminTenants } from "@/pages/admin/AdminTenants";
+import { AdminRequests } from "@/pages/admin/AdminRequests";
+
 // Tenant router
 import { TenantRouter } from "@/components/tenant/TenantRouter";
 
@@ -58,6 +65,13 @@ function App() {
             <Route path="/login" element={<SillonLogin />} />
             <Route path="/request-access" element={<RequestAccess />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+
+            {/* ========== Admin Sillon (Platform Admin) ========== */}
+            <Route path="/admin" element={<AdminGuard><AdminLayout /></AdminGuard>}>
+              <Route index element={<AdminDashboard />} />
+              <Route path="tenants" element={<AdminTenants />} />
+              <Route path="requests" element={<AdminRequests />} />
+            </Route>
 
             {/* ========== Tenant-Scoped Routes ========== */}
             <Route path="/t/:tenantSlug/*" element={<TenantRouter />} />
