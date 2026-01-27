@@ -29,6 +29,7 @@ const mainNavItems = [
 
 const configNavItems = [
   { to: '/admin/plans', label: 'Plans & Tarifs', icon: CreditCard, permission: 'canViewPlans' },
+  { to: '/admin/billing', label: 'Billing', icon: CreditCard, permission: 'canViewPlans' },
 ];
 
 const insightNavItems = [

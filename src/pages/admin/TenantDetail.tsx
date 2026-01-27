@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { ArrowLeft, Building2, Users, Settings, Shield, Activity, ExternalLink, MoreHorizontal, Package, ShoppingCart, Euro, Boxes, UserCheck } from 'lucide-react';
+import { ArrowLeft, Building2, Users, Settings, Shield, Activity, ExternalLink, MoreHorizontal, Package, ShoppingCart, Euro, Boxes, UserCheck, CreditCard, Clock, CheckCircle2, AlertCircle, FileText, Download } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useSillonAdmin } from '@/hooks/useSillonAdmin';
@@ -94,6 +94,50 @@ export function TenantDetail() {
       const { data } = await supabase.from('sillon_plans').select('*').eq('is_active', true).order('display_order');
       return data || [];
     },
+  });
+
+  // Fetch subscription
+  const { data: subscription } = useQuery({
+    queryKey: ['admin-tenant-subscription', tenantId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('tenant_subscriptions')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!tenantId,
+  });
+
+  // Fetch invoices
+  const { data: tenantInvoices } = useQuery({
+    queryKey: ['admin-tenant-invoices', tenantId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('tenant_invoices')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .order('issue_date', { ascending: false })
+        .limit(10);
+      return data || [];
+    },
+    enabled: !!tenantId,
+  });
+
+  // Fetch payment methods
+  const { data: paymentMethods } = useQuery({
+    queryKey: ['admin-tenant-payment-methods', tenantId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('tenant_payment_methods')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .eq('is_active', true)
+        .order('is_default', { ascending: false });
+      return data || [];
+    },
+    enabled: !!tenantId,
   });
 
   // Analytics queries
@@ -251,7 +295,7 @@ export function TenantDetail() {
 
   const capabilities = tenant.capabilities || {};
   const overrides = tenant.capability_overrides || {};
-  const tenantSettings = typeof tenant.settings === 'object' && tenant.settings !== null ? (tenant.settings as Record<string, any>) : {};
+  const tenantSettings = typeof tenant.settings === 'object' && tenant.settings !== null ? tenant.settings as Record<string, any> : {};
   const discount = tenantSettings.discount_percent || 0;
 
   return (
@@ -283,6 +327,7 @@ export function TenantDetail() {
         <TabsList className="mb-6">
           <TabsTrigger value="overview"><Building2 className="w-4 h-4 mr-2" />Overview</TabsTrigger>
           <TabsTrigger value="users"><Users className="w-4 h-4 mr-2" />Utilisateurs ({(erpUsers?.length || 0) + (proCustomers?.length || 0)})</TabsTrigger>
+          <TabsTrigger value="billing"><CreditCard className="w-4 h-4 mr-2" />Billing</TabsTrigger>
           <TabsTrigger value="analytics"><Activity className="w-4 h-4 mr-2" />Analytics</TabsTrigger>
           <TabsTrigger value="capabilities"><Shield className="w-4 h-4 mr-2" />Capabilities</TabsTrigger>
           <TabsTrigger value="settings"><Settings className="w-4 h-4 mr-2" />Paramètres</TabsTrigger>
@@ -450,6 +495,161 @@ export function TenantDetail() {
                     )}
                   </TableBody>
                 </Table>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Billing Tab */}
+        <TabsContent value="billing">
+          <div className="space-y-6">
+            {/* Subscription Overview */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Abonnement</CardTitle>
+                    <CardDescription>
+                      {subscription?.status === 'trialing' && subscription?.trial_ends_at && (
+                        <span className="text-blue-600">
+                          Essai jusqu'au {format(new Date(subscription.trial_ends_at), 'dd MMM yyyy', { locale: fr })}
+                        </span>
+                      )}
+                    </CardDescription>
+                  </div>
+                  {subscription?.status && (
+                    <Badge className={
+                      subscription.status === 'active' ? 'bg-green-500 text-white' :
+                      subscription.status === 'trialing' ? 'bg-blue-500 text-white' :
+                      subscription.status === 'past_due' ? 'bg-amber-500 text-white' :
+                      'bg-gray-500 text-white'
+                    }>
+                      {subscription.status === 'active' && <CheckCircle2 className="w-3 h-3 mr-1" />}
+                      {subscription.status === 'trialing' && <Clock className="w-3 h-3 mr-1" />}
+                      {subscription.status === 'past_due' && <AlertCircle className="w-3 h-3 mr-1" />}
+                      {subscription.status}
+                    </Badge>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {subscription ? (
+                  <div className="grid gap-4 md:grid-cols-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Plan</p>
+                      <p className="font-medium">{subscription.plan_code}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Montant mensuel</p>
+                      <p className="font-medium">
+                        {subscription.monthly_total?.toLocaleString('fr-FR') || 0}€
+                        {subscription.discount_percent > 0 && (
+                          <span className="text-green-600 text-sm ml-1">(-{subscription.discount_percent}%)</span>
+                        )}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Prochaine facturation</p>
+                      <p className="font-medium">
+                        {subscription.current_period_end 
+                          ? format(new Date(subscription.current_period_end), 'dd MMM yyyy', { locale: fr })
+                          : '-'
+                        }
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Méthode de paiement</p>
+                      <p className="font-medium">
+                        {paymentMethods?.find(pm => pm.is_default)?.label || 'Non configuré'}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <CreditCard className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>Aucun abonnement configuré</p>
+                    <Button variant="outline" className="mt-4">Créer un abonnement</Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Payment Methods */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Moyens de paiement</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {paymentMethods?.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-4">Aucun moyen de paiement configuré</p>
+                ) : (
+                  <div className="space-y-2">
+                    {paymentMethods?.map(pm => (
+                      <div key={pm.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <CreditCard className="w-5 h-5 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium">{pm.label}</p>
+                            <p className="text-xs text-muted-foreground">{pm.type}</p>
+                          </div>
+                        </div>
+                        {pm.is_default && <Badge variant="outline">Par défaut</Badge>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Invoices */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Factures récentes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {tenantInvoices?.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-4">Aucune facture</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Numéro</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Montant</TableHead>
+                        <TableHead>Statut</TableHead>
+                        <TableHead></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {tenantInvoices?.map(invoice => (
+                        <TableRow key={invoice.id}>
+                          <TableCell className="font-mono text-sm">{invoice.invoice_number}</TableCell>
+                          <TableCell>{format(new Date(invoice.issue_date), 'dd/MM/yyyy')}</TableCell>
+                          <TableCell className="font-medium">{invoice.total?.toLocaleString('fr-FR')}€</TableCell>
+                          <TableCell>
+                            <Badge variant={
+                              invoice.status === 'paid' ? 'default' :
+                              invoice.status === 'pending' ? 'outline' :
+                              invoice.status === 'overdue' ? 'destructive' :
+                              'secondary'
+                            }>
+                              {invoice.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {invoice.pdf_url && (
+                              <Button variant="ghost" size="sm" asChild>
+                                <a href={invoice.pdf_url} target="_blank" rel="noopener noreferrer">
+                                  <Download className="w-4 h-4" />
+                                </a>
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
           </div>
