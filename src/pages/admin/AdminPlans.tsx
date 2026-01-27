@@ -449,7 +449,7 @@ export function AdminPlans() {
                 </ScrollArea>
               </Tabs>
 
-              <DialogFooter className="mt-4 pt-4 border-t">
+              <DialogFooter className="mt-4 pt-4 border-t gap-3">
                 <Button type="button" variant="outline" onClick={() => { setEditingPlan(null); setEditedCapabilities({}); }}>Annuler</Button>
                 <Button type="submit" disabled={updatePlanMutation.isPending}>{updatePlanMutation.isPending ? 'Enregistrement...' : 'Enregistrer'}</Button>
               </DialogFooter>
@@ -483,7 +483,7 @@ export function AdminPlans() {
                 <div className="space-y-2"><Label>Capability</Label><Input value={editingAddon.capability_key} disabled /></div>
                 <div className="flex items-center justify-between p-4 border rounded-lg"><Label>Actif</Label><Switch name="is_active" defaultChecked={editingAddon.is_active} /></div>
               </div>
-              <DialogFooter className="mt-6">
+              <DialogFooter className="mt-6 gap-3">
                 <Button type="button" variant="outline" onClick={() => setEditingAddon(null)}>Annuler</Button>
                 <Button type="submit" disabled={updateAddonMutation.isPending}>Enregistrer</Button>
               </DialogFooter>
