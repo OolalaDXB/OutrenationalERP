@@ -431,15 +431,23 @@ export function TenantDetail() {
                     {plans?.map((p) => <SelectItem key={p.code} value={p.code}>{p.name} — {p.base_price_monthly}€/mois</SelectItem>)}
                   </SelectContent>
                 </Select>
-                {selectedPlanCode && selectedPlanCode !== tenant.plan_code && (
-                  <Button 
-                    onClick={() => assignPlanMutation.mutate(selectedPlanCode)}
-                    disabled={assignPlanMutation.isPending}
-                    className="w-full"
-                  >
-                    {assignPlanMutation.isPending ? 'Enregistrement...' : 'Enregistrer le plan'}
-                  </Button>
-                )}
+                <Button 
+                  onClick={() => {
+                    const planToAssign = selectedPlanCode ?? tenant.plan_code;
+                    if (planToAssign && planToAssign !== tenant.plan_code) {
+                      assignPlanMutation.mutate(planToAssign);
+                    }
+                  }}
+                  disabled={
+                    assignPlanMutation.isPending || 
+                    !can('canAssignPlan') ||
+                    !selectedPlanCode ||
+                    selectedPlanCode === tenant.plan_code
+                  }
+                  className="w-full"
+                >
+                  {assignPlanMutation.isPending ? 'Enregistrement...' : 'Enregistrer le plan'}
+                </Button>
               </CardContent>
             </Card>
           </div>
