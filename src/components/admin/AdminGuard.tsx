@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useSillonAdmin } from '@/hooks/useSillonAdmin';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AdminGuardProps {
   children: React.ReactNode;
@@ -14,14 +15,27 @@ export function AdminGuard({ children, requiredPermission }: AdminGuardProps) {
   const { isLoading, isAdmin, can } = useSillonAdmin();
 
   useEffect(() => {
-    if (!isLoading) {
+    const run = async () => {
+      if (isLoading) return;
+
+      // If there's no session, always go to login.
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate('/login', { replace: true });
+        return;
+      }
+
       if (!isAdmin) {
-        navigate('/', { replace: true });
-      } else if (requiredPermission && !can(requiredPermission as any)) {
-        // Has admin access but not this specific permission
+        navigate('/login', { replace: true });
+        return;
+      }
+
+      if (requiredPermission && !can(requiredPermission as any)) {
         navigate('/admin', { replace: true });
       }
-    }
+    };
+
+    run();
   }, [isAdmin, isLoading, navigate, requiredPermission, can]);
 
   if (isLoading) {
