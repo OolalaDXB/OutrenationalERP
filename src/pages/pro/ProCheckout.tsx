@@ -244,7 +244,7 @@ export function ProCheckout() {
           shipping_country: customer.country,
           shipping_phone: customer.phone,
           internal_notes: `Commande Pro - Remise ${discountRate}% - ${vatInfo.label} - ${selectedCurrency}`
-        })
+        } as any)
         .select()
         .single();
 
@@ -268,7 +268,7 @@ export function ProCheckout() {
 
       const { error: itemsError } = await supabase
         .from('order_items')
-        .insert(orderItems);
+        .insert(orderItems as any);
 
       if (itemsError) throw itemsError;
 

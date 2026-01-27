@@ -4,7 +4,7 @@ import { toast } from '@/hooks/use-toast';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
 export type Label = Tables<'labels'>;
-export type LabelInsert = TablesInsert<'labels'>;
+export type LabelInsert = Omit<TablesInsert<'labels'>, 'tenant_id'>;
 export type LabelUpdate = TablesUpdate<'labels'>;
 
 export interface LabelWithSupplier extends Label {
@@ -54,7 +54,7 @@ export function useCreateLabel() {
     mutationFn: async (label: LabelInsert) => {
       const { data, error } = await supabase
         .from('labels')
-        .insert(label)
+        .insert(label as TablesInsert<'labels'>)
         .select()
         .single();
       

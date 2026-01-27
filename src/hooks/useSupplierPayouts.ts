@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
 export type SupplierPayout = Tables<'supplier_payouts'>;
-export type SupplierPayoutInsert = TablesInsert<'supplier_payouts'>;
+export type SupplierPayoutInsert = Omit<TablesInsert<'supplier_payouts'>, 'tenant_id'>;
 export type SupplierPayoutUpdate = TablesUpdate<'supplier_payouts'>;
 
 export function useSupplierPayouts() {
@@ -45,7 +45,7 @@ export function useCreateSupplierPayout() {
     mutationFn: async (payout: SupplierPayoutInsert) => {
       const { data, error } = await supabase
         .from('supplier_payouts')
-        .insert(payout)
+        .insert(payout as TablesInsert<'supplier_payouts'>)
         .select()
         .single();
       if (error) throw error;

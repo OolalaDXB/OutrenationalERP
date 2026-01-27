@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
 export type Artist = Tables<'artists'>;
-export type ArtistInsert = TablesInsert<'artists'>;
+export type ArtistInsert = Omit<TablesInsert<'artists'>, 'tenant_id'>;
 export type ArtistUpdate = TablesUpdate<'artists'>;
 
 export function useArtists() {
@@ -42,7 +42,7 @@ export function useCreateArtist() {
     mutationFn: async (artist: ArtistInsert) => {
       const { data, error } = await supabase
         .from('artists')
-        .insert(artist)
+        .insert(artist as TablesInsert<'artists'>)
         .select()
         .single();
       if (error) throw error;

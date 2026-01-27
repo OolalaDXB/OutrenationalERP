@@ -84,7 +84,7 @@ export function useSaveSupplierLabels() {
         
         const { error: insertError } = await supabase
           .from('supplier_labels')
-          .insert(inserts);
+          .insert(inserts as any);
         
         if (insertError) throw insertError;
       }

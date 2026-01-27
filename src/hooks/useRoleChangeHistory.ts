@@ -81,7 +81,7 @@ export async function logRoleChange(
       old_role: oldRole,
       new_role: newRole,
       reason: reason || null,
-    });
+    } as any);
 
   if (error) {
     console.error('Error logging role change:', error);

@@ -161,7 +161,7 @@ export function ProCompleteProfile() {
         approved: false,
         discount_rate: 0,
         payment_terms: 30,
-      });
+      } as any);
 
       if (insertError) {
         console.error("Error creating customer:", insertError);

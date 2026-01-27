@@ -7,7 +7,7 @@ export type Product = Tables<'products'> & {
   label_country?: string | null;
   label_website?: string | null;
 };
-export type ProductInsert = TablesInsert<'products'>;
+export type ProductInsert = Omit<TablesInsert<'products'>, 'tenant_id'>;
 export type ProductUpdate = TablesUpdate<'products'>;
 
 export interface PaginatedResult<T> {
@@ -153,7 +153,7 @@ export function useCreateProduct(options?: CreateProductOptions) {
     mutationFn: async (product: ProductInsert) => {
       const { data, error } = await supabase
         .from('products')
-        .insert(product)
+        .insert(product as TablesInsert<'products'>)
         .select()
         .single();
       if (error) throw error;

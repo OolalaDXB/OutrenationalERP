@@ -283,7 +283,7 @@ export function useImportOrders() {
         });
         const { data: createdCustomers, error } = await supabase
           .from('customers')
-          .insert(newCustomers)
+          .insert(newCustomers as any)
           .select('id, email');
         
         if (!error && createdCustomers) {
@@ -311,7 +311,7 @@ export function useImportOrders() {
         
         // Calculate totals
         let subtotal = 0;
-        const itemsToInsert: TablesInsert<'order_items'>[] = [];
+        const itemsToInsert: any[] = [];
         
         for (const item of orderItems) {
           const product = productMap.get(item.product_sku);
@@ -341,7 +341,7 @@ export function useImportOrders() {
         
         const customerId = customerMap.get(order.customer_email.toLowerCase());
         
-        const orderData: TablesInsert<'orders'> = {
+        const orderData: any = {
           order_number: order.order_number,
           created_at: order.order_date,
           customer_email: order.customer_email,
