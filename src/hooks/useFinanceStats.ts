@@ -26,6 +26,18 @@ export interface TopProductItem {
   total_quantity: number;
 }
 
+// View row type - not generated in types.ts
+interface OrderItemWithMarginRow {
+  margin: number | null;
+  margin_type: 'purchase' | 'consignment' | 'unknown';
+  order_date: string;
+  total_price: number;
+  product_id: string | null;
+  title: string;
+  sku: string | null;
+  quantity: number;
+}
+
 export function getDateRange(period: PeriodType, customStart?: Date, customEnd?: Date) {
   const now = new Date();
   
@@ -109,22 +121,24 @@ export function useFinanceKPIs(startDate: Date, endDate: Date, period: PeriodTyp
       if (prevError) throw prevError;
       
       // Current period margin from view
-      const { data: marginData, error: marginError } = await supabase
+      const { data: marginDataRaw, error: marginError } = await supabase
         .from('v_order_items_with_margin')
         .select('margin, margin_type, order_date, total_price')
         .gte('order_date', format(startDate, 'yyyy-MM-dd'))
         .lte('order_date', format(endDate, 'yyyy-MM-dd'));
       
       if (marginError) throw marginError;
+      const marginData = (marginDataRaw || []) as unknown as OrderItemWithMarginRow[];
       
       // Previous period margin
-      const { data: prevMarginData, error: prevMarginError } = await supabase
+      const { data: prevMarginDataRaw, error: prevMarginError } = await supabase
         .from('v_order_items_with_margin')
         .select('margin, margin_type')
         .gte('order_date', format(prevRange.start, 'yyyy-MM-dd'))
         .lte('order_date', format(prevRange.end, 'yyyy-MM-dd'));
       
       if (prevMarginError) throw prevMarginError;
+      const prevMarginData = (prevMarginDataRaw || []) as unknown as OrderItemWithMarginRow[];
       
       // Unpaid invoices (all time) - calculate from invoices table directly
       let unpaidStats = { total_count: 0, total_amount: 0, overdue_count: 0, overdue_amount: 0 };
@@ -152,15 +166,15 @@ export function useFinanceKPIs(startDate: Date, endDate: Date, period: PeriodTyp
       const invoiceCount = currentInvoices?.length || 0;
       
       // Calculate margin
-      const validMargins = marginData?.filter(m => m.margin !== null) || [];
+      const validMargins = marginData.filter(m => m.margin !== null);
       const grossMargin = validMargins.reduce((sum, m) => sum + Number(m.margin || 0), 0);
-      const unknownCostCount = marginData?.filter(m => m.margin_type === 'unknown').length || 0;
-      const totalRevenue = marginData?.reduce((sum, m) => sum + Number(m.total_price || 0), 0) || 0;
+      const unknownCostCount = marginData.filter(m => m.margin_type === 'unknown').length;
+      const totalRevenue = marginData.reduce((sum, m) => sum + Number(m.total_price || 0), 0);
       const marginPercent = totalRevenue > 0 ? (grossMargin / totalRevenue) * 100 : 0;
       
       // Previous period calculations
       const prevRevenueHT = prevInvoices?.reduce((sum, inv) => sum + Number(inv.subtotal || 0), 0) || 0;
-      const prevGrossMargin = prevMarginData?.filter(m => m.margin !== null).reduce((sum, m) => sum + Number(m.margin || 0), 0) || 0;
+      const prevGrossMargin = prevMarginData.filter(m => m.margin !== null).reduce((sum, m) => sum + Number(m.margin || 0), 0);
       
       // Change percentages
       const revenueChange = prevRevenueHT > 0 ? ((revenueHT - prevRevenueHT) / prevRevenueHT) * 100 : 0;
@@ -294,18 +308,19 @@ export function useTopProducts(startDate: Date, endDate: Date, limit = 5) {
   return useQuery({
     queryKey: ['finance', 'top-products', format(startDate, 'yyyy-MM-dd'), format(endDate, 'yyyy-MM-dd'), limit],
     queryFn: async (): Promise<TopProductItem[]> => {
-      const { data, error } = await supabase
+      const { data: rawData, error } = await supabase
         .from('v_order_items_with_margin')
         .select('product_id, title, sku, total_price, quantity')
         .gte('order_date', format(startDate, 'yyyy-MM-dd'))
         .lte('order_date', format(endDate, 'yyyy-MM-dd'));
       
       if (error) throw error;
+      const data = (rawData || []) as unknown as OrderItemWithMarginRow[];
       
       // Aggregate by product
       const byProduct: Record<string, TopProductItem> = {};
       
-      (data || []).forEach(item => {
+      data.forEach(item => {
         const key = item.product_id || item.sku || item.title;
         if (!byProduct[key]) {
           byProduct[key] = { 
@@ -332,7 +347,7 @@ export function useMarginStats(startDate: Date, endDate: Date) {
   return useQuery({
     queryKey: ['finance', 'margin-stats', format(startDate, 'yyyy-MM-dd'), format(endDate, 'yyyy-MM-dd')],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: rawData, error } = await supabase
         .from('v_order_items_with_margin')
         .select('margin, margin_type, total_price')
         .gte('order_date', format(startDate, 'yyyy-MM-dd'))
@@ -340,7 +355,7 @@ export function useMarginStats(startDate: Date, endDate: Date) {
       
       if (error) throw error;
       
-      const items = data || [];
+      const items = (rawData || []) as unknown as OrderItemWithMarginRow[];
       const purchaseItems = items.filter(i => i.margin_type === 'purchase');
       const consignmentItems = items.filter(i => i.margin_type === 'consignment');
       const unknownItems = items.filter(i => i.margin_type === 'unknown');

@@ -2,6 +2,14 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { withTimeout } from '@/lib/withTimeout';
 
+// Dashboard KPIs type - not generated in types.ts
+interface DashboardKpis {
+  revenue_30d: number;
+  orders_30d: number;
+  new_customers_30d: number;
+  low_stock_alerts: number;
+  active_suppliers: number;
+}
 
 export function useDashboardKpis() {
   return useQuery({
@@ -14,7 +22,7 @@ export function useDashboardKpis() {
           .select('*')
           .single();
         if (error) throw error;
-        return data;
+        return data as unknown as DashboardKpis;
       })();
 
       return withTimeout(request, 15000, 'Timeout lors du chargement du dashboard.');
