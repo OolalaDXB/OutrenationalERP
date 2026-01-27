@@ -77,6 +77,7 @@ export function TenantDetail() {
   const queryClient = useQueryClient();
   const { can } = useSillonAdmin();
   const [activeTab, setActiveTab] = useState('overview');
+  const [selectedPlanCode, setSelectedPlanCode] = useState<string | null>(null);
 
   // Fetch tenant
   const { data: tenant, isLoading } = useQuery({
@@ -344,13 +345,28 @@ export function TenantDetail() {
             </Card>
             <Card>
               <CardHeader><CardTitle>Changer le plan</CardTitle></CardHeader>
-              <CardContent>
-                <Select value={tenant.plan_code || ''} onValueChange={(v) => assignPlanMutation.mutate(v)} disabled={!can('canAssignPlan')}>
+              <CardContent className="space-y-4">
+                <Select 
+                  value={selectedPlanCode ?? tenant.plan_code ?? ''} 
+                  onValueChange={(v) => setSelectedPlanCode(v)}
+                >
                   <SelectTrigger><SelectValue placeholder="Sélectionner un plan" /></SelectTrigger>
                   <SelectContent>
                     {plans?.map((p) => <SelectItem key={p.code} value={p.code}>{p.name} — {p.base_price_monthly}€/mois</SelectItem>)}
                   </SelectContent>
                 </Select>
+                <Button 
+                  onClick={() => {
+                    if (selectedPlanCode) {
+                      assignPlanMutation.mutate(selectedPlanCode);
+                      setSelectedPlanCode(null);
+                    }
+                  }}
+                  disabled={!selectedPlanCode || selectedPlanCode === tenant.plan_code || assignPlanMutation.isPending}
+                  className="w-full"
+                >
+                  {assignPlanMutation.isPending ? 'Enregistrement...' : 'Enregistrer le plan'}
+                </Button>
               </CardContent>
             </Card>
           </div>
