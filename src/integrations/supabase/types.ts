@@ -3188,6 +3188,10 @@ export type Database = {
         | { Args: never; Returns: boolean }
         | { Args: { _tenant_id?: string }; Returns: boolean }
       is_viewer_or_more: { Args: never; Returns: boolean }
+      link_sillon_admin_user_id: {
+        Args: { p_email: string; p_user_id: string }
+        Returns: undefined
+      }
       log_sillon_action: {
         Args: {
           p_action: string
