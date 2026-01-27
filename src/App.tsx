@@ -5,6 +5,7 @@ import { ThemeProvider } from "next-themes";
 // Sillon pages
 import { SillonLanding } from "@/pages/SillonLanding";
 import { SillonLogin } from "@/pages/SillonLogin";
+import { RequestAccess } from "@/pages/RequestAccess";
 import { ResetPasswordPage } from "@/pages/ResetPassword";
 
 // Tenant router
@@ -55,6 +56,7 @@ function App() {
             {/* ========== Sillon Public Pages ========== */}
             <Route path="/" element={<SillonLanding />} />
             <Route path="/login" element={<SillonLogin />} />
+            <Route path="/request-access" element={<RequestAccess />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
 
             {/* ========== Tenant-Scoped Routes ========== */}

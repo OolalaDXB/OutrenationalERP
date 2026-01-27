@@ -27,14 +27,24 @@ export function SillonLanding() {
             L'ERP des distributeurs vinyle
           </p>
           
-          {/* CTA */}
-          <Button 
-            size="lg" 
-            onClick={() => navigate('/login')}
-            className="px-8 py-6 text-base font-medium shadow-md hover:shadow-lg transition-shadow"
-          >
-            Se connecter
-          </Button>
+          {/* CTAs */}
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Button 
+              size="lg" 
+              onClick={() => navigate('/login')}
+              className="px-8 py-6 text-base font-medium shadow-md hover:shadow-lg transition-shadow"
+            >
+              Se connecter
+            </Button>
+            <Button 
+              size="lg" 
+              variant="outline"
+              onClick={() => navigate('/request-access')}
+              className="px-8 py-6 text-base font-medium"
+            >
+              Demander un accès
+            </Button>
+          </div>
         </div>
       </main>
 
