@@ -2879,10 +2879,9 @@ export type Database = {
       is_authenticated: { Args: never; Returns: boolean }
       is_pro_customer: { Args: never; Returns: boolean }
       is_staff_or_admin: { Args: never; Returns: boolean }
-      is_tenant_staff_or_admin: {
-        Args: { _tenant_id?: string }
-        Returns: boolean
-      }
+      is_tenant_staff_or_admin:
+        | { Args: never; Returns: boolean }
+        | { Args: { _tenant_id?: string }; Returns: boolean }
       is_tenant_viewer_or_more:
         | { Args: never; Returns: boolean }
         | { Args: { _tenant_id?: string }; Returns: boolean }
