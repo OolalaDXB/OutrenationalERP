@@ -1878,6 +1878,224 @@ export type Database = {
           },
         ]
       }
+      sillon_addons: {
+        Row: {
+          capability_key: string
+          code: string
+          created_at: string | null
+          description: string | null
+          display_order: number | null
+          id: string
+          included_in_plans: string[] | null
+          is_active: boolean | null
+          name: string
+          price_monthly: number
+          updated_at: string | null
+        }
+        Insert: {
+          capability_key: string
+          code: string
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          included_in_plans?: string[] | null
+          is_active?: boolean | null
+          name: string
+          price_monthly: number
+          updated_at?: string | null
+        }
+        Update: {
+          capability_key?: string
+          code?: string
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          included_in_plans?: string[] | null
+          is_active?: boolean | null
+          name?: string
+          price_monthly?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      sillon_admins: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          display_name: string | null
+          email: string
+          id: string
+          is_active: boolean | null
+          last_login_at: string | null
+          role: Database["public"]["Enums"]["sillon_admin_role"]
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          display_name?: string | null
+          email: string
+          id?: string
+          is_active?: boolean | null
+          last_login_at?: string | null
+          role?: Database["public"]["Enums"]["sillon_admin_role"]
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          display_name?: string | null
+          email?: string
+          id?: string
+          is_active?: boolean | null
+          last_login_at?: string | null
+          role?: Database["public"]["Enums"]["sillon_admin_role"]
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      sillon_audit_logs: {
+        Row: {
+          action: string
+          actor_email: string
+          actor_id: string | null
+          actor_role: Database["public"]["Enums"]["sillon_admin_role"] | null
+          details: Json | null
+          id: string
+          ip_address: string | null
+          target_id: string | null
+          target_name: string | null
+          target_type: string
+          timestamp: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          actor_email: string
+          actor_id?: string | null
+          actor_role?: Database["public"]["Enums"]["sillon_admin_role"] | null
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+          target_id?: string | null
+          target_name?: string | null
+          target_type: string
+          timestamp?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          actor_email?: string
+          actor_id?: string | null
+          actor_role?: Database["public"]["Enums"]["sillon_admin_role"] | null
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+          target_id?: string | null
+          target_name?: string | null
+          target_type?: string
+          timestamp?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
+      sillon_plan_versions: {
+        Row: {
+          base_price_monthly: number
+          capabilities: Json
+          created_at: string | null
+          created_by: string | null
+          id: string
+          plan_id: string
+          version: string
+        }
+        Insert: {
+          base_price_monthly: number
+          capabilities: Json
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          plan_id: string
+          version: string
+        }
+        Update: {
+          base_price_monthly?: number
+          capabilities?: Json
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          plan_id?: string
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sillon_plan_versions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "sillon_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sillon_plans: {
+        Row: {
+          base_price_monthly: number
+          billing_type: Database["public"]["Enums"]["billing_type"]
+          capabilities: Json
+          code: string
+          created_at: string | null
+          description: string | null
+          display_order: number | null
+          id: string
+          is_active: boolean | null
+          is_public: boolean | null
+          name: string
+          updated_at: string | null
+          variable_cap: number | null
+          variable_rate: number | null
+          version: string
+        }
+        Insert: {
+          base_price_monthly: number
+          billing_type?: Database["public"]["Enums"]["billing_type"]
+          capabilities?: Json
+          code: string
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          is_public?: boolean | null
+          name: string
+          updated_at?: string | null
+          variable_cap?: number | null
+          variable_rate?: number | null
+          version?: string
+        }
+        Update: {
+          base_price_monthly?: number
+          billing_type?: Database["public"]["Enums"]["billing_type"]
+          capabilities?: Json
+          code?: string
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          is_public?: boolean | null
+          name?: string
+          updated_at?: string | null
+          variable_cap?: number | null
+          variable_rate?: number | null
+          version?: string
+        }
+        Relationships: []
+      }
       stock_movements: {
         Row: {
           created_at: string | null
@@ -2887,6 +3105,10 @@ export type Database = {
         }
         Returns: number
       }
+      create_plan_version: {
+        Args: { p_new_version?: string; p_plan_code: string }
+        Returns: string
+      }
       create_purchase_order: {
         Args: {
           p_expected_delivery_date?: string
@@ -2926,6 +3148,10 @@ export type Database = {
           status: string
         }[]
       }
+      get_sillon_admin_role: {
+        Args: { _user_id?: string }
+        Returns: Database["public"]["Enums"]["sillon_admin_role"]
+      }
       get_user_tenants: {
         Args: never
         Returns: {
@@ -2953,6 +3179,7 @@ export type Database = {
       has_tenant_access: { Args: { _tenant_id: string }; Returns: boolean }
       is_authenticated: { Args: never; Returns: boolean }
       is_pro_customer: { Args: never; Returns: boolean }
+      is_sillon_admin: { Args: { _user_id?: string }; Returns: boolean }
       is_staff_or_admin: { Args: never; Returns: boolean }
       is_tenant_staff_or_admin:
         | { Args: never; Returns: boolean }
@@ -2961,6 +3188,16 @@ export type Database = {
         | { Args: never; Returns: boolean }
         | { Args: { _tenant_id?: string }; Returns: boolean }
       is_viewer_or_more: { Args: never; Returns: boolean }
+      log_sillon_action: {
+        Args: {
+          p_action: string
+          p_details?: Json
+          p_target_id?: string
+          p_target_name?: string
+          p_target_type: string
+        }
+        Returns: string
+      }
       po_change_status: {
         Args: {
           _po_id: string
@@ -2994,6 +3231,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "staff" | "viewer"
+      billing_type: "fixed" | "variable" | "hybrid"
       invoice_status: "draft" | "sent" | "paid" | "overdue" | "cancelled"
       invoice_type: "customer" | "supplier_payout"
       order_status:
@@ -3026,6 +3264,7 @@ export type Database = {
         | "cassette"
         | "digital"
       product_status: "draft" | "published" | "archived"
+      sillon_admin_role: "super_admin" | "admin" | "staff" | "viewer"
       stock_movement_type:
         | "purchase"
         | "sale"
@@ -3166,6 +3405,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "staff", "viewer"],
+      billing_type: ["fixed", "variable", "hybrid"],
       invoice_status: ["draft", "sent", "paid", "overdue", "cancelled"],
       invoice_type: ["customer", "supplier_payout"],
       order_status: [
@@ -3201,6 +3441,7 @@ export const Constants = {
         "digital",
       ],
       product_status: ["draft", "published", "archived"],
+      sillon_admin_role: ["super_admin", "admin", "staff", "viewer"],
       stock_movement_type: [
         "purchase",
         "sale",
