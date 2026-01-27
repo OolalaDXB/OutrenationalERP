@@ -71,12 +71,103 @@ export function AdminRequests() {
     },
   });
 
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status, notes }: { id: string; status: string; notes?: string }) => {
+  // Helper to create slug from company name
+  const createSlug = (name: string): string => {
+    return name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove accents
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .substring(0, 50);
+  };
+
+  const approveMutation = useMutation({
+    mutationFn: async ({ request, notes }: { request: TenantRequest; notes?: string }) => {
+      // 1. Create the tenant
+      const slug = createSlug(request.company_name);
+      
+      const { data: tenant, error: tenantError } = await supabase
+        .from('tenants')
+        .insert({
+          name: request.company_name,
+          slug: slug,
+          status: 'active',
+          settings: {
+            plan_code: 'STARTER',
+            contact_email: request.contact_email,
+          },
+        })
+        .select('id')
+        .single();
+
+      if (tenantError) {
+        console.error('Error creating tenant:', tenantError);
+        throw new Error(`Erreur création tenant: ${tenantError.message}`);
+      }
+
+      // 2. Create settings for the tenant
+      const { error: settingsError } = await supabase
+        .from('settings')
+        .insert({
+          id: tenant.id, // settings.id = tenant.id (1:1 relationship)
+          shop_name: request.company_name,
+          shop_email: request.contact_email,
+          shop_country: request.country || 'France',
+          plan_code: 'STARTER',
+        } as any);
+
+      if (settingsError) {
+        console.error('Error creating settings:', settingsError);
+        // Rollback: delete the tenant
+        await supabase.from('tenants').delete().eq('id', tenant.id);
+        throw new Error(`Erreur création settings: ${settingsError.message}`);
+      }
+
+      // 3. Check if user exists by email
+      const { data: existingCustomer } = await supabase
+        .from('customers')
+        .select('auth_user_id')
+        .eq('email', request.contact_email)
+        .maybeSingle();
+
+      // Note: We can't create tenant_users here without auth.uid() of the user
+      // The user will need to sign up/login and be added manually or via an invite flow
+      // For now, we just update the request status
+
+      // 4. Update the request status
+      const { error: updateError } = await supabase
+        .from('tenant_requests' as any)
+        .update({
+          status: 'approved',
+          notes: notes || null,
+          reviewed_at: new Date().toISOString(),
+        } as any)
+        .eq('id', request.id);
+
+      if (updateError) throw updateError;
+
+      return { tenantId: tenant.id, slug };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-pending-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-tenants'] });
+      toast.success(`Tenant créé avec succès ! Slug: ${data.slug}`);
+      setDetailsOpen(false);
+      setSelectedRequest(null);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Erreur lors de l\'approbation');
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: async ({ id, notes }: { id: string; notes?: string }) => {
       const { error } = await supabase
         .from('tenant_requests' as any)
         .update({
-          status,
+          status: 'rejected',
           notes: notes || null,
           reviewed_at: new Date().toISOString(),
         } as any)
@@ -86,21 +177,21 @@ export function AdminRequests() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-requests'] });
       queryClient.invalidateQueries({ queryKey: ['admin-pending-requests'] });
-      toast.success('Statut mis à jour');
+      toast.success('Demande refusée');
       setDetailsOpen(false);
       setSelectedRequest(null);
     },
     onError: () => {
-      toast.error('Erreur lors de la mise à jour');
+      toast.error('Erreur lors du refus');
     },
   });
 
   const handleApprove = (request: TenantRequest) => {
-    updateStatusMutation.mutate({ id: request.id, status: 'approved', notes });
+    approveMutation.mutate({ request, notes });
   };
 
   const handleReject = (request: TenantRequest) => {
-    updateStatusMutation.mutate({ id: request.id, status: 'rejected', notes });
+    rejectMutation.mutate({ id: request.id, notes });
   };
 
   const openDetails = (request: TenantRequest) => {
@@ -345,7 +436,7 @@ export function AdminRequests() {
                 <Button
                   variant="outline"
                   onClick={() => selectedRequest && handleReject(selectedRequest)}
-                  disabled={updateStatusMutation.isPending}
+                  disabled={rejectMutation.isPending}
                   className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
                 >
                   <X className="w-4 h-4 mr-2" />
@@ -353,7 +444,7 @@ export function AdminRequests() {
                 </Button>
                 <Button
                   onClick={() => selectedRequest && handleApprove(selectedRequest)}
-                  disabled={updateStatusMutation.isPending}
+                  disabled={approveMutation.isPending}
                   className="bg-green-500 hover:bg-green-600"
                 >
                   <Check className="w-4 h-4 mr-2" />
