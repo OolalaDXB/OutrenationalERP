@@ -1,5 +1,5 @@
 import { Link, useLocation, Outlet, Navigate } from "react-router-dom";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { ShoppingCart, Package, FileText, User, LogOut, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useProAuth } from "@/hooks/useProAuth";
@@ -20,14 +20,16 @@ export function ProLayout() {
   
   // Track whether we've completed customer resolution for this session
   const [customerResolved, setCustomerResolved] = useState(false);
-  const initialCheckDone = useRef(false);
 
   // Mark customer as resolved once we have definitive data
   useEffect(() => {
     // Skip if auth still loading
-    if (isLoading) return;
+    if (isLoading) {
+      setCustomerResolved(false);
+      return;
+    }
     
-    // If user is not logged in, resolution is complete (no customer expected)
+    // If user is not logged in, resolution is complete
     if (!user) {
       setCustomerResolved(true);
       return;
@@ -39,15 +41,12 @@ export function ProLayout() {
       return;
     }
     
-    // User exists but no customer yet - wait for async fetch
-    // Only set resolved after a reasonable delay to avoid false negatives
-    if (!initialCheckDone.current) {
-      initialCheckDone.current = true;
-      const timer = setTimeout(() => {
-        setCustomerResolved(true);
-      }, 1500); // 1.5s max wait for customer resolution
-      return () => clearTimeout(timer);
-    }
+    // User exists but no customer yet - give a short grace period
+    const timer = setTimeout(() => {
+      setCustomerResolved(true);
+    }, 500);
+    
+    return () => clearTimeout(timer);
   }, [isLoading, user, customer, needsProfile]);
 
   // Show loader while auth is loading OR while customer data is being fetched
