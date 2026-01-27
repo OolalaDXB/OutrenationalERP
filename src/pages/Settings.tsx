@@ -16,6 +16,7 @@ import { MarketplaceMappingsSection } from "@/components/settings/MarketplaceMap
 import { ImportHistorySection } from "@/components/settings/ImportHistorySection";
 import { PaymentsSection } from "@/components/settings/PaymentsSection";
 import { ShippingSection } from "@/components/settings/ShippingSection";
+import { TenantBillingSettings } from "@/components/settings/TenantBillingSettings";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 export function SettingsPage() {
@@ -266,6 +267,10 @@ export function SettingsPage() {
           <TabsTrigger value="features" className="gap-2">
             <ToggleLeft className="w-4 h-4" />
             Fonctions
+          </TabsTrigger>
+          <TabsTrigger value="subscription" className="gap-2">
+            <CreditCard className="w-4 h-4" />
+            Abonnement
           </TabsTrigger>
         </TabsList>
 
@@ -695,6 +700,11 @@ Les prix de nos produits sont indiqués en euros..."
               </p>
             </div>
           </div>
+        </TabsContent>
+
+        {/* Subscription Tab */}
+        <TabsContent value="subscription">
+          <TenantBillingSettings />
         </TabsContent>
       </Tabs>
 
