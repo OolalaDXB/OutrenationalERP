@@ -170,7 +170,7 @@ Deno.serve(async (req) => {
             stripe_customer_id: stripeCustomerId,
             plan_code: 'free',
             plan_version: '2024-01',
-            status: 'incomplete',
+            status: 'trialing',
             base_price: 0,
             current_period_start: new Date().toISOString(),
             current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
