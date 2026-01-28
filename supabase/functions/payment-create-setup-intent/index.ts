@@ -1,11 +1,10 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
+// Stripe Setup Intent creation using native fetch - no SDK dependencies
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Stripe API helper using fetch (no SDK needed - avoids Deno compatibility issues)
+// Stripe API helper using fetch
 async function stripeRequest(
   endpoint: string,
   method: string,
@@ -28,6 +27,49 @@ async function stripeRequest(
   return data;
 }
 
+// Simple Supabase client using fetch
+async function supabaseQuery(
+  url: string,
+  anonKey: string,
+  authHeader: string,
+  path: string,
+  options: { method?: string; body?: unknown; params?: Record<string, string> } = {}
+) {
+  const queryString = options.params ? '?' + new URLSearchParams(options.params).toString() : '';
+  const response = await fetch(`${url}/rest/v1/${path}${queryString}`, {
+    method: options.method || 'GET',
+    headers: {
+      'Authorization': authHeader,
+      'apikey': anonKey,
+      'Content-Type': 'application/json',
+      'Prefer': options.method === 'POST' ? 'return=representation' : 'return=minimal',
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Request failed' }));
+    throw new Error(error.message || `HTTP ${response.status}`);
+  }
+  
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
+}
+
+async function getUser(url: string, anonKey: string, token: string) {
+  const response = await fetch(`${url}/auth/v1/user`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'apikey': anonKey,
+    },
+  });
+  
+  if (!response.ok) {
+    return null;
+  }
+  return response.json();
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -42,23 +84,21 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const token = authHeader.replace('Bearer ', '');
-    const { data: userData, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !userData?.user) {
+
+    // Verify user
+    const user = await getUser(supabaseUrl, supabaseAnonKey, token);
+    if (!user?.id) {
       return new Response(JSON.stringify({ error: 'Invalid token' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const userId = userData.user.id;
-    const userEmail = userData.user.email || '';
+    const userId = user.id;
+    const userEmail = user.email || '';
 
     // Get tenant_id from request body
     const { tenant_id } = await req.json();
@@ -70,14 +110,13 @@ Deno.serve(async (req) => {
     }
 
     // Verify user has access to tenant
-    const { data: tenantAccess } = await supabase
-      .from('tenant_users')
-      .select('role')
-      .eq('tenant_id', tenant_id)
-      .eq('user_id', userId)
-      .maybeSingle();
+    const tenantAccess = await supabaseQuery(
+      supabaseUrl, supabaseAnonKey, authHeader,
+      'tenant_users',
+      { params: { tenant_id: `eq.${tenant_id}`, user_id: `eq.${userId}`, select: 'role' } }
+    );
 
-    if (!tenantAccess || !['admin', 'staff'].includes(tenantAccess.role)) {
+    if (!tenantAccess?.[0] || !['admin', 'staff'].includes(tenantAccess[0].role)) {
       return new Response(JSON.stringify({ error: 'Forbidden' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -93,49 +132,54 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get or create Stripe customer for this tenant
-    const { data: subscription } = await supabase
-      .from('tenant_subscriptions')
-      .select('stripe_customer_id')
-      .eq('tenant_id', tenant_id)
-      .maybeSingle();
+    // Get existing subscription to check for Stripe customer
+    const subscriptions = await supabaseQuery(
+      supabaseUrl, supabaseAnonKey, authHeader,
+      'tenant_subscriptions',
+      { params: { tenant_id: `eq.${tenant_id}`, select: 'stripe_customer_id' } }
+    );
 
-    let stripeCustomerId = subscription?.stripe_customer_id;
+    let stripeCustomerId = subscriptions?.[0]?.stripe_customer_id;
 
     if (!stripeCustomerId) {
       // Get tenant info for customer creation
-      const { data: tenant } = await supabase
-        .from('tenants')
-        .select('name')
-        .eq('id', tenant_id)
-        .single();
+      const tenants = await supabaseQuery(
+        supabaseUrl, supabaseAnonKey, authHeader,
+        'tenants',
+        { params: { id: `eq.${tenant_id}`, select: 'name' } }
+      );
 
-      // Create Stripe customer using REST API
+      // Create Stripe customer
       const customer = await stripeRequest('/customers', 'POST', {
         email: userEmail,
-        name: tenant?.name || 'Tenant',
+        name: tenants?.[0]?.name || 'Tenant',
         'metadata[tenant_id]': tenant_id,
         'metadata[created_by]': userId,
       }, stripeKey);
       
       stripeCustomerId = customer.id;
 
-      // Store customer ID in subscription (create if not exists)
-      await supabase
-        .from('tenant_subscriptions')
-        .upsert({
-          tenant_id,
-          stripe_customer_id: stripeCustomerId,
-          plan_code: 'free',
-          plan_version: '2024-01',
-          status: 'incomplete',
-          base_price: 0,
-          current_period_start: new Date().toISOString(),
-          current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        }, { onConflict: 'tenant_id' });
+      // Store customer ID in subscription (upsert)
+      await supabaseQuery(
+        supabaseUrl, supabaseAnonKey, authHeader,
+        'tenant_subscriptions',
+        {
+          method: 'POST',
+          body: {
+            tenant_id,
+            stripe_customer_id: stripeCustomerId,
+            plan_code: 'free',
+            plan_version: '2024-01',
+            status: 'incomplete',
+            base_price: 0,
+            current_period_start: new Date().toISOString(),
+            current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          },
+        }
+      );
     }
 
-    // Create SetupIntent using REST API
+    // Create SetupIntent
     const setupIntent = await stripeRequest('/setup_intents', 'POST', {
       customer: stripeCustomerId,
       'payment_method_types[]': 'card',
