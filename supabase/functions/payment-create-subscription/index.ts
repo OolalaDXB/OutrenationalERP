@@ -243,7 +243,6 @@ Deno.serve(async (req) => {
           stripe_price_id: stripePrice.id,
           status: stripeSubscription.status === 'trialing' ? 'trialing' : 'active',
           base_price: plan.base_price_monthly,
-          monthly_total: plan.base_price_monthly,
           payment_provider: 'stripe',
           trial_ends_at: toISOSafe(stripeSubscription.trial_end),
           current_period_start: toISOSafe(stripeSubscription.current_period_start) || new Date().toISOString(),
