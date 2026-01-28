@@ -261,6 +261,7 @@ export function TenantBillingSettings() {
   const queryClient = useQueryClient();
   const [showAddPaymentMethod, setShowAddPaymentMethod] = useState(false);
   const [paymentMethodToDelete, setPaymentMethodToDelete] = useState<any>(null);
+  const [selectingPlanCode, setSelectingPlanCode] = useState<string | null>(null);
 
   // Fetch subscription
   const { data: subscription, isLoading: subscriptionLoading } = useQuery({
@@ -430,6 +431,9 @@ export function TenantBillingSettings() {
       console.error('[selectPlanMutation] Error:', error);
       toast.error(error.message || 'Erreur lors du changement de plan');
     },
+    onSettled: () => {
+      setSelectingPlanCode(null);
+    },
   });
 
   if (subscriptionLoading) {
@@ -574,10 +578,13 @@ export function TenantBillingSettings() {
                           variant="outline" 
                           className="w-full" 
                           size="sm"
-                          onClick={() => selectPlanMutation.mutate(plan.code)}
-                          disabled={selectPlanMutation.isPending}
+                          onClick={() => {
+                            setSelectingPlanCode(plan.code);
+                            selectPlanMutation.mutate(plan.code);
+                          }}
+                          disabled={selectingPlanCode !== null}
                         >
-                          {selectPlanMutation.isPending ? 'Sélection...' : 'Sélectionner'}
+                          {selectingPlanCode === plan.code ? 'Sélection...' : 'Sélectionner'}
                         </Button>
                       )}
                     </CardFooter>
