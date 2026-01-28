@@ -1,13 +1,34 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import Stripe from 'https://esm.sh/stripe@14.21.0?target=deno';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
+// Stripe API helper using fetch (no SDK needed - avoids Deno compatibility issues)
+async function stripeRequest(
+  endpoint: string,
+  method: string,
+  body: Record<string, string> | null,
+  stripeKey: string
+) {
+  const response = await fetch(`https://api.stripe.com/v1${endpoint}`, {
+    method,
+    headers: {
+      'Authorization': `Bearer ${stripeKey}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: body ? new URLSearchParams(body).toString() : undefined,
+  });
+  
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error?.message || 'Stripe API error');
+  }
+  return data;
+}
+
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -28,15 +49,15 @@ serve(async (req) => {
     );
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: claims, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsError || !claims?.claims) {
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !userData?.user) {
       return new Response(JSON.stringify({ error: 'Invalid token' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const userId = claims.claims.sub;
+    const userId = userData.user.id;
 
     const { tenant_id, plan_code, payment_method_id, trial_days = 0 } = await req.json();
     
@@ -69,8 +90,6 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    const stripe = new Stripe(stripeKey, { apiVersion: '2023-10-16' });
 
     // Get plan details from database
     const { data: plan, error: planError } = await supabase
@@ -105,46 +124,45 @@ serve(async (req) => {
 
     // Set default payment method if provided
     if (payment_method_id) {
-      await stripe.customers.update(customerId, {
-        invoice_settings: { default_payment_method: payment_method_id },
-      });
+      await stripeRequest(`/customers/${customerId}`, 'POST', {
+        'invoice_settings[default_payment_method]': payment_method_id,
+      }, stripeKey);
     }
 
-    // Create or retrieve Stripe Product for this plan
-    let stripeProduct: Stripe.Product;
-    const existingProducts = await stripe.products.search({
-      query: `metadata['plan_code']:'${plan_code}'`,
-    });
-
-    if (existingProducts.data.length > 0) {
-      stripeProduct = existingProducts.data[0];
+    // Search for existing Stripe Product
+    const productsSearch = await stripeRequest(`/products/search?query=metadata['plan_code']:'${plan_code}'`, 'GET', null, stripeKey);
+    
+    let stripeProductId: string;
+    if (productsSearch.data && productsSearch.data.length > 0) {
+      stripeProductId = productsSearch.data[0].id;
     } else {
-      stripeProduct = await stripe.products.create({
+      // Create new product
+      const newProduct = await stripeRequest('/products', 'POST', {
         name: `Sillon ${plan.name}`,
         description: plan.description || `Plan ${plan.name}`,
-        metadata: { plan_code: plan.code },
-      });
+        'metadata[plan_code]': plan.code,
+      }, stripeKey);
+      stripeProductId = newProduct.id;
     }
 
     // Create dynamic price based on sillon_plans table
     const priceAmount = Math.round(plan.base_price_monthly * 100); // Convert to cents
     
-    const stripePrice = await stripe.prices.create({
-      product: stripeProduct.id,
-      unit_amount: priceAmount,
+    const stripePrice = await stripeRequest('/prices', 'POST', {
+      product: stripeProductId,
+      unit_amount: priceAmount.toString(),
       currency: 'eur',
-      recurring: { interval: 'month' },
-      metadata: { plan_code: plan.code, plan_version: plan.version },
-    });
+      'recurring[interval]': 'month',
+      'metadata[plan_code]': plan.code,
+      'metadata[plan_version]': plan.version,
+    }, stripeKey);
 
     console.log('Created dynamic Stripe price:', stripePrice.id, 'for plan:', plan_code, 'amount:', priceAmount);
 
     // Cancel existing subscription if exists
     if (existingSub?.stripe_subscription_id) {
       try {
-        await stripe.subscriptions.cancel(existingSub.stripe_subscription_id, {
-          prorate: true,
-        });
+        await stripeRequest(`/subscriptions/${existingSub.stripe_subscription_id}`, 'DELETE', null, stripeKey);
         console.log('Cancelled existing subscription:', existingSub.stripe_subscription_id);
       } catch (err) {
         console.warn('Could not cancel existing subscription:', err);
@@ -152,19 +170,20 @@ serve(async (req) => {
     }
 
     // Create new subscription
-    const subscriptionParams: Stripe.SubscriptionCreateParams = {
+    const subscriptionParams: Record<string, string> = {
       customer: customerId,
-      items: [{ price: stripePrice.id }],
-      metadata: { tenant_id, plan_code: plan.code },
-      expand: ['latest_invoice.payment_intent'],
+      'items[0][price]': stripePrice.id,
+      'metadata[tenant_id]': tenant_id,
+      'metadata[plan_code]': plan.code,
+      'expand[]': 'latest_invoice.payment_intent',
     };
 
     // Add trial if requested
     if (trial_days > 0) {
-      subscriptionParams.trial_period_days = trial_days;
+      subscriptionParams['trial_period_days'] = trial_days.toString();
     }
 
-    const stripeSubscription = await stripe.subscriptions.create(subscriptionParams);
+    const stripeSubscription = await stripeRequest('/subscriptions', 'POST', subscriptionParams, stripeKey);
 
     console.log('Created Stripe subscription:', stripeSubscription.id, 'status:', stripeSubscription.status);
 
@@ -206,14 +225,14 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       subscription_id: stripeSubscription.id,
       status: stripeSubscription.status,
-      client_secret: (stripeSubscription.latest_invoice as any)?.payment_intent?.client_secret,
+      client_secret: stripeSubscription.latest_invoice?.payment_intent?.client_secret,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error: unknown) {
-    console.error('Error creating subscription:', error);
-    const message = error instanceof Error ? error.message : 'Internal server error';
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Internal server error';
+    console.error('Error creating subscription:', message);
     return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -1,13 +1,88 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import Stripe from 'https://esm.sh/stripe@14.21.0?target=deno';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, stripe-signature',
 };
 
-serve(async (req) => {
+// Stripe webhook signature verification using Web Crypto API
+async function verifyStripeSignature(
+  payload: string,
+  signature: string,
+  secret: string
+): Promise<boolean> {
+  const elements = signature.split(',');
+  const signatureMap: Record<string, string> = {};
+  
+  for (const element of elements) {
+    const [key, value] = element.split('=');
+    signatureMap[key] = value;
+  }
+  
+  const timestamp = signatureMap['t'];
+  const v1Signature = signatureMap['v1'];
+  
+  if (!timestamp || !v1Signature) {
+    return false;
+  }
+  
+  // Check timestamp is within tolerance (5 minutes)
+  const timestampSeconds = parseInt(timestamp, 10);
+  const now = Math.floor(Date.now() / 1000);
+  if (Math.abs(now - timestampSeconds) > 300) {
+    console.warn('Webhook timestamp too old');
+    return false;
+  }
+  
+  // Compute expected signature
+  const signedPayload = `${timestamp}.${payload}`;
+  const encoder = new TextEncoder();
+  
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  
+  const signatureBuffer = await crypto.subtle.sign(
+    'HMAC',
+    key,
+    encoder.encode(signedPayload)
+  );
+  
+  const expectedSignature = Array.from(new Uint8Array(signatureBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+  
+  return expectedSignature === v1Signature;
+}
+
+// Stripe API helper using fetch
+async function stripeRequest(
+  endpoint: string,
+  method: string,
+  body: Record<string, string> | null,
+  stripeKey: string
+) {
+  const response = await fetch(`https://api.stripe.com/v1${endpoint}`, {
+    method,
+    headers: {
+      'Authorization': `Bearer ${stripeKey}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: body ? new URLSearchParams(body).toString() : undefined,
+  });
+  
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error?.message || 'Stripe API error');
+  }
+  return data;
+}
+
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -23,7 +98,6 @@ serve(async (req) => {
     });
   }
 
-  const stripe = new Stripe(stripeKey, { apiVersion: '2023-10-16' });
   const signature = req.headers.get('stripe-signature');
 
   if (!signature) {
@@ -35,8 +109,18 @@ serve(async (req) => {
 
   try {
     const body = await req.text();
-    const event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret);
+    
+    // Verify webhook signature
+    const isValid = await verifyStripeSignature(body, signature, webhookSecret);
+    if (!isValid) {
+      console.error('Invalid webhook signature');
+      return new Response(JSON.stringify({ error: 'Invalid signature' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
+    const event = JSON.parse(body);
     console.log('Webhook received:', event.type, event.id);
 
     // Use service role for webhook operations
@@ -48,7 +132,7 @@ serve(async (req) => {
     switch (event.type) {
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
-        const subscription = event.data.object as Stripe.Subscription;
+        const subscription = event.data.object;
         const tenantId = subscription.metadata?.tenant_id;
 
         if (!tenantId) {
@@ -81,7 +165,7 @@ serve(async (req) => {
       }
 
       case 'customer.subscription.deleted': {
-        const subscription = event.data.object as Stripe.Subscription;
+        const subscription = event.data.object;
         const tenantId = subscription.metadata?.tenant_id;
 
         if (tenantId) {
@@ -100,12 +184,12 @@ serve(async (req) => {
       }
 
       case 'invoice.payment_succeeded': {
-        const invoice = event.data.object as Stripe.Invoice;
-        const subscriptionId = invoice.subscription as string;
+        const invoice = event.data.object;
+        const subscriptionId = invoice.subscription;
 
         if (subscriptionId) {
           // Get tenant_id from subscription
-          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          const subscription = await stripeRequest(`/subscriptions/${subscriptionId}`, 'GET', null, stripeKey);
           const tenantId = subscription.metadata?.tenant_id;
 
           if (tenantId) {
@@ -148,11 +232,11 @@ serve(async (req) => {
       }
 
       case 'invoice.payment_failed': {
-        const invoice = event.data.object as Stripe.Invoice;
-        const subscriptionId = invoice.subscription as string;
+        const invoice = event.data.object;
+        const subscriptionId = invoice.subscription;
 
         if (subscriptionId) {
-          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          const subscription = await stripeRequest(`/subscriptions/${subscriptionId}`, 'GET', null, stripeKey);
           const tenantId = subscription.metadata?.tenant_id;
 
           if (tenantId) {
@@ -178,9 +262,9 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error: unknown) {
-    console.error('Webhook error:', error);
-    const message = error instanceof Error ? error.message : 'Webhook processing error';
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Webhook processing error';
+    console.error('Webhook error:', message);
     return new Response(JSON.stringify({ error: message }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -188,7 +272,7 @@ serve(async (req) => {
   }
 });
 
-function mapStripeStatus(stripeStatus: Stripe.Subscription.Status): string {
+function mapStripeStatus(stripeStatus: string): string {
   const statusMap: Record<string, string> = {
     trialing: 'trialing',
     active: 'active',

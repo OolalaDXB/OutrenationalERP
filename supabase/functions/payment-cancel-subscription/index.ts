@@ -1,13 +1,34 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import Stripe from 'https://esm.sh/stripe@14.21.0?target=deno';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
+// Stripe API helper using fetch (no SDK needed - avoids Deno compatibility issues)
+async function stripeRequest(
+  endpoint: string,
+  method: string,
+  body: Record<string, string> | null,
+  stripeKey: string
+) {
+  const response = await fetch(`https://api.stripe.com/v1${endpoint}`, {
+    method,
+    headers: {
+      'Authorization': `Bearer ${stripeKey}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: body ? new URLSearchParams(body).toString() : undefined,
+  });
+  
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error?.message || 'Stripe API error');
+  }
+  return data;
+}
+
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -28,15 +49,15 @@ serve(async (req) => {
     );
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: claims, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsError || !claims?.claims) {
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !userData?.user) {
       return new Response(JSON.stringify({ error: 'Invalid token' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const userId = claims.claims.sub;
+    const userId = userData.user.id;
     const { tenant_id, cancel_at_period_end = true } = await req.json();
 
     if (!tenant_id) {
@@ -83,20 +104,16 @@ serve(async (req) => {
       });
     }
 
-    const stripe = new Stripe(stripeKey, { apiVersion: '2023-10-16' });
-
     let result;
     if (cancel_at_period_end) {
       // Cancel at end of billing period
-      result = await stripe.subscriptions.update(subscription.stripe_subscription_id, {
-        cancel_at_period_end: true,
-      });
+      result = await stripeRequest(`/subscriptions/${subscription.stripe_subscription_id}`, 'POST', {
+        cancel_at_period_end: 'true',
+      }, stripeKey);
       console.log('Subscription set to cancel at period end:', subscription.stripe_subscription_id);
     } else {
       // Cancel immediately
-      result = await stripe.subscriptions.cancel(subscription.stripe_subscription_id, {
-        prorate: true,
-      });
+      result = await stripeRequest(`/subscriptions/${subscription.stripe_subscription_id}`, 'DELETE', null, stripeKey);
       console.log('Subscription canceled immediately:', subscription.stripe_subscription_id);
     }
 
@@ -121,9 +138,9 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error: unknown) {
-    console.error('Error canceling subscription:', error);
-    const message = error instanceof Error ? error.message : 'Internal server error';
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Internal server error';
+    console.error('Error canceling subscription:', message);
     return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
