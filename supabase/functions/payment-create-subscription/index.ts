@@ -220,6 +220,16 @@ Deno.serve(async (req) => {
     const stripeSubscription = await stripeRequest('/subscriptions', 'POST', subscriptionParams, stripeKey);
     console.log('Created Stripe subscription:', stripeSubscription.id, 'status:', stripeSubscription.status);
 
+    // Helper to safely convert Unix timestamp to ISO string
+    const toISOSafe = (timestamp: number | null | undefined): string | null => {
+      if (timestamp == null || !Number.isFinite(timestamp)) return null;
+      try {
+        return new Date(timestamp * 1000).toISOString();
+      } catch {
+        return null;
+      }
+    };
+
     // Update tenant_subscriptions
     await supabaseQuery(
       supabaseUrl, supabaseAnonKey, authHeader,
@@ -235,11 +245,9 @@ Deno.serve(async (req) => {
           base_price: plan.base_price_monthly,
           monthly_total: plan.base_price_monthly,
           payment_provider: 'stripe',
-          trial_ends_at: stripeSubscription.trial_end 
-            ? new Date(stripeSubscription.trial_end * 1000).toISOString() 
-            : null,
-          current_period_start: new Date(stripeSubscription.current_period_start * 1000).toISOString(),
-          current_period_end: new Date(stripeSubscription.current_period_end * 1000).toISOString(),
+          trial_ends_at: toISOSafe(stripeSubscription.trial_end),
+          current_period_start: toISOSafe(stripeSubscription.current_period_start) || new Date().toISOString(),
+          current_period_end: toISOSafe(stripeSubscription.current_period_end) || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
           updated_at: new Date().toISOString(),
         },
       }
