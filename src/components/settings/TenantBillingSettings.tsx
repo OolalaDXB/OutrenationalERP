@@ -383,24 +383,52 @@ export function TenantBillingSettings() {
     },
   });
 
-  // Select/change plan mutation
+  // Select/change plan mutation - calls Edge Function via PaymentService
   const selectPlanMutation = useMutation({
     mutationFn: async (planCode: string) => {
-      const { data, error } = await supabase.rpc('create_tenant_subscription', {
-        p_tenant_id: tenant?.id,
-        p_plan_code: planCode,
-        p_trial_days: subscription ? 0 : 14,
+      console.log('[selectPlanMutation] Starting plan selection:', planCode, 'tenantId:', tenant?.id);
+      
+      // Get default payment method if available
+      const defaultPm = paymentMethods?.find(pm => pm.is_default);
+      console.log('[selectPlanMutation] Default payment method:', defaultPm?.stripe_payment_method_id);
+      
+      // Call the Edge Function via supabase.functions.invoke
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.access_token) {
+        throw new Error('Non authentifié');
+      }
+      
+      const { data, error } = await supabase.functions.invoke('payment-create-subscription', {
+        body: {
+          tenant_id: tenant?.id,
+          plan_code: planCode,
+          payment_method_id: defaultPm?.stripe_payment_method_id,
+          trial_days: subscription ? 0 : 14,
+        },
       });
-      if (error) throw error;
+      
+      console.log('[selectPlanMutation] Edge Function response:', { data, error });
+      
+      if (error) {
+        console.error('[selectPlanMutation] Edge Function error:', error);
+        throw new Error(error.message || 'Erreur lors de la création de l\'abonnement');
+      }
+      
+      if (data?.error) {
+        console.error('[selectPlanMutation] API error:', data.error);
+        throw new Error(data.error);
+      }
+      
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('[selectPlanMutation] Success:', data);
       queryClient.invalidateQueries({ queryKey: ['tenant-subscription', tenant?.id] });
       toast.success(subscription ? 'Plan modifié avec succès' : 'Abonnement créé avec essai de 14 jours');
     },
-    onError: (error) => {
-      console.error('Error changing plan:', error);
-      toast.error('Erreur lors du changement de plan');
+    onError: (error: Error) => {
+      console.error('[selectPlanMutation] Error:', error);
+      toast.error(error.message || 'Erreur lors du changement de plan');
     },
   });
 
