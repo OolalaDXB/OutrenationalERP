@@ -2055,6 +2055,8 @@ export type Database = {
           is_active: boolean | null
           is_public: boolean | null
           name: string
+          stripe_price_id: string | null
+          stripe_product_id: string | null
           updated_at: string | null
           variable_cap: number | null
           variable_rate: number | null
@@ -2072,6 +2074,8 @@ export type Database = {
           is_active?: boolean | null
           is_public?: boolean | null
           name: string
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
           updated_at?: string | null
           variable_cap?: number | null
           variable_rate?: number | null
@@ -2089,6 +2093,8 @@ export type Database = {
           is_active?: boolean | null
           is_public?: boolean | null
           name?: string
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
           updated_at?: string | null
           variable_cap?: number | null
           variable_rate?: number | null
