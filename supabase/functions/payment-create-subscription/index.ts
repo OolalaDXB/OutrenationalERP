@@ -124,11 +124,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get plan details
+    // Get plan details with cached Stripe IDs
     const plans = await supabaseQuery(
       supabaseUrl, supabaseAnonKey, authHeader,
       'sillon_plans',
-      { params: { code: `eq.${plan_code}`, is_active: 'eq.true', select: '*' } }
+      { params: { code: `eq.${plan_code}`, is_active: 'eq.true', select: 'id,code,name,description,base_price_monthly,version,stripe_product_id,stripe_price_id' } }
     );
 
     if (!plans?.[0]) {
@@ -156,58 +156,82 @@ Deno.serve(async (req) => {
 
     const customerId = existingSubs[0].stripe_customer_id;
 
-    // Set default payment method if provided
+    // Set default payment method if provided (parallel with Stripe setup if needed)
+    const setupPromises: Promise<unknown>[] = [];
+    
     if (payment_method_id) {
-      await stripeRequest(`/customers/${customerId}`, 'POST', {
+      setupPromises.push(stripeRequest(`/customers/${customerId}`, 'POST', {
         'invoice_settings[default_payment_method]': payment_method_id,
-      }, stripeKey);
+      }, stripeKey));
     }
 
-    // Search for existing product
-    const productsSearch = await stripeRequest(
-      `/products/search?query=metadata['plan_code']:'${plan_code}'`,
-      'GET', null, stripeKey
-    );
-    
-    let stripeProductId: string;
-    if (productsSearch.data?.length > 0) {
-      stripeProductId = productsSearch.data[0].id;
-    } else {
-      const newProduct = await stripeRequest('/products', 'POST', {
-        name: `Sillon ${plan.name}`,
-        description: plan.description || `Plan ${plan.name}`,
-        'metadata[plan_code]': plan.code,
-      }, stripeKey);
-      stripeProductId = newProduct.id;
-    }
-
-    // Search for existing active price with matching amount
+    // Use cached Stripe IDs if available, otherwise create them
+    let stripeProductId = plan.stripe_product_id;
+    let stripePriceId = plan.stripe_price_id;
     const priceAmount = Math.round(plan.base_price_monthly * 100);
-    const pricesSearch = await stripeRequest(
-      `/prices?product=${stripeProductId}&active=true&currency=eur&limit=10`,
-      'GET', null, stripeKey
-    );
-    
-    let stripePriceId: string;
-    const existingPrice = pricesSearch.data?.find(
-      (p: { unit_amount: number; recurring?: { interval: string } }) => 
-        p.unit_amount === priceAmount && p.recurring?.interval === 'month'
-    );
-    
-    if (existingPrice) {
-      stripePriceId = existingPrice.id;
-      console.log('Reusing existing Stripe price:', stripePriceId);
+    let needsCacheUpdate = false;
+
+    if (!stripeProductId || !stripePriceId) {
+      console.log('Stripe IDs not cached, creating...');
+      needsCacheUpdate = true;
+      
+      // Create or find product
+      if (!stripeProductId) {
+        const productsSearch = await stripeRequest(
+          `/products/search?query=metadata['plan_code']:'${plan_code}'`,
+          'GET', null, stripeKey
+        );
+        
+        if (productsSearch.data?.length > 0) {
+          stripeProductId = productsSearch.data[0].id;
+        } else {
+          const newProduct = await stripeRequest('/products', 'POST', {
+            name: `Sillon ${plan.name}`,
+            description: plan.description || `Plan ${plan.name}`,
+            'metadata[plan_code]': plan.code,
+          }, stripeKey);
+          stripeProductId = newProduct.id;
+        }
+      }
+
+      // Create or find price
+      if (!stripePriceId) {
+        const pricesSearch = await stripeRequest(
+          `/prices?product=${stripeProductId}&active=true&currency=eur&limit=10`,
+          'GET', null, stripeKey
+        );
+        
+        const existingPrice = pricesSearch.data?.find(
+          (p: { unit_amount: number; recurring?: { interval: string } }) => 
+            p.unit_amount === priceAmount && p.recurring?.interval === 'month'
+        );
+        
+        if (existingPrice) {
+          stripePriceId = existingPrice.id;
+        } else {
+          const newPrice = await stripeRequest('/prices', 'POST', {
+            product: stripeProductId,
+            unit_amount: priceAmount.toString(),
+            currency: 'eur',
+            'recurring[interval]': 'month',
+            'metadata[plan_code]': plan.code,
+          }, stripeKey);
+          stripePriceId = newPrice.id;
+        }
+      }
+
+      // Cache the IDs for future use (fire and forget)
+      supabaseQuery(
+        supabaseUrl, supabaseAnonKey, authHeader,
+        `sillon_plans?id=eq.${plan.id}`,
+        { method: 'PATCH', body: { stripe_product_id: stripeProductId, stripe_price_id: stripePriceId } }
+      ).catch(err => console.warn('Failed to cache Stripe IDs:', err));
     } else {
-      const newPrice = await stripeRequest('/prices', 'POST', {
-        product: stripeProductId,
-        unit_amount: priceAmount.toString(),
-        currency: 'eur',
-        'recurring[interval]': 'month',
-        'metadata[plan_code]': plan.code,
-      }, stripeKey);
-      stripePriceId = newPrice.id;
-      console.log('Created new Stripe price:', stripePriceId);
+      console.log('Using cached Stripe IDs - product:', stripeProductId, 'price:', stripePriceId);
     }
+
+    // Wait for payment method setup
+    await Promise.all(setupPromises);
 
     // Cancel existing subscription if exists
     if (existingSubs[0]?.stripe_subscription_id) {
