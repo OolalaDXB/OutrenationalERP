@@ -181,18 +181,33 @@ Deno.serve(async (req) => {
       stripeProductId = newProduct.id;
     }
 
-    // Create price
+    // Search for existing active price with matching amount
     const priceAmount = Math.round(plan.base_price_monthly * 100);
-    const stripePrice = await stripeRequest('/prices', 'POST', {
-      product: stripeProductId,
-      unit_amount: priceAmount.toString(),
-      currency: 'eur',
-      'recurring[interval]': 'month',
-      'metadata[plan_code]': plan.code,
-      'metadata[plan_version]': plan.version,
-    }, stripeKey);
-
-    console.log('Created Stripe price:', stripePrice.id, 'for plan:', plan_code);
+    const pricesSearch = await stripeRequest(
+      `/prices?product=${stripeProductId}&active=true&currency=eur&limit=10`,
+      'GET', null, stripeKey
+    );
+    
+    let stripePriceId: string;
+    const existingPrice = pricesSearch.data?.find(
+      (p: { unit_amount: number; recurring?: { interval: string } }) => 
+        p.unit_amount === priceAmount && p.recurring?.interval === 'month'
+    );
+    
+    if (existingPrice) {
+      stripePriceId = existingPrice.id;
+      console.log('Reusing existing Stripe price:', stripePriceId);
+    } else {
+      const newPrice = await stripeRequest('/prices', 'POST', {
+        product: stripeProductId,
+        unit_amount: priceAmount.toString(),
+        currency: 'eur',
+        'recurring[interval]': 'month',
+        'metadata[plan_code]': plan.code,
+      }, stripeKey);
+      stripePriceId = newPrice.id;
+      console.log('Created new Stripe price:', stripePriceId);
+    }
 
     // Cancel existing subscription if exists
     if (existingSubs[0]?.stripe_subscription_id) {
@@ -207,7 +222,7 @@ Deno.serve(async (req) => {
     // Create new subscription
     const subscriptionParams: Record<string, string> = {
       customer: customerId,
-      'items[0][price]': stripePrice.id,
+      'items[0][price]': stripePriceId,
       'metadata[tenant_id]': tenant_id,
       'metadata[plan_code]': plan.code,
       'expand[]': 'latest_invoice.payment_intent',
@@ -240,7 +255,7 @@ Deno.serve(async (req) => {
           plan_code: plan.code,
           plan_version: plan.version,
           stripe_subscription_id: stripeSubscription.id,
-          stripe_price_id: stripePrice.id,
+          stripe_price_id: stripePriceId,
           status: stripeSubscription.status === 'trialing' ? 'trialing' : 'active',
           base_price: plan.base_price_monthly,
           payment_provider: 'stripe',
