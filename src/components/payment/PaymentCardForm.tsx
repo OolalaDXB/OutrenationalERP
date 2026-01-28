@@ -77,9 +77,13 @@ function CardFormInner({
         ? setupIntent.payment_method 
         : setupIntent.payment_method.id;
 
+      const paymentService = getStripePaymentService();
+
+      // Save the payment method to database
+      await paymentService.savePaymentMethod(tenantId, paymentMethodId);
+
       // If a plan is selected, create the subscription
       if (planCode) {
-        const paymentService = getStripePaymentService();
         const result = await paymentService.createSubscription(
           tenantId,
           planCode,
