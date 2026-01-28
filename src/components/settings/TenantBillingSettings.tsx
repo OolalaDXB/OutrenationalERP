@@ -32,6 +32,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PaymentCardForm } from '@/components/payment/PaymentCardForm';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
   trialing: { label: 'Essai', color: 'bg-blue-500', icon: Clock },
@@ -163,22 +164,16 @@ function AddPaymentMethodDialog({ open, onOpenChange, tenantId, paymentMethodsCo
           </TabsList>
 
           <TabsContent value="card" className="space-y-4 pt-4">
-            <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-              <CreditCard className="w-5 h-5 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Visa, Mastercard, American Express</p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="card-label">Libellé</Label>
-              <Input 
-                id="card-label" 
-                placeholder="Ma carte principale" 
-                value={label} 
-                onChange={(e) => setLabel(e.target.value)} 
+            {tenantId && (
+              <PaymentCardForm
+                tenantId={tenantId}
+                onSuccess={() => {
+                  onSuccess();
+                  onOpenChange(false);
+                }}
+                onCancel={() => onOpenChange(false)}
               />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Note: L'intégration Stripe complète redirigera vers Stripe Checkout pour saisir les informations de carte de manière sécurisée.
-            </p>
+            )}
           </TabsContent>
 
           <TabsContent value="sepa" className="space-y-4 pt-4">
@@ -246,14 +241,16 @@ function AddPaymentMethodDialog({ open, onOpenChange, tenantId, paymentMethodsCo
           </TabsContent>
         </Tabs>
 
-        <DialogFooter className="gap-3">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Annuler
-          </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting}>
-            {isSubmitting ? 'Ajout...' : 'Ajouter'}
-          </Button>
-        </DialogFooter>
+        {activeTab !== 'card' && (
+          <DialogFooter className="gap-3">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Annuler
+            </Button>
+            <Button onClick={handleSubmit} disabled={isSubmitting}>
+              {isSubmitting ? 'Ajout...' : 'Ajouter'}
+            </Button>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );

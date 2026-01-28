@@ -17,3 +17,15 @@ verify_jwt = false
 
 [functions.ship24-tracking]
 verify_jwt = false
+
+[functions.payment-create-setup-intent]
+verify_jwt = false
+
+[functions.payment-create-subscription]
+verify_jwt = false
+
+[functions.payment-webhook]
+verify_jwt = false
+
+[functions.payment-cancel-subscription]
+verify_jwt = false
