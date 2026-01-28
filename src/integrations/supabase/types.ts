@@ -2840,10 +2840,12 @@ export type Database = {
           discount_percent: number | null
           discount_reason: string | null
           id: string
+          last_payment_at: string | null
           monthly_total: number | null
           payment_method_type:
             | Database["public"]["Enums"]["payment_method_type"]
             | null
+          payment_provider: string | null
           plan_code: string
           plan_version: string
           status: Database["public"]["Enums"]["subscription_status"]
@@ -2876,10 +2878,12 @@ export type Database = {
           discount_percent?: number | null
           discount_reason?: string | null
           id?: string
+          last_payment_at?: string | null
           monthly_total?: number | null
           payment_method_type?:
             | Database["public"]["Enums"]["payment_method_type"]
             | null
+          payment_provider?: string | null
           plan_code: string
           plan_version?: string
           status?: Database["public"]["Enums"]["subscription_status"]
@@ -2912,10 +2916,12 @@ export type Database = {
           discount_percent?: number | null
           discount_reason?: string | null
           id?: string
+          last_payment_at?: string | null
           monthly_total?: number | null
           payment_method_type?:
             | Database["public"]["Enums"]["payment_method_type"]
             | null
+          payment_provider?: string | null
           plan_code?: string
           plan_version?: string
           status?: Database["public"]["Enums"]["subscription_status"]
