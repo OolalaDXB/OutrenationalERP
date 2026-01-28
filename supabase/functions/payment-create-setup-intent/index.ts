@@ -1,13 +1,34 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import Stripe from 'https://esm.sh/stripe@14.21.0?target=deno';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
+// Stripe API helper using fetch (no SDK needed - avoids Deno compatibility issues)
+async function stripeRequest(
+  endpoint: string,
+  method: string,
+  body: Record<string, string> | null,
+  stripeKey: string
+) {
+  const response = await fetch(`https://api.stripe.com/v1${endpoint}`, {
+    method,
+    headers: {
+      'Authorization': `Bearer ${stripeKey}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: body ? new URLSearchParams(body).toString() : undefined,
+  });
+  
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error?.message || 'Stripe API error');
+  }
+  return data;
+}
+
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -28,16 +49,16 @@ serve(async (req) => {
     );
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: claims, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsError || !claims?.claims) {
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !userData?.user) {
       return new Response(JSON.stringify({ error: 'Invalid token' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const userId = claims.claims.sub;
-    const userEmail = claims.claims.email as string;
+    const userId = userData.user.id;
+    const userEmail = userData.user.email || '';
 
     // Get tenant_id from request body
     const { tenant_id } = await req.json();
@@ -72,8 +93,6 @@ serve(async (req) => {
       });
     }
 
-    const stripe = new Stripe(stripeKey, { apiVersion: '2023-10-16' });
-
     // Get or create Stripe customer for this tenant
     const { data: subscription } = await supabase
       .from('tenant_subscriptions')
@@ -91,11 +110,14 @@ serve(async (req) => {
         .eq('id', tenant_id)
         .single();
 
-      const customer = await stripe.customers.create({
+      // Create Stripe customer using REST API
+      const customer = await stripeRequest('/customers', 'POST', {
         email: userEmail,
         name: tenant?.name || 'Tenant',
-        metadata: { tenant_id, created_by: userId },
-      });
+        'metadata[tenant_id]': tenant_id,
+        'metadata[created_by]': userId,
+      }, stripeKey);
+      
       stripeCustomerId = customer.id;
 
       // Store customer ID in subscription (create if not exists)
@@ -113,12 +135,12 @@ serve(async (req) => {
         }, { onConflict: 'tenant_id' });
     }
 
-    // Create SetupIntent
-    const setupIntent = await stripe.setupIntents.create({
+    // Create SetupIntent using REST API
+    const setupIntent = await stripeRequest('/setup_intents', 'POST', {
       customer: stripeCustomerId,
-      payment_method_types: ['card'],
-      metadata: { tenant_id },
-    });
+      'payment_method_types[]': 'card',
+      'metadata[tenant_id]': tenant_id,
+    }, stripeKey);
 
     console.log('SetupIntent created:', setupIntent.id, 'for tenant:', tenant_id);
 
@@ -129,9 +151,10 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error) {
-    console.error('Error creating setup intent:', error);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Internal server error';
+    console.error('Error creating setup intent:', message);
+    return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
