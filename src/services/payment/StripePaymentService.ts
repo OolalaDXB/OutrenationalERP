@@ -34,6 +34,24 @@ export class StripePaymentService implements PaymentService {
     };
   }
 
+  async savePaymentMethod(tenantId: string, paymentMethodId: string): Promise<{ success: boolean; label?: string }> {
+    const token = await this.getAuthToken();
+    
+    const response = await supabase.functions.invoke('payment-save-method', {
+      body: { tenant_id: tenantId, payment_method_id: paymentMethodId },
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (response.error) {
+      throw new Error(response.error.message || 'Failed to save payment method');
+    }
+
+    return {
+      success: response.data.success,
+      label: response.data.label,
+    };
+  }
+
   async createSubscription(
     tenantId: string,
     planCode: string,
