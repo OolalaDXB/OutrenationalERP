@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { clearSession, supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export type AppRole = 'admin' | 'staff' | 'viewer';
@@ -79,6 +79,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     mountedRef.current = true;
 
+    const forceReLogin = async (reason?: string) => {
+      try {
+        console.warn('Forcing re-login:', reason);
+        // Clear all local auth artifacts (handles corrupted/invalid refresh token)
+        await clearSession();
+      } finally {
+        queryClient.clear();
+        setSession(null);
+        setUser(null);
+        setLoading(false);
+
+        const path = window.location.pathname;
+        // Avoid redirect loops on auth pages
+        const isAuthPage =
+          path === '/login' ||
+          path === '/request-access' ||
+          path === '/reset-password' ||
+          path.startsWith('/t/') || // tenant router will handle login redirects
+          path.startsWith('/pro');
+
+        if (!isAuthPage) {
+          window.location.replace('/login');
+        }
+      }
+    };
+
     // Set up auth state listener - this is the SINGLE source of truth
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
@@ -86,10 +112,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         console.log('Auth state change:', event, newSession?.user?.email);
 
-        // Handle token refresh failures or sign out
+        // Handle token refresh failures or corrupted sessions
+        if ((event as any) === 'TOKEN_REFRESH_FAILED') {
+          await forceReLogin('TOKEN_REFRESH_FAILED');
+          return;
+        }
+
         if (event === 'TOKEN_REFRESHED' && !newSession) {
-          console.warn('Token refresh failed, signing out');
-          await supabase.auth.signOut();
+          await forceReLogin('TOKEN_REFRESHED_WITHOUT_SESSION');
           return;
         }
 
@@ -148,14 +178,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Trigger initial session check - the listener above will handle the result
     // Only do this once
-    if (!initializedRef.current) {
+     if (!initializedRef.current) {
       initializedRef.current = true;
       supabase.auth.getSession().then(({ data: { session: initialSession }, error }) => {
         if (error) {
           console.error('Error getting initial session:', error);
-          if (mountedRef.current) {
-            setLoading(false);
-          }
+           const msg = String((error as any)?.message || error);
+           // Most common cause of "loading then nothing": invalid refresh token stuck in storage
+           if (msg.toLowerCase().includes('refresh_token_not_found') || msg.toLowerCase().includes('invalid refresh token')) {
+             void forceReLogin('INVALID_REFRESH_TOKEN');
+             return;
+           }
+           if (mountedRef.current) setLoading(false);
         }
         // If no session and listener hasn't fired yet, set loading to false
         if (!initialSession && mountedRef.current) {
