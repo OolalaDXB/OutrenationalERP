@@ -136,10 +136,11 @@ Deno.serve(async (req) => {
     const subscriptions = await supabaseQuery(
       supabaseUrl, supabaseAnonKey, authHeader,
       'tenant_subscriptions',
-      { params: { tenant_id: `eq.${tenant_id}`, select: 'stripe_customer_id' } }
+      { params: { tenant_id: `eq.${tenant_id}`, select: 'id,stripe_customer_id' } }
     );
 
-    let stripeCustomerId = subscriptions?.[0]?.stripe_customer_id;
+    const existingSubscription = subscriptions?.[0];
+    let stripeCustomerId = existingSubscription?.stripe_customer_id;
 
     if (!stripeCustomerId) {
       // Get tenant info for customer creation
@@ -159,24 +160,38 @@ Deno.serve(async (req) => {
       
       stripeCustomerId = customer.id;
 
-      // Store customer ID in subscription (upsert)
-      await supabaseQuery(
-        supabaseUrl, supabaseAnonKey, authHeader,
-        'tenant_subscriptions',
-        {
-          method: 'POST',
-          body: {
-            tenant_id,
-            stripe_customer_id: stripeCustomerId,
-            plan_code: 'free',
-            plan_version: '2024-01',
-            status: 'trialing',
-            base_price: 0,
-            current_period_start: new Date().toISOString(),
-            current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          },
-        }
-      );
+      if (existingSubscription) {
+        // UPDATE existing subscription with Stripe customer ID
+        await supabaseQuery(
+          supabaseUrl, supabaseAnonKey, authHeader,
+          `tenant_subscriptions?id=eq.${existingSubscription.id}`,
+          {
+            method: 'PATCH',
+            body: {
+              stripe_customer_id: stripeCustomerId,
+            },
+          }
+        );
+      } else {
+        // INSERT new subscription record
+        await supabaseQuery(
+          supabaseUrl, supabaseAnonKey, authHeader,
+          'tenant_subscriptions',
+          {
+            method: 'POST',
+            body: {
+              tenant_id,
+              stripe_customer_id: stripeCustomerId,
+              plan_code: 'free',
+              plan_version: '2024-01',
+              status: 'trialing',
+              base_price: 0,
+              current_period_start: new Date().toISOString(),
+              current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            },
+          }
+        );
+      }
     }
 
     // Create SetupIntent
